@@ -1,0 +1,42 @@
+-- =====================================================
+-- FILE 21: PRODUCT TRACKING DESIGN
+-- PROJECT: ERP Distribution
+-- PURPOSE: Dokumentasi aturan tracking produk
+-- TYPE: DESIGN DOCUMENTATION
+-- =====================================================
+
+-- TRACKING TYPE YANG DIIZINKAN:
+--
+-- 1. quantity
+--    Produk dikelola berdasarkan jumlah stok.
+--    Contoh: charger, kabel, casing.
+--
+-- 2. imei
+--    Produk dikelola per unit menggunakan IMEI.
+--    Satu unit dapat memiliki IMEI_1 dan IMEI_2.
+--    Contoh: smartphone dan tablet seluler.
+--
+-- 3. serial
+--    Produk dikelola per unit menggunakan serial number.
+--    Contoh: laptop, TV, smartwatch.
+--
+-- ATURAN:
+-- - Setiap produk memiliki satu tracking_type.
+-- - Produk quantity tidak wajib memiliki identifier unik.
+-- - Produk imei wajib memiliki IMEI sesuai aturan kategori.
+-- - Produk serial wajib memiliki serial number.
+-- - IMEI dan serial number harus unik.
+-- - Satu unit fisik dapat memiliki beberapa identifier.
+-- - Aksesori dapat menggunakan quantity atau serial.
+--
+-- IMPLEMENTASI BERIKUTNYA:
+-- - product_variants
+-- - product_attributes
+-- - product_units
+-- - product_unit_identifiers
+--
+-- Tidak ada perubahan database pada file ini.
+--
+-- =====================================================
+-- END OF FILE 21
+-- =====================================================

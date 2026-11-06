@@ -1,0 +1,418 @@
+
+-- ============================================================
+-- FILE 28: INVENTORY VALUATION POLICY
+-- PROJECT: ERP Distribution
+-- MODULE: INVENTORY MANAGEMENT
+-- ============================================================
+--
+-- PURPOSE
+-- Menetapkan kebijakan inventory movement, valuation,
+-- Moving Average, transfer, return, opening balance,
+-- adjustment, dan reversal.
+--
+-- VALUATION METHOD
+-- Moving Average per:
+-- 1. Product Variant
+-- 2. Warehouse
+--
+-- ============================================================
+-- 1. INVENTORY STATUS
+-- ============================================================
+--
+-- Status persediaan:
+-- available
+-- reserved
+-- quarantine
+-- damaged
+-- repair
+--
+-- Seluruh status termasuk dalam on_hand_quantity.
+--
+-- Perubahan status tidak mengubah total kuantitas fisik
+-- maupun inventory value.
+--
+-- Damaged dapat memerlukan impairment atau write-off
+-- melalui proses Finance tersendiri.
+--
+-- ============================================================
+-- 2. INVENTORY MOVEMENT LIFECYCLE
+-- ============================================================
+--
+-- Satu tabel inventory_movements menyimpan transaksi
+-- draft dan posted.
+--
+-- Lifecycle:
+-- draft -> posted
+-- draft -> cancelled
+--
+-- Ketentuan:
+-- 1. Draft belum memengaruhi saldo persediaan.
+-- 2. Draft belum menghasilkan valuation log.
+-- 3. Transaksi divalidasi sebelum posting.
+-- 4. Approval diterapkan sesuai jenis transaksi,
+--    nilai, risiko, dan kewenangan.
+-- 5. Posting dilakukan melalui controlled database function.
+-- 6. Posting harus atomic.
+-- 7. Posted movement tidak boleh diedit atau dihapus.
+-- 8. Koreksi dilakukan melalui movement kompensasi.
+--
+-- ============================================================
+-- 3. CONTROLLED POSTING
+-- ============================================================
+--
+-- Posting wajib melakukan:
+-- 1. Validasi referensi transaksi.
+-- 2. Validasi kewenangan pengguna.
+-- 3. Validasi approval jika diwajibkan.
+-- 4. Lock inventory balance terkait.
+-- 5. Validasi ketersediaan stok.
+-- 6. Validasi product unit jika serialized.
+-- 7. Hitung kuantitas dan nilai persediaan.
+-- 8. Update inventory_balances.
+-- 9. Update product_units jika diperlukan.
+-- 10. Buat inventory valuation log jika berdampak finansial.
+-- 11. Buat jurnal akuntansi jika diwajibkan.
+-- 12. Tandai movement sebagai posted.
+--
+-- Seluruh proses berada dalam satu transaksi database.
+-- Jika salah satu langkah gagal, seluruh proses rollback.
+--
+-- Tidak ada perubahan saldo melalui update langsung
+-- dari aplikasi.
+--
+-- ============================================================
+-- 4. MOVING AVERAGE FORMULA
+-- ============================================================
+--
+-- Average Unit Cost =
+-- Inventory Value / On Hand Quantity
+--
+-- Average cost disimpan dengan 6 angka desimal.
+-- Inventory value disimpan dengan 4 angka desimal.
+--
+-- Jika on_hand_quantity = 0:
+-- inventory_value = 0
+-- average_unit_cost = 0
+--
+-- Perhitungan dilakukan per warehouse dan product variant.
+--
+-- ============================================================
+-- 5. PURCHASE
+-- ============================================================
+--
+-- Purchase receipt menambah kuantitas dan nilai persediaan.
+--
+-- Inventory Value After =
+-- Inventory Value Before + Capitalizable Purchase Cost
+--
+-- Average cost dihitung ulang setelah penerimaan.
+--
+-- Biaya yang dapat dikapitalisasi dapat mencakup:
+-- - Harga pembelian
+-- - Biaya pengiriman yang dapat dialokasikan
+-- - Biaya langsung lain yang memenuhi kebijakan akuntansi
+--
+-- Pajak yang dapat dikreditkan tidak otomatis menjadi
+-- bagian dari nilai persediaan.
+--
+-- ============================================================
+-- 6. SALES
+-- ============================================================
+--
+-- Sales issue mengurangi stok berdasarkan average cost
+-- gudang pada saat posting.
+--
+-- COGS =
+-- Quantity Issued x Average Unit Cost Before Posting
+--
+-- Nilai pengeluaran tidak boleh menyebabkan saldo
+-- kuantitas atau nilai persediaan negatif.
+--
+-- ============================================================
+-- 7. INTER-WAREHOUSE TRANSFER
+-- ============================================================
+--
+-- Satu transfer terdiri dari:
+--
+-- transfer_out:
+-- - Warehouse asal
+-- - Quantity delta negatif
+--
+-- transfer_in:
+-- - Warehouse tujuan
+-- - Quantity delta positif
+--
+-- Kedua movement wajib:
+-- - Memiliki movement_group_id yang sama.
+-- - Memiliki product_variant_id yang sama.
+-- - Memiliki kuantitas absolut yang sama.
+-- - Memiliki inventory status yang konsisten.
+--
+-- Transfer diposting secara atomic.
+--
+-- Valuation:
+-- - Transfer out menggunakan average cost gudang asal.
+-- - Nilai transfer in sama dengan nilai transfer out.
+-- - Average cost gudang tujuan dihitung ulang.
+-- - Transfer tidak menghasilkan pendapatan atau beban.
+--
+-- Serialized product:
+-- - Menggunakan product_unit_id yang sama.
+-- - Unit harus tercatat di gudang asal.
+-- - Warehouse unit diperbarui ke gudang tujuan.
+-- - Status unit diperbarui melalui controlled posting.
+--
+-- MVP:
+-- Transfer diposting ketika gudang tujuan menerima barang.
+-- Tidak menggunakan workflow in_transit.
+--
+-- ============================================================
+-- 8. CUSTOMER RETURN
+-- ============================================================
+--
+-- Customer return wajib:
+-- - Mengacu pada penjualan asli.
+-- - Memvalidasi product variant.
+-- - Memvalidasi IMEI atau serial number jika serialized.
+-- - Memastikan unit memang berasal dari transaksi tersebut.
+-- - Mencatat hasil pemeriksaan gudang.
+--
+-- Barang masuk ke status quarantine.
+--
+-- Valuation:
+-- - Dinilai secara manual oleh Finance.
+-- - Memerlukan dasar penilaian yang terdokumentasi.
+-- - Memerlukan approval dari pihak berwenang.
+-- - Assessor tidak boleh menyetujui penilaiannya sendiri.
+--
+-- Posting inventory dan jurnal dilakukan secara atomic.
+--
+-- Tidak otomatis menggunakan current average cost.
+--
+-- ============================================================
+-- 9. SUPPLIER RETURN
+-- ============================================================
+--
+-- Supplier return wajib:
+-- - Mengacu pada purchase atau receipt asli.
+-- - Memvalidasi kuantitas yang tersedia.
+-- - Memvalidasi IMEI atau serial number jika serialized.
+-- - Memastikan barang dapat dikeluarkan dari stok terkait.
+--
+-- Valuation:
+-- - Dinilai secara manual oleh Finance.
+-- - Memiliki dasar penilaian terdokumentasi.
+-- - Memerlukan approval berwenang.
+-- - Assessor tidak boleh menyetujui penilaiannya sendiri.
+--
+-- Pengeluaran stok dan jurnal dilakukan secara atomic.
+--
+-- ============================================================
+-- 10. OPENING BALANCE
+-- ============================================================
+--
+-- Opening balance harus berdasarkan stock opname.
+--
+-- Kuantitas dapat dibagi ke dalam:
+-- - available
+-- - reserved
+-- - quarantine
+-- - damaged
+-- - repair
+--
+-- Serialized product dicatat per unit.
+--
+-- Valuation:
+-- - Menggunakan historical acquisition cost.
+-- - Menggunakan dokumen pembelian sebagai dasar.
+-- - Finance memvalidasi nilai pembukaan.
+-- - Jika dokumen tidak tersedia, Finance dapat menetapkan
+--   nilai pengecualian dengan dasar terdokumentasi.
+--
+-- Opening balance harus memiliki referensi dokumen
+-- dan jurnal pembukaan yang sesuai.
+--
+-- ============================================================
+-- 11. INVENTORY ADJUSTMENT
+-- ============================================================
+--
+-- Adjustment wajib memiliki:
+-- - Alasan koreksi.
+-- - Referensi dokumen.
+-- - Kuantitas sebelum dan sesudah.
+-- - Dasar valuasi.
+-- - Pembuat transaksi.
+-- - Approval sesuai kewenangan.
+--
+-- Adjustment tidak boleh digunakan untuk menghindari
+-- proses return atau reversal yang diwajibkan.
+--
+-- ============================================================
+-- 12. STATUS CHANGE
+-- ============================================================
+--
+-- Status change hanya memindahkan kuantitas antar bucket.
+--
+-- Contoh:
+-- available -> quarantine
+-- quarantine -> repair
+-- repair -> available
+--
+-- Total on_hand_quantity tidak berubah.
+-- Inventory value tidak berubah.
+-- Average unit cost tidak berubah.
+--
+-- Tidak menghasilkan financial valuation log.
+--
+-- Tetap menghasilkan movement dan audit trail operasional.
+--
+-- Untuk serialized product, product_units harus diperbarui
+-- secara atomic bersama inventory_balances.
+--
+-- ============================================================
+-- 13. SERIALIZED INVENTORY
+-- ============================================================
+--
+-- Tracking type:
+-- - quantity
+-- - imei
+-- - serial
+--
+-- Tracking IMEI:
+-- - IMEI_1 wajib.
+-- - IMEI_2 opsional.
+--
+-- Tracking serial:
+-- - SERIAL_NUMBER wajib.
+--
+-- Serialized product wajib memiliki product_unit_id
+-- untuk setiap unit fisik.
+--
+-- Quantity movement harus konsisten dengan jumlah
+-- product_unit_id yang diproses.
+--
+-- Quantity-tracked product tidak menggunakan
+-- product_units sebagai sumber kuantitas.
+--
+-- ============================================================
+-- 14. FULL AND PARTIAL REVERSAL
+-- ============================================================
+--
+-- Reversal menggunakan movement kompensasi.
+--
+-- Ketentuan:
+-- 1. Movement asli tetap immutable.
+-- 2. Reversal menggunakan movement baru.
+-- 3. reversal_of_id mengacu movement asli.
+-- 4. Transaction type sama dengan movement asli.
+-- 5. Quantity delta berlawanan tanda.
+-- 6. Full dan partial reversal diperbolehkan.
+-- 7. Beberapa partial reversal diperbolehkan.
+-- 8. Total reversal tidak boleh melebihi kuantitas asli.
+-- 9. Reversal of reversal dilarang.
+-- 10. Validasi dilakukan dengan row locking.
+--
+-- Untuk serialized product:
+-- - Reversal dilakukan berdasarkan product_unit_id.
+-- - Unit harus memenuhi validasi lokasi dan status.
+--
+-- Untuk transfer:
+-- - Kedua movement reversal diproses bersama.
+-- - Keduanya harus berhasil atau seluruhnya rollback.
+--
+-- Valuation reversal:
+-- - Mengacu histori valuation movement asli.
+-- - Tidak otomatis menggunakan average cost saat ini.
+-- - Tidak boleh menghasilkan saldo negatif.
+--
+-- Customer return dan supplier return tetap mengikuti
+-- prosedur pemeriksaan dan penilaian masing-masing.
+-- Generic reversal tidak boleh melewati kontrol return.
+--
+-- ============================================================
+-- 15. INVENTORY VALUATION LOG
+-- ============================================================
+--
+-- Setiap movement yang mengubah kuantitas atau nilai
+-- persediaan menghasilkan valuation log.
+--
+-- Status change tidak menghasilkan valuation log.
+--
+-- Valuation log mencatat:
+-- - Quantity before / after / delta
+-- - Value before / after / delta
+-- - Average cost before / after
+-- - Movement reference
+-- - User dan timestamp
+--
+-- Valuation log bersifat append-only.
+--
+-- ============================================================
+-- 16. INVENTORY BALANCE CONTROL
+-- ============================================================
+--
+-- inventory_balances merupakan sumber saldo terkini.
+--
+-- Satu saldo per:
+-- product_variant_id + warehouse_id
+--
+-- Total on_hand_quantity harus sama dengan:
+-- available + reserved + quarantine + damaged + repair
+--
+-- Saldo tidak boleh negatif.
+--
+-- Update hanya melalui controlled posting function.
+--
+-- Perubahan saldo dan valuation log harus atomic.
+--
+-- ============================================================
+-- 17. ACCOUNTING INTEGRATION
+-- ============================================================
+--
+-- Inventory transaction yang berdampak finansial
+-- menghasilkan jurnal double-entry sesuai jenis transaksi.
+--
+-- Contoh:
+--
+-- Purchase:
+-- Debit Inventory
+-- Credit AP / Cash
+--
+-- Sale:
+-- Debit COGS
+-- Credit Inventory
+--
+-- Transfer:
+-- Tidak menghasilkan pendapatan atau beban.
+--
+-- Return:
+-- Mengikuti hasil penilaian dan kebijakan akuntansi.
+--
+-- Jurnal harus balance sebelum posting selesai.
+--
+-- Inventory movement, valuation log, inventory balance,
+-- dan jurnal terkait harus atomic.
+--
+-- ============================================================
+-- 18. SECURITY AND SEGREGATION OF DUTIES
+-- ============================================================
+--
+-- Pengamanan:
+-- - RLS aktif.
+-- - RBAC berdasarkan permission.
+-- - Tidak ada akses perubahan saldo langsung.
+-- - Posting melalui controlled database function.
+-- - Posted movement immutable.
+-- - Valuation log append-only.
+--
+-- Pemisahan tugas:
+-- - Warehouse: pencatatan dan pemeriksaan barang.
+-- - Finance: penilaian transaksi yang memerlukan valuasi.
+-- - Approver: persetujuan sesuai kewenangan.
+-- - Posting: controlled database function.
+--
+-- Assessor tidak boleh menyetujui penilaiannya sendiri.
+--
+-- ============================================================
+-- END OF FILE 28
+-- ============================================================

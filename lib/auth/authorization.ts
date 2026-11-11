@@ -1,3 +1,4 @@
+
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthorizationContext = {
@@ -18,7 +19,6 @@ export async function getAuthorizationContext(
 ): Promise<AuthorizationContext> {
   const supabase = await createClient();
 
-  // 1. Verifikasi sesi pengguna.
   const {
     data: { user },
     error: authError,
@@ -33,7 +33,6 @@ export async function getAuthorizationContext(
     };
   }
 
-  // 2. Verifikasi profil dan status aktif.
   const {
     data: profile,
     error: profileError,
@@ -55,7 +54,6 @@ export async function getAuthorizationContext(
     };
   }
 
-  // 3. Verifikasi permission melalui fungsi database.
   const {
     data: hasPermission,
     error: permissionError,

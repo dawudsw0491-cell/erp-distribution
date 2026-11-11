@@ -27,6 +27,7 @@ DECLARE
     v_tracking_type VARCHAR(30);
 
     v_balance RECORD;
+    v_balance_status_quantity NUMERIC(18,3);
 
     v_original_quantity NUMERIC(18,3);
     v_reversal_quantity NUMERIC(18,3);
@@ -46,6 +47,7 @@ DECLARE
 
     v_average_before NUMERIC(20,6);
     v_average_after NUMERIC(20,6);
+
 BEGIN
 
     -- ========================================================
@@ -328,25 +330,31 @@ BEGIN
     v_average_before := v_balance.average_unit_cost;
 
 
-    -- ========================================================
-    -- 10. VALIDATE AVAILABLE STATUS BUCKET
-    -- ========================================================
+   -- ========================================================
+-- 10. VALIDATE AVAILABLE STATUS BUCKET
+-- ========================================================
 
-    IF CASE v_original.inventory_status
-        WHEN 'available' THEN v_balance.available_quantity
-        WHEN 'reserved' THEN v_balance.reserved_quantity
-        WHEN 'quarantine' THEN v_balance.quarantine_quantity
-        WHEN 'damaged' THEN v_balance.damaged_quantity
-        WHEN 'repair' THEN v_balance.repair_quantity
-        ELSE 0
-    END < v_reversal_quantity
-    AND v_reversal.quantity_delta < 0
-    THEN
-        RAISE EXCEPTION
-            'Saldo status inventory tidak mencukupi untuk reversal.';
-    END IF;
+v_balance_status_quantity := CASE v_original.inventory_status
+    WHEN 'available' THEN v_balance.available_quantity
+    WHEN 'reserved' THEN v_balance.reserved_quantity
+    WHEN 'quarantine' THEN v_balance.quarantine_quantity
+    WHEN 'damaged' THEN v_balance.damaged_quantity
+    WHEN 'repair' THEN v_balance.repair_quantity
+    ELSE NULL
+END;
 
+IF v_balance_status_quantity IS NULL THEN
+    RAISE EXCEPTION
+        'Status inventory tidak valid: %',
+        v_original.inventory_status;
+END IF;
 
+IF v_reversal.quantity_delta < 0
+   AND v_balance_status_quantity < v_reversal_quantity
+THEN
+    RAISE EXCEPTION
+        'Saldo status inventory tidak mencukupi untuk reversal.';
+END IF;
     -- ========================================================
     -- 11. CALCULATE NEW BALANCE
     -- ========================================================

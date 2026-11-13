@@ -14,14 +14,17 @@ const UUID_REGEX =
 
 const CODE_REGEX = /^[A-Z0-9_-]+$/;
 
-function getFormValue(formData: FormData, field: string) {
+function getFormValue(formData: FormData, field: string): string {
   return String(formData.get(field) ?? "").trim();
 }
 
-function normalizeCode(value: string) {
+function normalizeCode(value: string): string {
   return value.toUpperCase();
 }
 
+/**
+ * CREATE PRODUCT ATTRIBUTE VALUE
+ */
 export async function createProductAttributeValue(
   _prevState: AttributeValueActionState,
   formData: FormData
@@ -120,7 +123,9 @@ export async function createProductAttributeValue(
       };
     }
 
-    return { error: `Gagal menyimpan data: ${insertError.message}` };
+    return {
+      error: `Gagal menyimpan data: ${insertError.message}`,
+    };
   }
 
   revalidatePath("/product-attribute-values");
@@ -128,6 +133,9 @@ export async function createProductAttributeValue(
   redirect(`/product-attribute-values/${inserted.id}?success=created`);
 }
 
+/**
+ * UPDATE PRODUCT ATTRIBUTE VALUE
+ */
 export async function updateProductAttributeValue(
   formData: FormData
 ): Promise<void> {
@@ -148,28 +156,28 @@ export async function updateProductAttributeValue(
   }
 
   if (!UUID_REGEX.test(attributeId)) {
-    fail("Parent Attribute tidak valid.");
+    return fail("Parent Attribute tidak valid.");
   }
 
   if (!valueCode || !CODE_REGEX.test(valueCode) || valueCode.length > 50) {
-    fail(
+    return fail(
       "Value Code wajib diisi dan hanya boleh berisi huruf, angka, - atau _."
     );
   }
 
   if (!valueName || valueName.length > 100) {
-    fail("Value Name wajib diisi dan maksimal 100 karakter.");
+    return fail("Value Name wajib diisi dan maksimal 100 karakter.");
   }
 
   if (description.length > 1000) {
-    fail("Description maksimal 1000 karakter.");
+    return fail("Description maksimal 1000 karakter.");
   }
 
   const { supabase, authorized } =
     await getAuthorizationContext("master.update");
 
   if (!authorized) {
-    fail("Anda tidak memiliki izin mengubah Attribute Value.");
+    return fail("Anda tidak memiliki izin mengubah Attribute Value.");
   }
 
   const { data: existing, error: existingError } = await supabase
@@ -179,19 +187,11 @@ export async function updateProductAttributeValue(
     .maybeSingle();
 
   if (existingError) {
-    redirect(
-      `/product-attribute-values/${id}/edit?error=${encodeURIComponent(
-        `Gagal mengambil data: ${existingError.message}`
-      )}`
-    );
+    return fail(`Gagal mengambil data: ${existingError.message}`);
   }
 
-  if (!existing) {
-    redirect(
-      `/product-attribute-values/${id}/edit?error=${encodeURIComponent(
-        "Attribute Value tidak ditemukan."
-      )}`
-    );
+  if (existing === null) {
+    return fail("Attribute Value tidak ditemukan.");
   }
 
   const existingAttributeId = existing.attribute_id;
@@ -205,11 +205,13 @@ export async function updateProductAttributeValue(
       .limit(1);
 
     if (usageError) {
-      fail(`Gagal memeriksa relasi Product Variant: ${usageError.message}`);
+      return fail(
+        `Gagal memeriksa relasi Product Variant: ${usageError.message}`
+      );
     }
 
     if (usage && usage.length > 0) {
-      fail(
+      return fail(
         "Parent Attribute tidak dapat diubah karena Attribute Value sudah digunakan oleh Product Variant. Value Code, Value Name, dan Description tetap dapat diubah."
       );
     }
@@ -222,7 +224,7 @@ export async function updateProductAttributeValue(
       .maybeSingle();
 
     if (parentError || !parentAttribute) {
-      fail("Parent Attribute tidak ditemukan atau sudah tidak aktif.");
+      return fail("Parent Attribute tidak ditemukan atau sudah tidak aktif.");
     }
   }
 
@@ -235,7 +237,7 @@ export async function updateProductAttributeValue(
     .maybeSingle();
 
   if (duplicateCode) {
-    fail("Value Code sudah digunakan pada Parent Attribute tersebut.");
+    return fail("Value Code sudah digunakan pada Parent Attribute tersebut.");
   }
 
   const { data: duplicateName } = await supabase
@@ -247,7 +249,7 @@ export async function updateProductAttributeValue(
     .maybeSingle();
 
   if (duplicateName) {
-    fail("Value Name sudah digunakan pada Parent Attribute tersebut.");
+    return fail("Value Name sudah digunakan pada Parent Attribute tersebut.");
   }
 
   const { error: updateError } = await supabase
@@ -263,21 +265,24 @@ export async function updateProductAttributeValue(
 
   if (updateError) {
     if (updateError.code === "23505") {
-      fail("Value Code atau Value Name sudah digunakan.");
+      return fail("Value Code atau Value Name sudah digunakan.");
     }
 
-    fail(`Gagal memperbarui data: ${updateError.message}`);
+    return fail(`Gagal memperbarui data: ${updateError.message}`);
   }
 
   revalidatePath("/product-attribute-values");
   revalidatePath(`/product-attribute-values/${id}`);
+  revalidatePath(`/product-attribute-values/${id}/edit`);
 
   redirect(`/product-attribute-values/${id}?success=updated`);
 }
 
 /**
- * Mengubah status Attribute Value tanpa menghapus data.
- * Relasi Product Variant tetap dipertahankan.
+ * TOGGLE PRODUCT ATTRIBUTE VALUE STATUS
+ *
+ * Mengubah status aktif/nonaktif.
+ * Tidak menghapus data maupun relasi Product Variant.
  */
 export async function toggleProductAttributeValueStatus(
   formData: FormData
@@ -298,7 +303,7 @@ export async function toggleProductAttributeValueStatus(
     await getAuthorizationContext("master.update");
 
   if (!authorized) {
-    fail("Anda tidak memiliki izin mengubah status Attribute Value.");
+    return fail("Anda tidak memiliki izin mengubah status Attribute Value.");
   }
 
   const { data: existing, error: existingError } = await supabase
@@ -308,23 +313,15 @@ export async function toggleProductAttributeValueStatus(
     .maybeSingle();
 
   if (existingError) {
-  redirect(
-    `/product-attribute-values/${id}?error=${encodeURIComponent(
-      `Gagal mengambil data: ${existingError.message}`
-    )}`
-  );
-}
+    return fail(`Gagal mengambil data: ${existingError.message}`);
+  }
 
-if (!existing) {
-  redirect(
-    `/product-attribute-values/${id}?error=${encodeURIComponent(
-      "Attribute Value tidak ditemukan."
-    )}`
-  );
-}
+  if (existing === null) {
+    return fail("Attribute Value tidak ditemukan.");
+  }
 
-const existingIsActive = existing.is_active;
-const newStatus = !existingIsActive;
+  const existingIsActive = existing.is_active;
+  const newStatus = !existingIsActive;
 
   const { data: updated, error: updateError } = await supabase
     .from("product_attribute_values")
@@ -338,11 +335,11 @@ const newStatus = !existingIsActive;
     .maybeSingle();
 
   if (updateError) {
-    fail(`Gagal mengubah status: ${updateError.message}`);
+    return fail(`Gagal mengubah status: ${updateError.message}`);
   }
 
   if (!updated) {
-    fail(
+    return fail(
       "Status Attribute Value sudah berubah atau data tidak dapat diperbarui. Silakan muat ulang halaman."
     );
   }
@@ -354,5 +351,109 @@ const newStatus = !existingIsActive;
     `/product-attribute-values/${id}?success=${
       newStatus ? "activated" : "deactivated"
     }`
+  );
+}
+
+/**
+ * DELETE PRODUCT ATTRIBUTE VALUE
+ *
+ * Hard delete satu record berdasarkan ID.
+ *
+ * Ketentuan:
+ * 1. Memerlukan permission master.delete.
+ * 2. Tidak menghapus Parent Attribute.
+ * 3. Tidak menghapus Product Variant.
+ * 4. Menolak penghapusan jika masih digunakan Product Variant.
+ * 5. Database FK tetap menjadi perlindungan relasi terakhir.
+ */
+export async function deleteProductAttributeValue(
+  formData: FormData
+): Promise<void> {
+  const id = getFormValue(formData, "id");
+
+  const fail = (message: string): never => {
+    redirect(
+      `/product-attribute-values?error=${encodeURIComponent(message)}`
+    );
+  };
+
+  if (!UUID_REGEX.test(id)) {
+    return fail("ID Attribute Value tidak valid.");
+  }
+
+  const { supabase, authorized } =
+    await getAuthorizationContext("master.delete");
+
+  if (!authorized) {
+    return fail("Anda tidak memiliki izin menghapus Attribute Value.");
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("product_attribute_values")
+    .select("id, value_code, value_name")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (existingError) {
+    return fail(`Gagal mengambil data: ${existingError.message}`);
+  }
+
+  if (existing === null) {
+    return fail("Attribute Value tidak ditemukan atau sudah dihapus.");
+  }
+
+  const existingValueName: string = existing.value_name;
+  const existingValueCode: string = existing.value_code;
+
+  // Periksa apakah Attribute Value digunakan Product Variant.
+  const { data: usage, error: usageError } = await supabase
+    .from("product_variant_attribute_values")
+    .select("attribute_value_id")
+    .eq("attribute_value_id", id)
+    .limit(1);
+
+  if (usageError) {
+    return fail(
+      `Gagal memeriksa relasi Product Variant: ${usageError.message}`
+    );
+  }
+
+  if (usage && usage.length > 0) {
+    return fail(
+      `Attribute Value "${existingValueName}" tidak dapat dihapus karena masih digunakan oleh Product Variant.`
+    );
+  }
+
+  // Hard delete hanya satu Attribute Value.
+  const { data: deleted, error: deleteError } = await supabase
+    .from("product_attribute_values")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (deleteError) {
+    if (deleteError.code === "23503") {
+      return fail(
+        "Attribute Value tidak dapat dihapus karena masih memiliki relasi dengan data lain."
+      );
+    }
+
+    return fail(`Gagal menghapus Attribute Value: ${deleteError.message}`);
+  }
+
+  if (!deleted) {
+    return fail(
+      "Attribute Value tidak berhasil dihapus. Data mungkin sudah berubah atau tidak tersedia."
+    );
+  }
+
+  revalidatePath("/product-attribute-values");
+  revalidatePath("/product-attributes");
+
+  redirect(
+    `/product-attribute-values?success=deleted&deleted=${encodeURIComponent(
+      existingValueCode
+    )}`
   );
 }

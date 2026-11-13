@@ -7,7 +7,18 @@ import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 import DashboardClock from "@/components/layout/dashboard-clock";
 
-// DASHBOARD SUMMARY
+type BalanceRow = {
+  product_variant_id: string;
+  warehouse_id: string;
+  available_quantity: number;
+  reserved_quantity: number;
+  quarantine_quantity: number;
+  damaged_quantity: number;
+  repair_quantity: number;
+  on_hand_quantity: number;
+  inventory_value: number;
+};
+
 const summaryCards = [
   {
     title: "Total Produk",
@@ -35,7 +46,20 @@ const summaryCards = [
   },
 ];
 
-// DASHBOARD CONTENT
+function formatNumber(value: number) {
+  return Number(value || 0).toLocaleString("id-ID", {
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value || 0);
+}
+
 async function DashboardContent() {
   await connection();
 
@@ -54,11 +78,9 @@ async function DashboardContent() {
       <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 px-4">
         <div className="w-full max-w-md rounded-2xl border border-white/80 bg-gradient-to-br from-white via-sky-50 to-blue-100 p-8 text-center shadow-[0_15px_35px_rgba(37,99,235,0.16)]">
           <div className="mb-4 text-4xl text-red-500">!</div>
-
           <h1 className="text-xl font-bold text-slate-800">
             Akses Dashboard Ditolak
           </h1>
-
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
             Profil pengguna tidak aktif atau Anda tidak memiliki hak akses
             untuk membuka Dashboard. Silakan hubungi administrator sistem.
@@ -73,64 +95,155 @@ async function DashboardContent() {
 
   const initial = displayName.charAt(0).toUpperCase();
 
+  // INVENTORY OVERVIEW ACCESS
+  const inventoryAccess =
+    await getAuthorizationContext("inventory.view");
+
+  let inventoryData:
+    | {
+        balances: BalanceRow[];
+        warehouseCount: number;
+        variantCount: number;
+        postedMovementCount: number;
+      }
+    | null = null;
+
+  let inventoryLoadError = false;
+
+  if (
+    inventoryAccess.user &&
+    inventoryAccess.profile &&
+    inventoryAccess.authorized
+  ) {
+    const [
+      balanceResult,
+      warehouseResult,
+      variantResult,
+      movementResult,
+    ] = await Promise.all([
+      inventoryAccess.supabase
+        .from("inventory_balances")
+        .select(`
+          product_variant_id,
+          warehouse_id,
+          available_quantity,
+          reserved_quantity,
+          quarantine_quantity,
+          damaged_quantity,
+          repair_quantity,
+          on_hand_quantity,
+          inventory_value
+        `),
+
+      inventoryAccess.supabase
+        .from("warehouses")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true),
+
+      inventoryAccess.supabase
+        .from("product_variants")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true),
+
+      inventoryAccess.supabase
+        .from("inventory_movements")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "posted"),
+    ]);
+
+    if (
+      balanceResult.error ||
+      warehouseResult.error ||
+      variantResult.error ||
+      movementResult.error
+    ) {
+      inventoryLoadError = true;
+    } else {
+      inventoryData = {
+        balances: (balanceResult.data ?? []) as BalanceRow[],
+        warehouseCount: warehouseResult.count ?? 0,
+        variantCount: variantResult.count ?? 0,
+        postedMovementCount: movementResult.count ?? 0,
+      };
+    }
+  }
+
+  const balances = inventoryData?.balances ?? [];
+
+  const inventorySummary = balances.reduce(
+    (result, row) => {
+      result.available += Number(row.available_quantity || 0);
+      result.reserved += Number(row.reserved_quantity || 0);
+      result.quarantine += Number(row.quarantine_quantity || 0);
+      result.damaged += Number(row.damaged_quantity || 0);
+      result.repair += Number(row.repair_quantity || 0);
+      result.onHand += Number(row.on_hand_quantity || 0);
+      result.value += Number(row.inventory_value || 0);
+      return result;
+    },
+    {
+      available: 0,
+      reserved: 0,
+      quarantine: 0,
+      damaged: 0,
+      repair: 0,
+      onHand: 0,
+      value: 0,
+    }
+  );
+
+  const totalInventorySku = new Set(
+    balances.map((row) => row.product_variant_id)
+  ).size;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 text-slate-800 md:flex">
-
-      {/* SHARED ERP SIDEBAR */}
       <ErpSidebar activePath="/" />
 
-      {/* MAIN CONTENT */}
       <main className="min-w-0 flex-1">
-
         {/* HEADER */}
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100/80 bg-gradient-to-r from-white via-white to-sky-50 px-5 py-4 shadow-[0_3px_12px_rgba(37,99,235,0.06)] md:px-8">
           <div>
             <h1 className="text-xl font-bold text-slate-800">
               Dashboard
             </h1>
-
             <p className="mt-1 text-sm text-slate-500">
               Ringkasan aktivitas bisnis distribusi handphone
             </p>
           </div>
 
-          {/* JAM DIGITAL DAN INFORMASI PENGGUNA */}
-<div className="flex flex-wrap items-center gap-4">
-  <DashboardClock />
+          <div className="flex flex-wrap items-center gap-4">
+            <DashboardClock />
 
-  <div className="flex items-center gap-3">
-    <div className="text-right">
-      <p className="text-sm font-semibold">
-        {displayName}
-      </p>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm font-semibold">
+                  {displayName}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Pengguna ERP
+                </p>
+              </div>
 
-      <p className="text-xs text-slate-500">
-        Pengguna ERP
-      </p>
-    </div>
-
-    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-gradient-to-br from-white to-blue-100 font-bold text-blue-700 shadow-[0_3px_8px_rgba(37,99,235,0.16)]">
-      {initial}
-    </div>
-  </div>
-</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-gradient-to-br from-white to-blue-100 font-bold text-blue-700 shadow-[0_3px_8px_rgba(37,99,235,0.16)]">
+                {initial}
+              </div>
+            </div>
+          </div>
         </header>
 
-        {/* DASHBOARD CONTENT */}
         <div className="space-y-6 p-5 md:p-8">
-
           {/* WELCOME */}
           <section className="rounded-2xl border border-white/80 bg-gradient-to-r from-white/90 via-sky-50 to-blue-100/70 p-6 shadow-[0_8px_22px_rgba(37,99,235,0.09)]">
             <h2 className="text-lg font-bold text-slate-800">
               Selamat Datang di ERP Distribution
             </h2>
-
             <p className="mt-1 text-sm text-slate-500">
               Pantau operasional, persediaan, penjualan, dan keuangan bisnis Anda.
             </p>
           </section>
 
-          {/* SUMMARY CARDS */}
+          {/* EXISTING ERP SUMMARY */}
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {summaryCards.map((card) => (
               <div
@@ -141,16 +254,13 @@ async function DashboardContent() {
                   <p className="text-sm font-medium text-slate-500">
                     {card.title}
                   </p>
-
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-100 text-2xl text-blue-600 shadow-sm">
                     {card.icon}
                   </span>
                 </div>
-
                 <p className="mt-4 text-2xl font-bold text-slate-800">
                   {card.value}
                 </p>
-
                 <p className="mt-2 text-xs text-slate-400">
                   {card.note}
                 </p>
@@ -158,15 +268,147 @@ async function DashboardContent() {
             ))}
           </section>
 
+          {/* NEW INVENTORY OVERVIEW */}
+          <section className="rounded-2xl border border-white/90 bg-gradient-to-br from-white via-sky-50/70 to-blue-50 p-6 shadow-[0_8px_22px_rgba(37,99,235,0.09)]">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">
+                  Inventory Overview
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Ringkasan kondisi persediaan seluruh gudang.
+                </p>
+              </div>
+              <span className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
+                Inventory Monitoring
+              </span>
+            </div>
+
+            {!inventoryAccess.authorized ? (
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Anda tidak memiliki permission untuk melihat ringkasan Inventory.
+              </div>
+            ) : inventoryLoadError ? (
+              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                Data Inventory gagal dimuat. Periksa koneksi database dan permission tabel terkait.
+              </div>
+            ) : inventoryData ? (
+              <>
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      label: "Total SKU",
+                      value: formatNumber(totalInventorySku),
+                      note: "Varian produk yang memiliki saldo",
+                    },
+                    {
+                      label: "Total On Hand",
+                      value: formatNumber(inventorySummary.onHand),
+                      note: "Kuantitas seluruh status persediaan",
+                    },
+                    {
+                      label: "Gudang Aktif",
+                      value: formatNumber(inventoryData.warehouseCount),
+                      note: "Gudang berstatus aktif",
+                    },
+                    {
+                      label: "Nilai Persediaan",
+                      value: formatCurrency(inventorySummary.value),
+                      note: "Berdasarkan valuasi inventory",
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                    >
+                      <p className="text-sm font-medium text-slate-500">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 break-words text-2xl font-bold text-slate-900">
+                        {item.value}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {item.note}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6">
+                  <h3 className="font-semibold text-slate-800">
+                    Komposisi Persediaan
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Distribusi kuantitas berdasarkan status inventory.
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {[
+                      {
+                        label: "Available",
+                        value: inventorySummary.available,
+                        color: "text-emerald-700",
+                      },
+                      {
+                        label: "Reserved",
+                        value: inventorySummary.reserved,
+                        color: "text-blue-700",
+                      },
+                      {
+                        label: "Quarantine",
+                        value: inventorySummary.quarantine,
+                        color: "text-amber-700",
+                      },
+                      {
+                        label: "Damaged",
+                        value: inventorySummary.damaged,
+                        color: "text-red-700",
+                      },
+                      {
+                        label: "Repair",
+                        value: inventorySummary.repair,
+                        color: "text-purple-700",
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-xl border border-slate-200 bg-white p-4"
+                      >
+                        <p className="text-sm text-slate-500">
+                          {item.label}
+                        </p>
+                        <p className={`mt-2 text-2xl font-bold ${item.color}`}>
+                          {formatNumber(item.value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      Aktivitas Inventory
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatNumber(inventoryData.postedMovementCount)} transaksi movement berstatus Posted.
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {formatNumber(inventoryData.variantCount)} varian produk aktif
+                  </p>
+                </div>
+              </>
+            ) : null}
+          </section>
+
           {/* BUSINESS ACTIVITY AND SYSTEM INFORMATION */}
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-
             {/* BUSINESS ACTIVITY */}
             <div className="rounded-2xl border border-white/90 bg-gradient-to-br from-white via-sky-50/70 to-blue-50 p-6 shadow-[0_8px_22px_rgba(37,99,235,0.09)] xl:col-span-2">
               <h3 className="font-bold text-slate-800">
                 Aktivitas Bisnis
               </h3>
-
               <p className="mt-1 text-sm text-slate-500">
                 Ringkasan transaksi terbaru
               </p>
@@ -175,30 +417,15 @@ async function DashboardContent() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-blue-100 text-slate-500">
-                      <th className="pb-3 pr-4 font-medium">
-                        Tanggal
-                      </th>
-
-                      <th className="pb-3 pr-4 font-medium">
-                        Aktivitas
-                      </th>
-
-                      <th className="pb-3 pr-4 font-medium">
-                        Referensi
-                      </th>
-
-                      <th className="pb-3 font-medium">
-                        Status
-                      </th>
+                      <th className="pb-3 pr-4 font-medium">Tanggal</th>
+                      <th className="pb-3 pr-4 font-medium">Aktivitas</th>
+                      <th className="pb-3 pr-4 font-medium">Referensi</th>
+                      <th className="pb-3 font-medium">Status</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     <tr>
-                      <td
-                        colSpan={4}
-                        className="py-10 text-center text-slate-400"
-                      >
+                      <td colSpan={4} className="py-10 text-center text-slate-400">
                         Belum ada transaksi. Data akan tampil setelah modul
                         operasional terhubung.
                       </td>
@@ -208,170 +435,112 @@ async function DashboardContent() {
               </div>
             </div>
 
-            
-{/* SYSTEM HEALTH OVERVIEW */}
-<div className="rounded-2xl border border-white/90 bg-gradient-to-br from-white via-sky-50/70 to-blue-50 p-6 shadow-[0_8px_22px_rgba(37,99,235,0.09)]">
+            {/* SYSTEM HEALTH OVERVIEW */}
+            <div className="rounded-2xl border border-white/90 bg-gradient-to-br from-white via-sky-50/70 to-blue-50 p-6 shadow-[0_8px_22px_rgba(37,99,235,0.09)]">
+              <div className="flex items-center gap-3 border-b border-blue-100 pb-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 to-green-100 shadow-[0_6px_14px_rgba(5,150,105,0.18)]">
+                  <svg
+                    viewBox="0 0 64 64"
+                    className="h-12 w-12 drop-shadow-[0_5px_4px_rgba(5,100,70,0.3)]"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-label="System Health"
+                    role="img"
+                  >
+                    <defs>
+                      <linearGradient id="healthShield" x1="10" y1="5" x2="52" y2="60">
+                        <stop offset="0%" stopColor="#6EE7B7" />
+                        <stop offset="50%" stopColor="#10B981" />
+                        <stop offset="100%" stopColor="#047857" />
+                      </linearGradient>
+                      <linearGradient id="healthSide" x1="20" y1="20" x2="55" y2="60">
+                        <stop offset="0%" stopColor="#059669" />
+                        <stop offset="100%" stopColor="#064E3B" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M32 5 L55 14 V30 C55 44 45 54 32 61 C19 54 9 44 9 30 V14 Z"
+                      fill="url(#healthSide)"
+                      transform="translate(0 2)"
+                    />
+                    <path
+                      d="M32 3 L54 12 V29 C54 42 44 52 32 58 C20 52 10 42 10 29 V12 Z"
+                      fill="url(#healthShield)"
+                      stroke="#D1FAE5"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M16 15 L32 8 L48 15"
+                      stroke="white"
+                      strokeOpacity=".55"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M20 30 L28 38 L44 22"
+                      stroke="white"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    STATUS SISTEM
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Monitoring Layanan DSW
+                  </p>
+                </div>
+              </div>
 
-  {/* HEADER */}
-  <div className="flex items-center gap-3 border-b border-blue-100 pb-4">
-    
-<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 to-green-100 shadow-[0_6px_14px_rgba(5,150,105,0.18)]">
-  <svg
-    viewBox="0 0 64 64"
-    className="h-12 w-12 drop-shadow-[0_5px_4px_rgba(5,100,70,0.3)]"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-label="System Health"
-    role="img"
-  >
-    <defs>
-      <linearGradient id="healthShield" x1="10" y1="5" x2="52" y2="60">
-        <stop offset="0%" stopColor="#6EE7B7" />
-        <stop offset="50%" stopColor="#10B981" />
-        <stop offset="100%" stopColor="#047857" />
-      </linearGradient>
-      <linearGradient id="healthSide" x1="20" y1="20" x2="55" y2="60">
-        <stop offset="0%" stopColor="#059669" />
-        <stop offset="100%" stopColor="#064E3B" />
-      </linearGradient>
-    </defs>
+              {[
+                { label: "Status Server", icon: "▤" },
+                { label: "Koneksi Database", icon: "▥" },
+                { label: "Backup Terakhir", icon: "◷" },
+                { label: "Uptime Sistem", icon: "↗" },
+              ].map((item) => (
+                <div key={item.label} className="mt-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <span className="text-lg">{item.icon}</span>
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">
+                      {item.label}
+                    </span>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+                    {item.label === "Status Server" || item.label === "Koneksi Database"
+                      ? "Belum diperiksa"
+                      : "Belum tersedia"}
+                  </span>
+                </div>
+              ))}
 
-    <path
-      d="M32 5 L55 14 V30 C55 44 45 54 32 61 C19 54 9 44 9 30 V14 Z"
-      fill="url(#healthSide)"
-      transform="translate(0 2)"
-    />
-
-    <path
-      d="M32 3 L54 12 V29 C54 42 44 52 32 58 C20 52 10 42 10 29 V12 Z"
-      fill="url(#healthShield)"
-      stroke="#D1FAE5"
-      strokeWidth="1.5"
-    />
-
-    <path
-      d="M16 15 L32 8 L48 15"
-      stroke="white"
-      strokeOpacity=".55"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-
-    <path
-      d="M20 30 L28 38 L44 22"
-      stroke="white"
-      strokeWidth="5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-</div>
-
-
-    <div>
-      <h3 className="font-bold text-slate-800">
-        STATUS SISTEM
-      </h3>
-      <p className="mt-1 text-xs text-slate-500">
-        Monitoring Layanan DSW
-      </p>
-    </div>
-  </div>
-
-  {/* STATUS SERVER */}
-  <div className="mt-5 flex items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-        <span className="text-lg">▤</span>
-      </div>
-      <span className="text-sm font-medium text-slate-600">
-        Status Server
-      </span>
-    </div>
-
-    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-      Belum diperiksa
-    </span>
-  </div>
-
-  {/* DATABASE */}
-  <div className="mt-4 flex items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-        <span className="text-lg">▥</span>
-      </div>
-      <span className="text-sm font-medium text-slate-600">
-        Koneksi Database
-      </span>
-    </div>
-
-    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-      Belum diperiksa
-    </span>
-  </div>
-
-  {/* LAST BACKUP */}
-  <div className="mt-4 flex items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-        <span className="text-lg">◷</span>
-      </div>
-      <span className="text-sm font-medium text-slate-600">
-        Backup Terakhir
-      </span>
-    </div>
-
-    <span className="text-right text-xs font-medium text-slate-500">
-      Belum tersedia
-    </span>
-  </div>
-
-  {/* UPTIME */}
-  <div className="mt-4 flex items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-        <span className="text-lg">↗</span>
-      </div>
-      <span className="text-sm font-medium text-slate-600">
-        Uptime Sistem
-      </span>
-    </div>
-
-    <span className="text-xs font-semibold text-slate-500">
-      Belum tersedia
-    </span>
-  </div>
-
-  {/* SYSTEM CONDITION */}
-  <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-sky-100/80 to-blue-100/80 p-4">
-    <div className="flex items-center gap-2">
-      <span className="text-lg text-blue-600">●</span>
-      <span className="text-sm font-bold text-slate-700">
-        Kondisi Sistem
-      </span>
-    </div>
-
-    <p className="mt-1 pl-6 text-xs text-slate-500">
-      Menunggu hasil pemeriksaan layanan sistem.
-    </p>
-  </div>
-
-</div>
-
+              <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-sky-100/80 to-blue-100/80 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg text-blue-600">●</span>
+                  <span className="text-sm font-bold text-slate-700">
+                    Kondisi Sistem
+                  </span>
+                </div>
+                <p className="mt-1 pl-6 text-xs text-slate-500">
+                  Menunggu hasil pemeriksaan layanan sistem.
+                </p>
+              </div>
+            </div>
           </section>
 
-          {/* FOOTER */}
           <footer className="pb-4 text-center text-xs font-medium text-slate-500 drop-shadow-[0_1px_1px_rgba(15,23,42,0.12)]">
             Enterprise Distribution & Workflow Gateway © 2026
           </footer>
-
         </div>
       </main>
     </div>
   );
 }
 
-// ROOT PAGE
 export default function Home() {
   return (
     <Suspense

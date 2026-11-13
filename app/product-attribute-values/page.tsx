@@ -4,6 +4,7 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 import { connection } from "next/server";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import AttributeValueFilters from "./attribute-value-filters";
+import DeleteAttributeValueButton from "./delete-attribute-value-button";
 
 export const metadata = {
   title: "Product Attribute Values | HEXACORE",
@@ -16,6 +17,9 @@ type SearchParams = {
   attribute?: string;
   status?: string;
   page?: string;
+  error?: string;
+  success?: string;
+  deleted?: string;
 };
 
 const PAGE_SIZE = 10;
@@ -269,6 +273,18 @@ export default async function ProductAttributeValuesPage({
           </Link>
         </div>
 
+        {params.error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {params.error}
+          </div>
+        )}
+
+        {params.success === "deleted" && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            Attribute Value dengan kode {params.deleted ?? ""} berhasil dihapus permanen.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-sm text-slate-500">Total Data</p>
@@ -350,12 +366,20 @@ export default async function ProductAttributeValuesPage({
                       </td>
 
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/product-attribute-values/${item.id}`}
-                          className="font-medium text-blue-600 hover:text-blue-800"
-                        >
-                          Detail
-                        </Link>
+                        <div className="inline-flex items-center justify-end gap-3">
+                          <Link
+                            href={`/product-attribute-values/${item.id}`}
+                            className="font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            Detail
+                          </Link>
+
+                          <DeleteAttributeValueButton
+                            id={item.id}
+                            valueName={item.value_name}
+                            valueCode={item.value_code}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );

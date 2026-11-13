@@ -1,26 +1,28 @@
 
 -- ============================================================
 -- FILE 33: INVENTORY POSTING FUNCTIONS
--- PROJECT: ERP Distribution
--- PURPOSE: Controlled and atomic inventory posting
--- VALUATION: MOVING AVERAGE PER WAREHOUSE / PRODUCT VARIANT
--- DEPENDENCIES: FILE 24, 25, 26, 29, 30, 31, 32
+-- PROJECT: HEXACORE ERP
+-- REVISION:
+--   1. Validate individual stock buckets before outbound posting
+--   2. Support serialized customer returns from sold status
+--   3. Set supplier-returned serialized units to returned_to_supplier
+--   4. Preserve approval, permission, locking and valuation controls
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.post_inventory_movement(
-    p_movement_id UUID,
-    p_unit_cost NUMERIC(20,6) DEFAULT NULL
+    p_movement_id uuid,
+    p_unit_cost numeric DEFAULT NULL::numeric
 )
-RETURNS UUID
+RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
-AS $$
+SET search_path TO ''
+AS $function$
+
 DECLARE
     v_user_id UUID;
     v_movement RECORD;
     v_tracking_type VARCHAR(30);
-
     v_balance RECORD;
 
     v_quantity NUMERIC(18,3);
@@ -35,15 +37,15 @@ DECLARE
     v_average_after NUMERIC(20,6);
 
     v_unit_status VARCHAR(30);
-    v_bucket_before VARCHAR(30);
-    v_bucket_after VARCHAR(30);
+    v_bucket_before NUMERIC(18,3);
 
     v_has_imei1 BOOLEAN;
     v_has_serial BOOLEAN;
+
 BEGIN
 
     -- ========================================================
-    -- 1. USER AUTHENTICATION AND AUTHORIZATION
+    -- 1. AUTHENTICATION AND AUTHORIZATION
     -- ========================================================
 
     v_user_id := auth.uid();
@@ -126,7 +128,7 @@ BEGIN
 
 
     -- ========================================================
-    -- 4. VALIDATE PRODUCT TRACKING TYPE
+    -- 4. PRODUCT TRACKING TYPE
     -- ========================================================
 
     SELECT p.tracking_type
@@ -143,7 +145,7 @@ BEGIN
 
 
     -- ========================================================
-    -- 5. VALIDATE MOVEMENT TYPE
+    -- 5. MOVEMENT TYPE AND TRACKING VALIDATION
     -- ========================================================
 
     IF v_movement.movement_type = 'status_change' THEN
@@ -165,14 +167,12 @@ BEGIN
             'available', 'reserved', 'quarantine',
             'damaged', 'repair'
         ) THEN
-            RAISE EXCEPTION
-                'Status unit tidak valid.';
+            RAISE EXCEPTION 'Status unit tidak valid.';
         END IF;
 
-        IF v_movement.status_from = 'sold'
-           OR v_movement.status_to = 'sold' THEN
+        IF v_movement.status_from = v_movement.status_to THEN
             RAISE EXCEPTION
-                'Perubahan status sold harus melalui transaksi penjualan.';
+                'Status awal dan status tujuan tidak boleh sama.';
         END IF;
 
     ELSE
@@ -237,7 +237,7 @@ BEGIN
 
 
     -- ========================================================
-    -- 7. PREPARE BALANCE ROW AND LOCK
+    -- 7. PREPARE AND LOCK INVENTORY BALANCE
     -- ========================================================
 
     INSERT INTO public.inventory_balances (
@@ -287,7 +287,6 @@ BEGIN
                 'Status unit aktual tidak sesuai status_from.';
         END IF;
 
-        -- Kurangi bucket status lama dan tambah bucket baru.
         UPDATE public.inventory_balances
         SET
             available_quantity =
@@ -335,7 +334,7 @@ BEGIN
 
 
     -- ========================================================
-    -- 9. VALIDATE INVENTORY STATUS
+    -- 9. INVENTORY STATUS AND MOVEMENT DIRECTION
     -- ========================================================
 
     IF v_movement.inventory_status NOT IN (
@@ -348,10 +347,30 @@ BEGIN
         RAISE EXCEPTION 'Inventory status tidak valid.';
     END IF;
 
-    IF v_movement.movement_type = 'customer_return'
-       AND v_movement.inventory_status <> 'quarantine' THEN
+    IF v_movement.movement_type = 'customer_return' THEN
+
+        IF v_movement.quantity_delta <= 0 THEN
+            RAISE EXCEPTION
+                'Customer return harus menambah persediaan.';
+        END IF;
+
+        IF v_movement.inventory_status <> 'quarantine' THEN
+            RAISE EXCEPTION
+                'Customer return wajib masuk quarantine.';
+        END IF;
+
+        IF v_movement.source_reference_id IS NULL
+           OR v_movement.source_reference_type IS NULL THEN
+            RAISE EXCEPTION
+                'Customer return wajib memiliki referensi transaksi penjualan asal.';
+        END IF;
+
+    END IF;
+
+    IF v_movement.movement_type = 'supplier_return'
+       AND v_movement.quantity_delta >= 0 THEN
         RAISE EXCEPTION
-            'Customer return wajib masuk quarantine.';
+            'Supplier return harus mengurangi persediaan.';
     END IF;
 
 
@@ -361,39 +380,93 @@ BEGIN
 
     IF v_tracking_type IN ('imei', 'serial') THEN
 
-        SELECT unit_status
-        INTO v_unit_status
-        FROM public.product_units
-        WHERE id = v_movement.product_unit_id
-          AND product_variant_id = v_movement.product_variant_id
-          AND warehouse_id = v_movement.warehouse_id
-        FOR UPDATE;
+        IF v_movement.movement_type = 'customer_return' THEN
 
-        IF NOT FOUND THEN
-            RAISE EXCEPTION
-                'Product unit tidak ditemukan di warehouse terkait.';
-        END IF;
+            -- Sold unit has no warehouse.
+            -- It must be returned to quarantine at destination warehouse.
 
-        IF v_movement.quantity_delta > 0
-           AND v_unit_status IN ('sold', 'in_transit') THEN
-            RAISE EXCEPTION
-                'Unit tidak dapat diterima dengan status saat ini.';
-        END IF;
+            SELECT unit_status
+            INTO v_unit_status
+            FROM public.product_units
+            WHERE id = v_movement.product_unit_id
+              AND product_variant_id = v_movement.product_variant_id
+              AND warehouse_id IS NULL
+            FOR UPDATE;
 
-        IF v_movement.quantity_delta < 0
-           AND v_unit_status <> v_movement.inventory_status THEN
-            RAISE EXCEPTION
-                'Status unit tidak sesuai dengan inventory_status movement.';
+            IF NOT FOUND THEN
+                RAISE EXCEPTION
+                    'Customer return hanya dapat menerima unit sold yang belum berada di gudang.';
+            END IF;
+
+            IF v_unit_status <> 'sold' THEN
+                RAISE EXCEPTION
+                    'Customer return hanya dapat menerima unit berstatus sold.';
+            END IF;
+
+        ELSE
+
+            SELECT unit_status
+            INTO v_unit_status
+            FROM public.product_units
+            WHERE id = v_movement.product_unit_id
+              AND product_variant_id = v_movement.product_variant_id
+              AND warehouse_id = v_movement.warehouse_id
+            FOR UPDATE;
+
+            IF NOT FOUND THEN
+                RAISE EXCEPTION
+                    'Product unit tidak ditemukan di warehouse terkait.';
+            END IF;
+
+            IF v_movement.quantity_delta > 0
+               AND v_unit_status IN ('sold', 'in_transit', 'returned_to_supplier') THEN
+                RAISE EXCEPTION
+                    'Unit tidak dapat diterima dengan status saat ini.';
+            END IF;
+
+            IF v_movement.quantity_delta < 0
+               AND v_unit_status <> v_movement.inventory_status THEN
+                RAISE EXCEPTION
+                    'Status unit tidak sesuai dengan inventory_status movement.';
+            END IF;
+
         END IF;
 
     END IF;
 
 
     -- ========================================================
-    -- 11. DETERMINE QUANTITY AND VALUE
+    -- 11. VALIDATE OUTBOUND STOCK BUCKET
     -- ========================================================
 
     v_quantity := ABS(v_movement.quantity_delta);
+
+    IF v_movement.quantity_delta < 0 THEN
+
+        v_bucket_before :=
+            CASE v_movement.inventory_status
+                WHEN 'available' THEN v_balance.available_quantity
+                WHEN 'reserved' THEN v_balance.reserved_quantity
+                WHEN 'quarantine' THEN v_balance.quarantine_quantity
+                WHEN 'damaged' THEN v_balance.damaged_quantity
+                WHEN 'repair' THEN v_balance.repair_quantity
+                ELSE 0
+            END;
+
+        IF v_bucket_before < v_quantity THEN
+            RAISE EXCEPTION
+                'Stok pada bucket % tidak mencukupi. Tersedia: %, diperlukan: %.',
+                v_movement.inventory_status,
+                v_bucket_before,
+                v_quantity;
+        END IF;
+
+    END IF;
+
+
+    -- ========================================================
+    -- 12. DETERMINE INVENTORY VALUE
+    -- ========================================================
 
     IF v_movement.quantity_delta > 0 THEN
 
@@ -411,33 +484,19 @@ BEGIN
 
         IF v_quantity_before < v_quantity THEN
             RAISE EXCEPTION
-                'Stok tidak mencukupi untuk transaksi keluar.';
+                'Total stok tidak mencukupi untuk transaksi keluar.';
         END IF;
 
-        v_value_delta := ROUND(
+        IF v_average_before IS NULL OR v_average_before < 0 THEN
+            RAISE EXCEPTION
+                'Average unit cost tidak valid.';
+        END IF;
+
+        v_value_delta := -ROUND(
             v_quantity * v_average_before,
             4
         );
 
-        v_value_delta := -v_value_delta;
-
-    END IF;
-
-
-    -- ========================================================
-    -- 12. CUSTOMER / SUPPLIER RETURN VALIDATION
-    -- ========================================================
-
-    IF v_movement.movement_type = 'supplier_return'
-       AND v_movement.quantity_delta >= 0 THEN
-        RAISE EXCEPTION
-            'Supplier return harus mengurangi persediaan.';
-    END IF;
-
-    IF v_movement.movement_type = 'customer_return'
-       AND v_movement.quantity_delta <= 0 THEN
-        RAISE EXCEPTION
-            'Customer return harus menambah persediaan.';
     END IF;
 
 
@@ -516,15 +575,36 @@ BEGIN
 
 
     -- ========================================================
-    -- 15. UPDATE SERIALIZED UNIT STATUS
+    -- 15. UPDATE SERIALIZED UNIT STATUS AND LOCATION
     -- ========================================================
 
     IF v_tracking_type IN ('imei', 'serial') THEN
 
-        IF v_movement.quantity_delta > 0 THEN
+        IF v_movement.movement_type = 'customer_return' THEN
 
             UPDATE public.product_units
-            SET unit_status = v_movement.inventory_status
+            SET
+                unit_status = 'quarantine',
+                warehouse_id = v_movement.warehouse_id,
+                unit_cost = p_unit_cost,
+                updated_at = NOW()
+            WHERE id = v_movement.product_unit_id;
+
+        ELSIF v_movement.movement_type = 'supplier_return' THEN
+
+            UPDATE public.product_units
+            SET
+                unit_status = 'returned_to_supplier',
+                warehouse_id = NULL,
+                updated_at = NOW()
+            WHERE id = v_movement.product_unit_id;
+
+        ELSIF v_movement.quantity_delta > 0 THEN
+
+            UPDATE public.product_units
+            SET
+                unit_status = v_movement.inventory_status,
+                updated_at = NOW()
             WHERE id = v_movement.product_unit_id;
 
         ELSE
@@ -532,7 +612,8 @@ BEGIN
             UPDATE public.product_units
             SET
                 unit_status = 'sold',
-                warehouse_id = NULL
+                warehouse_id = NULL,
+                updated_at = NOW()
             WHERE id = v_movement.product_unit_id;
 
         END IF;
@@ -553,7 +634,7 @@ BEGIN
 
 
     -- ========================================================
-    -- 17. CREATE VALUATION LOG
+    -- 17. CREATE INVENTORY VALUATION LOG
     -- ========================================================
 
     INSERT INTO public.inventory_valuation_logs (
@@ -590,22 +671,8 @@ BEGIN
     RETURN p_movement_id;
 
 END;
-$$;
-
-
--- ============================================================
--- 18. FUNCTION PRIVILEGES
--- ============================================================
-
-REVOKE ALL
-ON FUNCTION public.post_inventory_movement(UUID, NUMERIC)
-FROM PUBLIC, anon;
-
-GRANT EXECUTE
-ON FUNCTION public.post_inventory_movement(UUID, NUMERIC)
-TO authenticated;
-
+$function$;
 
 -- ============================================================
--- END OF FILE 33
+-- END FILE 33
 -- ============================================================

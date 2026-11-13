@@ -6,6 +6,7 @@ import { connection } from "next/server";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import DeleteProductAttributeButton from "./delete-product-attribute-button";
 
 export const metadata = {
   title: "Product Attributes | DAWUD ERP",
@@ -16,6 +17,9 @@ type PageProps = {
   searchParams: Promise<{
     q?: string;
     status?: string;
+    error?: string;
+    success?: string;
+    deleted?: string;
   }>;
 };
 
@@ -49,28 +53,41 @@ async function AttributesContent({ searchParams }: PageProps) {
   }
 
   const params = await searchParams;
+
   const keyword = (params.q ?? "").trim().slice(0, 100);
   const status = ["active", "inactive"].includes(params.status ?? "")
     ? params.status!
     : "";
 
-  const [createPermission, totalResult, activeResult, inactiveResult] =
-    await Promise.all([
-      supabase.rpc("has_permission", {
-        required_permission: "master.create",
-      }),
-      supabase
-        .from("product_attributes")
-        .select("id", { count: "exact", head: true }),
-      supabase
-        .from("product_attributes")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
-      supabase
-        .from("product_attributes")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", false),
-    ]);
+  const errorMessage = params.error ?? "";
+  const successMessage = params.success ?? "";
+  const deletedCode = params.deleted ?? "";
+
+  const [
+    createPermission,
+    deletePermission,
+    totalResult,
+    activeResult,
+    inactiveResult,
+  ] = await Promise.all([
+    supabase.rpc("has_permission", {
+      required_permission: "master.create",
+    }),
+    supabase.rpc("has_permission", {
+      required_permission: "master.delete",
+    }),
+    supabase
+      .from("product_attributes")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("product_attributes")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+    supabase
+      .from("product_attributes")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", false),
+  ]);
 
   let query = supabase
     .from("product_attributes")
@@ -99,6 +116,7 @@ async function AttributesContent({ searchParams }: PageProps) {
   const { data: attributes, error, count } = await query;
 
   const canCreate = createPermission.data === true;
+  const canDelete = deletePermission.data === true;
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -106,7 +124,6 @@ async function AttributesContent({ searchParams }: PageProps) {
 
       <main className="min-w-0 flex-1 bg-slate-100 p-5 md:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
-
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
@@ -127,7 +144,25 @@ async function AttributesContent({ searchParams }: PageProps) {
             )}
           </header>
 
-          {totalResult.error || activeResult.error || inactiveResult.error ? (
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p className="font-semibold">
+                Penghapusan tidak dapat dilakukan.
+              </p>
+              <p className="mt-1">{errorMessage}</p>
+            </div>
+          )}
+
+          {successMessage === "deleted" && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+              Product Attribute dengan kode{" "}
+              <strong>{deletedCode}</strong> berhasil dihapus.
+            </div>
+          )}
+
+          {totalResult.error ||
+          activeResult.error ||
+          inactiveResult.error ? (
             <div className="rounded-xl border border-red-200 bg-white p-6">
               <h2 className="font-bold text-red-700">
                 Gagal Memuat Statistik Atribut
@@ -259,15 +294,30 @@ async function AttributesContent({ searchParams }: PageProps) {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-slate-700">
                     <tr>
-                      <th className="px-5 py-4 text-left">Kode Atribut</th>
-                      <th className="px-5 py-4 text-left">Nama Atribut</th>
-                      <th className="px-5 py-4 text-left">Deskripsi</th>
-                      <th className="px-5 py-4 text-center">Status</th>
+                      <th className="px-5 py-4 text-left">
+                        Kode Atribut
+                      </th>
+                      <th className="px-5 py-4 text-left">
+                        Nama Atribut
+                      </th>
+                      <th className="px-5 py-4 text-left">
+                        Deskripsi
+                      </th>
+                      <th className="px-5 py-4 text-center">
+                        Status
+                      </th>
+                      <th className="px-5 py-4 text-center">
+                        Aksi
+                      </th>
                     </tr>
                   </thead>
+
                   <tbody className="divide-y divide-slate-100">
                     {attributes.map((attribute) => (
-                      <tr key={attribute.id} className="hover:bg-blue-50/40">
+                      <tr
+                        key={attribute.id}
+                        className="hover:bg-blue-50/40"
+                      >
                         <td className="px-5 py-4 font-semibold">
                           <Link
                             href={`/product-attributes/${attribute.id}`}
@@ -276,12 +326,15 @@ async function AttributesContent({ searchParams }: PageProps) {
                             {attribute.attribute_code}
                           </Link>
                         </td>
+
                         <td className="px-5 py-4 font-medium text-slate-900">
                           {attribute.attribute_name}
                         </td>
+
                         <td className="px-5 py-4 text-slate-600">
                           {attribute.description || "-"}
                         </td>
+
                         <td className="px-5 py-4 text-center">
                           {attribute.is_active ? (
                             <span className="rounded-md bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
@@ -293,6 +346,25 @@ async function AttributesContent({ searchParams }: PageProps) {
                             </span>
                           )}
                         </td>
+
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Link
+                              href={`/product-attributes/${attribute.id}/edit`}
+                              className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                            >
+                              Edit
+                            </Link>
+
+                            {canDelete && (
+                              <DeleteProductAttributeButton
+                                id={attribute.id}
+                                attributeCode={attribute.attribute_code}
+                                attributeName={attribute.attribute_name}
+                              />
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -300,7 +372,6 @@ async function AttributesContent({ searchParams }: PageProps) {
               </div>
             )}
           </section>
-
         </div>
       </main>
     </div>

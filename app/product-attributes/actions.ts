@@ -15,6 +15,9 @@ export type ProductAttributeActionState = {
   };
 };
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function createProductAttribute(
   _previousState: ProductAttributeActionState,
   formData: FormData
@@ -166,12 +169,7 @@ export async function toggleProductAttributeStatus(
 ): Promise<void> {
   const attributeId = String(formData.get("id") ?? "").trim();
 
-  if (
-    !attributeId ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      attributeId
-    )
-  ) {
+  if (!UUID_REGEX.test(attributeId)) {
     throw new Error("ID Product Attribute tidak valid.");
   }
 
@@ -241,10 +239,7 @@ export async function updateProductAttribute(
     formData.get("description") ?? ""
   ).trim();
 
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(attributeId)) {
+  if (!UUID_REGEX.test(attributeId)) {
     throw new Error("ID Product Attribute tidak valid.");
   }
 
@@ -280,7 +275,7 @@ export async function updateProductAttribute(
   const { data: currentAttribute, error: fetchError } =
     await supabase
       .from("product_attributes")
-      .select("id, is_active")
+      .select("id")
       .eq("id", attributeId)
       .maybeSingle();
 
@@ -354,4 +349,87 @@ export async function updateProductAttribute(
   revalidatePath(`/product-attributes/${attributeId}/edit`);
 
   redirect(`/product-attributes/${attributeId}?success=updated`);
+}
+
+export async function deleteProductAttribute(
+  formData: FormData
+): Promise<void> {
+  const attributeId = String(formData.get("id") ?? "").trim();
+
+  const fail = (message: string): never => {
+    redirect(
+      `/product-attributes?error=${encodeURIComponent(message)}`
+    );
+  };
+
+  if (!UUID_REGEX.test(attributeId)) {
+    return fail("ID Product Attribute tidak valid.");
+  }
+
+  const { supabase, user, authorized } =
+    await getAuthorizationContext("master.delete");
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!authorized) {
+    return fail(
+      "Anda tidak memiliki izin menghapus Product Attribute."
+    );
+  }
+
+  const { data, error } = await supabase.rpc(
+    "delete_product_attribute",
+    {
+      p_attribute_id: attributeId,
+    }
+  );
+
+  if (error) {
+    console.error("Product Attribute delete RPC:", error);
+    return fail(
+      `Gagal menghapus Product Attribute: ${error.message}`
+    );
+  }
+
+  const result = data as {
+    success?: boolean;
+    message?: string;
+    attribute_code?: string;
+    dependencies?: {
+      category_attribute_templates?: number;
+      product_attribute_assignments?: number;
+      product_attribute_values?: number;
+      product_variant_attribute_values?: number;
+    };
+  } | null;
+
+  if (!result?.success) {
+    let message =
+      result?.message ??
+      "Product Attribute tidak berhasil dihapus.";
+
+    if (result?.dependencies) {
+      const dependencies = result.dependencies;
+
+      message +=
+        ` Category Template: ${dependencies.category_attribute_templates ?? 0};` +
+        ` Product Assignment: ${dependencies.product_attribute_assignments ?? 0};` +
+        ` Attribute Values: ${dependencies.product_attribute_values ?? 0};` +
+        ` Variant Values: ${dependencies.product_variant_attribute_values ?? 0}.`;
+    }
+
+    return fail(message);
+  }
+
+  revalidatePath("/product-attributes");
+  revalidatePath("/product-attribute-values");
+  revalidatePath("/product-models");
+
+  redirect(
+    `/product-attributes?success=deleted&deleted=${encodeURIComponent(
+      result.attribute_code ?? ""
+    )}`
+  );
 }

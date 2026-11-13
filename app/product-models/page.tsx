@@ -6,7 +6,7 @@ import { connection } from "next/server";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import { toggleProductModelStatus } from "./actions";
+import DeleteProductModelButton from "./delete-product-model-button";
 
 export const metadata = {
   title: "Product Models | DAWUD ERP",
@@ -63,12 +63,15 @@ function buildPageUrl(
 
 function getErrorMessage(error: string) {
   const messages: Record<string, string> = {
-    forbidden: "Anda tidak memiliki izin untuk mengubah Product Model.",
+    forbidden: "Anda tidak memiliki izin untuk mengelola Product Model.",
     "invalid-id": "ID Product Model tidak valid.",
     "invalid-status": "Status Product Model tidak valid.",
     "update-failed": "Gagal mengubah status Product Model.",
     "record-changed":
       "Data telah berubah atau tidak ditemukan. Muat ulang halaman.",
+    "delete-failed": "Gagal menghapus Product Model.",
+    "delete-blocked":
+      "Penghapusan ditolak karena data masih digunakan dalam transaksi atau persediaan.",
   };
 
   return messages[error] ?? "Terjadi kesalahan.";
@@ -122,6 +125,7 @@ async function ProductModelsContent({
     params,
     createPermissionResult,
     updatePermissionResult,
+    deletePermissionResult,
     totalResult,
     activeResult,
     inactiveResult,
@@ -135,6 +139,10 @@ async function ProductModelsContent({
 
     supabase.rpc("has_permission", {
       required_permission: "master.update",
+    }),
+
+    supabase.rpc("has_permission", {
+      required_permission: "master.delete",
     }),
 
     supabase
@@ -160,6 +168,7 @@ async function ProductModelsContent({
 
   const canCreate = createPermissionResult.data === true;
   const canUpdate = updatePermissionResult.data === true;
+  const canDelete = deletePermissionResult.data === true;
 
   const keyword = (params.q ?? "").trim().slice(0, 100);
   const brandId = (params.brand ?? "").trim();
@@ -336,6 +345,12 @@ async function ProductModelsContent({
           {params.success === "status-updated" && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               Status Product Model berhasil diperbarui.
+            </div>
+          )}
+
+          {params.success === "deleted" && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Product Model berhasil dihapus.
             </div>
           )}
 
@@ -528,11 +543,7 @@ async function ProductModelsContent({
                           Jumlah Produk
                         </th>
 
-                        <th className="whitespace-nowrap px-5 py-4 font-semibold">
-                          Status
-                        </th>
-
-                        {canUpdate && (
+                        {(canUpdate || canDelete) && (
                           <th className="whitespace-nowrap px-5 py-4 font-semibold">
                             Aksi
                           </th>
@@ -571,56 +582,35 @@ async function ProductModelsContent({
                           </td>
 
                           <td className="whitespace-nowrap px-5 py-4 text-slate-700">
-                            {model.products?.[0]?.count ?? 0}
-                          </td>
+                      {model.products?.[0]?.count ?? 0}
+</td>
 
-                          <td className="whitespace-nowrap px-5 py-4">
-                            {model.is_active ? (
-                              <span className="inline-flex items-center rounded-md border border-green-800 bg-green-700 px-3 py-1 text-xs font-semibold text-white">
-                                Aktif
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center rounded-md border border-red-800 bg-red-700 px-3 py-1 text-xs font-semibold text-white">
-                                Nonaktif
-                              </span>
-                            )}
-                          </td>
+{(canUpdate || canDelete) && (
+  <td className="whitespace-nowrap px-5 py-4">
+    <div className="flex items-center justify-center gap-2">
+      {canUpdate && (
+        <Link
+          href={`/product-models/${model.id}/edit`}
+          className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+        >
+          Edit
+        </Link>
+      )}
 
-                          {canUpdate && (
-                            <td className="whitespace-nowrap px-5 py-4">
-                              <form action={toggleProductModelStatus}>
-                                <input
-                                  type="hidden"
-                                  name="id"
-                                  value={model.id}
-                                />
-
-                                <input
-                                  type="hidden"
-                                  name="is_active"
-                                  value={String(model.is_active)}
-                                />
-
-                                <button
-                                  type="submit"
-                                  className={
-                                    model.is_active
-                                      ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50"
-                                      : "rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
-                                  }
-                                >
-                                  {model.is_active
-                                    ? "Nonaktifkan"
-                                    : "Aktifkan"}
-                                </button>
-                              </form>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+      {canDelete && (
+        <DeleteProductModelButton
+          modelId={model.id}
+          modelCode={model.model_code}
+        />
+      )}
+    </div>
+  </td>
+)}
+</tr>
+))}
+</tbody>
+</table>
+</div>
 
                 <div className="flex flex-col justify-between gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
                   <p className="text-sm text-slate-600">

@@ -15,6 +15,32 @@ type PurchaseOrderItemInput = {
   notes?: string;
 };
 
+type GoodsReceiptIdentifierInput = {
+  identifier_type: "IMEI_1" | "IMEI_2" | "SERIAL_NUMBER";
+  identifier_value: string;
+};
+
+type GoodsReceiptUnitInput = {
+  unit_code?: string;
+  identifiers: GoodsReceiptIdentifierInput[];
+};
+
+type GoodsReceiptItemInput = {
+  purchase_order_item_id: string;
+  quantity_received: string | number;
+  unit_cost: string | number;
+  discount_amount?: string | number;
+  tax_amount?: string | number;
+  inventory_status:
+    | "available"
+    | "reserved"
+    | "quarantine"
+    | "damaged"
+    | "repair";
+  notes?: string;
+  units?: GoodsReceiptUnitInput[];
+};
+
 function getString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
@@ -82,7 +108,6 @@ export async function createPurchaseOrderAction(
     authorized,
   } = await getAuthorizationContext("purchasing.create");
 
-  // 1. Authorization
   if (!user) {
     redirect("/login");
   }
@@ -91,7 +116,6 @@ export async function createPurchaseOrderAction(
     redirect("/purchases?error=permission_denied");
   }
 
-  // 2. Read form data
   const supplierId = getString(formData, "supplier_id");
   const warehouseId = getString(formData, "warehouse_id");
   const orderDate = getString(formData, "order_date");
@@ -100,12 +124,10 @@ export async function createPurchaseOrderAction(
   const shippingCost = getString(formData, "shipping_cost");
   const rawItems = getString(formData, "items");
 
-  // 3. Validate supplier and warehouse
   if (!isValidUUID(supplierId) || !isValidUUID(warehouseId)) {
     redirect("/purchases/new?error=invalid_reference");
   }
 
-  // 4. Validate dates
   if (!isValidDate(orderDate)) {
     redirect("/purchases/new?error=invalid_order_date");
   }
@@ -118,7 +140,6 @@ export async function createPurchaseOrderAction(
     redirect("/purchases/new?error=invalid_date_range");
   }
 
-  // 5. Validate shipping cost
   if (!isValidAmount(shippingCost, 2)) {
     redirect("/purchases/new?error=invalid_shipping_cost");
   }
@@ -127,7 +148,6 @@ export async function createPurchaseOrderAction(
     redirect("/purchases/new?error=notes_too_long");
   }
 
-  // 6. Parse purchase order items
   let parsedItems: unknown;
 
   try {
@@ -144,7 +164,6 @@ export async function createPurchaseOrderAction(
     redirect("/purchases/new?error=invalid_items");
   }
 
-  // 7. Validate individual items
   const items: PurchaseOrderItemInput[] = [];
 
   for (const item of parsedItems) {
@@ -192,7 +211,6 @@ export async function createPurchaseOrderAction(
     });
   }
 
-  // 8. Execute transactional database function
   const { data, error } = await supabase.rpc(
     "create_purchase_order",
     {
@@ -212,7 +230,6 @@ export async function createPurchaseOrderAction(
     redirect("/purchases/new?error=save_failed");
   }
 
-  // 9. Refresh and redirect
   revalidatePath("/purchases");
 
   redirect(`/purchases/${data}?created=1`);
@@ -323,4 +340,233 @@ export async function rejectPurchaseOrderAction(
   revalidatePath(`/purchases/${purchaseOrderId}`);
 
   redirect(`/purchases/${purchaseOrderId}?rejected=1`);
+}
+
+/**
+ * Create Goods Receipt draft.
+ *
+ * This action does not post inventory movements.
+ * Stock changes will happen only through the posting RPC.
+ */
+export async function createGoodsReceiptAction(
+  formData: FormData
+): Promise<never> {
+  const purchaseOrderId = getString(
+    formData,
+    "purchase_order_id"
+  );
+
+  const receiptDate = getString(
+    formData,
+    "receipt_date"
+  );
+
+  const notes = getString(formData, "notes");
+  const rawItems = getString(formData, "items");
+
+  if (!isValidUUID(purchaseOrderId)) {
+    redirect("/purchases?error=invalid_id");
+  }
+
+  const returnUrl =
+    `/purchases/${purchaseOrderId}/goods-receipts/new`;
+
+  if (!isValidDate(receiptDate)) {
+    redirect(`${returnUrl}?error=invalid_receipt_date`);
+  }
+
+  if (notes.length > 2000) {
+    redirect(`${returnUrl}?error=notes_too_long`);
+  }
+
+  let parsedItems: unknown;
+
+  try {
+    parsedItems = JSON.parse(rawItems);
+  } catch {
+    redirect(`${returnUrl}?error=invalid_items`);
+  }
+
+  if (
+    !Array.isArray(parsedItems) ||
+    parsedItems.length === 0 ||
+    parsedItems.length > 100
+  ) {
+    redirect(`${returnUrl}?error=invalid_items`);
+  }
+
+  const items: GoodsReceiptItemInput[] = [];
+
+  for (const item of parsedItems) {
+    if (!isRecord(item)) {
+      redirect(`${returnUrl}?error=invalid_item_data`);
+    }
+
+    const purchaseOrderItemId = item.purchase_order_item_id;
+    const quantity = item.quantity_received;
+    const unitCost = item.unit_cost;
+    const discountAmount = item.discount_amount ?? "0";
+    const taxAmount = item.tax_amount ?? "0";
+
+    if (
+      typeof purchaseOrderItemId !== "string" ||
+      !isValidUUID(purchaseOrderItemId) ||
+      !isValidAmount(quantity, 3) ||
+      !isValidAmount(unitCost, 2) ||
+      !isValidAmount(discountAmount, 2) ||
+      !isValidAmount(taxAmount, 2)
+    ) {
+      redirect(`${returnUrl}?error=invalid_item_data`);
+    }
+
+    if (Number(quantity) <= 0) {
+      redirect(`${returnUrl}?error=invalid_quantity`);
+    }
+
+    const inventoryStatus = item.inventory_status ?? "available";
+
+    if (
+      typeof inventoryStatus !== "string" ||
+      ![
+        "available",
+        "reserved",
+        "quarantine",
+        "damaged",
+        "repair",
+      ].includes(inventoryStatus)
+    ) {
+      redirect(`${returnUrl}?error=invalid_inventory_status`);
+    }
+
+    const itemNotes =
+      typeof item.notes === "string"
+        ? item.notes.trim()
+        : "";
+
+    if (itemNotes.length > 500) {
+      redirect(`${returnUrl}?error=invalid_item_notes`);
+    }
+
+    const unitsInput = item.units ?? [];
+
+    if (
+      !Array.isArray(unitsInput) ||
+      unitsInput.length > 10000
+    ) {
+      redirect(`${returnUrl}?error=invalid_units`);
+    }
+
+    const units: GoodsReceiptUnitInput[] = [];
+
+    for (const unit of unitsInput) {
+      if (!isRecord(unit)) {
+        redirect(`${returnUrl}?error=invalid_unit_data`);
+      }
+
+      const unitCode =
+        typeof unit.unit_code === "string"
+          ? unit.unit_code.trim()
+          : "";
+
+      if (unitCode.length > 100) {
+        redirect(`${returnUrl}?error=invalid_unit_code`);
+      }
+
+      const identifiersInput = unit.identifiers ?? [];
+
+      if (
+        !Array.isArray(identifiersInput) ||
+        identifiersInput.length > 3
+      ) {
+        redirect(`${returnUrl}?error=invalid_identifiers`);
+      }
+
+      const identifiers: GoodsReceiptIdentifierInput[] = [];
+
+      for (const identifier of identifiersInput) {
+        if (!isRecord(identifier)) {
+          redirect(`${returnUrl}?error=invalid_identifier_data`);
+        }
+
+        const identifierType = identifier.identifier_type;
+        const identifierValue =
+          typeof identifier.identifier_value === "string"
+            ? identifier.identifier_value.trim()
+            : "";
+
+        if (
+          !["IMEI_1", "IMEI_2", "SERIAL_NUMBER"].includes(
+            String(identifierType)
+          ) ||
+          !identifierValue ||
+          identifierValue.length > 255
+        ) {
+          redirect(`${returnUrl}?error=invalid_identifier_data`);
+        }
+
+        identifiers.push({
+          identifier_type:
+            identifierType as GoodsReceiptIdentifierInput["identifier_type"],
+          identifier_value: identifierValue,
+        });
+      }
+
+      units.push({
+        ...(unitCode ? { unit_code: unitCode } : {}),
+        identifiers,
+      });
+    }
+
+    items.push({
+      purchase_order_item_id: purchaseOrderItemId,
+      quantity_received: String(quantity),
+      unit_cost: String(unitCost),
+      discount_amount: String(discountAmount),
+      tax_amount: String(taxAmount),
+      inventory_status:
+        inventoryStatus as GoodsReceiptItemInput["inventory_status"],
+      notes: itemNotes,
+      units,
+    });
+  }
+
+  const {
+    supabase,
+    user,
+    profile,
+    authorized,
+  } = await getAuthorizationContext("purchasing.create");
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!profile || !authorized) {
+    redirect(
+      `/purchases/${purchaseOrderId}?error=permission_denied`
+    );
+  }
+
+  const { data, error } = await supabase.rpc(
+    "create_goods_receipt",
+    {
+      p_purchase_order_id: purchaseOrderId,
+      p_receipt_date: receiptDate,
+      p_notes: notes || null,
+      p_items: items,
+    }
+  );
+
+  if (error || !data) {
+    console.error("Create Goods Receipt failed:", error);
+
+    redirect(`${returnUrl}?error=save_failed`);
+  }
+
+  revalidatePath("/purchases");
+  revalidatePath(`/purchases/${purchaseOrderId}`);
+
+  redirect(
+    `/purchases/${purchaseOrderId}/goods-receipts/${data}?created=1`
+  );
 }

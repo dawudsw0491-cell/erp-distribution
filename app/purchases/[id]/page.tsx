@@ -1,6 +1,7 @@
 
 import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 import ErpSidebar from "@/components/layout/erp-sidebar";
@@ -69,6 +70,15 @@ type PurchaseOrderDetail = {
   }[];
 };
 
+type GoodsReceiptSummary = {
+  id: string;
+  receipt_number: string;
+  receipt_date: string;
+  status: string;
+  posted_at: string | null;
+  created_at: string;
+};
+
 const statusLabels: Record<string, string> = {
   draft: "Draft",
   approved: "Disetujui",
@@ -129,7 +139,7 @@ function DetailRow({
   value,
 }: {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-0 sm:flex-row sm:justify-between sm:gap-4">
@@ -227,6 +237,58 @@ export default async function PurchaseOrderDetailPage({
   const order = data as unknown as PurchaseOrderDetail;
   const currency = order.currency || "IDR";
 
+  // Ambil riwayat Goods Receipt untuk PO ini.
+  const {
+    data: receiptData,
+    error: receiptError,
+  } = await supabase
+    .from("goods_receipts")
+    .select(`
+      id,
+      receipt_number,
+      receipt_date,
+      status,
+      posted_at,
+      created_at
+    `)
+    .eq("purchase_order_id", order.id)
+    .order("created_at", { ascending: false });
+
+  if (receiptError) {
+    console.error(
+      "Goods Receipt history query failed:",
+      receiptError
+    );
+  }
+
+  const goodsReceipts =
+    (receiptData ?? []) as GoodsReceiptSummary[];
+
+  const totalOrdered = order.items.reduce(
+    (total, item) =>
+      total + Number(item.quantity || 0),
+    0
+  );
+
+  const totalReceived = order.items.reduce(
+    (total, item) =>
+      total + Number(item.received_quantity || 0),
+    0
+  );
+
+  const totalRemaining = Math.max(
+    totalOrdered - totalReceived,
+    0
+  );
+
+  const canCreateGoodsReceipt =
+    ["approved", "partially_received"].includes(order.status) &&
+    order.items.some(
+      (item) =>
+        Number(item.quantity) >
+        Number(item.received_quantity)
+    );
+
   return (
     <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:min-h-0 md:overflow-hidden">
       <ErpSidebar activePath="/purchases" />
@@ -254,6 +316,15 @@ export default async function PurchaseOrderDetailPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {canCreateGoodsReceipt && (
+                <a
+                  href={`/purchases/${order.id}/goods-receipts/new`}
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  + Buat Goods Receipt
+                </a>
+              )}
+
               <span
                 className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold ${
                   statusStyles[order.status] ||
@@ -288,12 +359,16 @@ export default async function PurchaseOrderDetailPage({
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               {query.error === "approve_failed" &&
                 "Approval Purchase Order gagal diproses."}
+
               {query.error === "reject_failed" &&
                 "Penolakan Purchase Order gagal diproses."}
+
               {query.error === "invalid_rejection_reason" &&
                 "Alasan penolakan wajib diisi dan maksimal 1.000 karakter."}
+
               {query.error === "permission_denied" &&
                 "Anda tidak memiliki hak akses untuk melakukan tindakan ini."}
+
               {![
                 "approve_failed",
                 "reject_failed",
@@ -386,10 +461,12 @@ export default async function PurchaseOrderDetailPage({
                   label="Nomor PO"
                   value={order.po_number}
                 />
+
                 <DetailRow
                   label="Tanggal PO"
                   value={formatDate(order.order_date)}
                 />
+
                 <DetailRow
                   label="Tanggal Estimasi"
                   value={formatDate(order.expected_date)}
@@ -405,6 +482,7 @@ export default async function PurchaseOrderDetailPage({
                       : "-"
                   }
                 />
+
                 <DetailRow
                   label="Gudang Tujuan"
                   value={
@@ -413,6 +491,7 @@ export default async function PurchaseOrderDetailPage({
                       : "-"
                   }
                 />
+
                 <DetailRow
                   label="Mata Uang"
                   value={currency}
@@ -421,25 +500,60 @@ export default async function PurchaseOrderDetailPage({
             </div>
           </section>
 
-          {/* Daftar Item */}
+          {/* Ringkasan Penerimaan */}
+          <section className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">
+                Total Dipesan
+              </p>
+
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {formatQuantity(totalOrdered)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">
+                Total Diterima
+              </p>
+
+              <p className="mt-2 text-2xl font-bold text-emerald-700">
+                {formatQuantity(totalReceived)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">
+                Sisa Belum Diterima
+              </p>
+
+              <p className="mt-2 text-2xl font-bold text-amber-600">
+                {formatQuantity(totalRemaining)}
+              </p>
+            </div>
+          </section>
+
+          {/* Daftar Item Purchase Order */}
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-slate-900">
                 Item Purchase Order
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Daftar produk dan rincian pembelian.
               </p>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-sm">
+              <table className="w-full min-w-[1050px] text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Produk</th>
                     <th className="px-4 py-3">SKU Varian</th>
                     <th className="px-4 py-3 text-right">Qty</th>
                     <th className="px-4 py-3 text-right">Diterima</th>
+                    <th className="px-4 py-3 text-right">Sisa</th>
                     <th className="px-4 py-3 text-right">Harga Satuan</th>
                     <th className="px-4 py-3 text-right">Diskon</th>
                     <th className="px-4 py-3 text-right">Pajak</th>
@@ -454,9 +568,11 @@ export default async function PurchaseOrderDetailPage({
                         <p className="font-medium text-slate-900">
                           {item.variant?.product?.product_name || "-"}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-500">
                           {item.variant?.variant_name || "-"}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-400">
                           {item.variant?.product?.sku || "-"}
                         </p>
@@ -472,6 +588,16 @@ export default async function PurchaseOrderDetailPage({
 
                       <td className="px-4 py-4 text-right tabular-nums">
                         {formatQuantity(item.received_quantity)}
+                      </td>
+
+                      <td className="px-4 py-4 text-right font-medium tabular-nums text-amber-700">
+                        {formatQuantity(
+                          Math.max(
+                            Number(item.quantity) -
+                              Number(item.received_quantity),
+                            0
+                          )
+                        )}
                       </td>
 
                       <td className="px-4 py-4 text-right tabular-nums">
@@ -495,7 +621,7 @@ export default async function PurchaseOrderDetailPage({
                   {order.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="px-4 py-10 text-center text-slate-500"
                       >
                         Belum ada item Purchase Order.
@@ -505,6 +631,87 @@ export default async function PurchaseOrderDetailPage({
                 </tbody>
               </table>
             </div>
+          </section>
+
+          {/* Riwayat Goods Receipt */}
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 p-4 sm:p-6">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Riwayat Goods Receipt
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Daftar penerimaan barang berdasarkan Purchase Order ini.
+              </p>
+            </div>
+
+            {receiptError ? (
+              <div className="p-5 text-sm text-red-600">
+                Riwayat Goods Receipt gagal dimuat.
+              </div>
+            ) : goodsReceipts.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="font-medium text-slate-700">
+                  Belum ada Goods Receipt.
+                </p>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Penerimaan barang akan tercatat di sini.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[650px] text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3">Nomor GR</th>
+                      <th className="px-5 py-3">Tanggal</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3">Waktu Posting</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {goodsReceipts.map((receipt) => (
+                      <tr
+                        key={receipt.id}
+                        className="hover:bg-slate-50"
+                      >
+                        <td className="px-5 py-4 font-semibold text-blue-700">
+                          {receipt.receipt_number}
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-600">
+                          {formatDate(receipt.receipt_date)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              receipt.status === "posted"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : receipt.status === "cancelled"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {receipt.status === "posted"
+                              ? "Posted"
+                              : receipt.status === "cancelled"
+                                ? "Cancelled"
+                                : "Draft"}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-600">
+                          {formatDateTime(receipt.posted_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {/* Ringkasan Total */}
@@ -538,6 +745,7 @@ export default async function PurchaseOrderDetailPage({
                 <span className="font-semibold text-slate-900">
                   Grand Total
                 </span>
+
                 <span className="text-lg font-bold text-blue-700">
                   {formatCurrency(order.grand_total, currency)}
                 </span>

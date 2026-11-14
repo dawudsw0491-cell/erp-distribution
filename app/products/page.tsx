@@ -100,9 +100,7 @@ async function ProductsContent({
   const [
     params,
     createPermissionResult,
-    totalResult,
-    activeResult,
-    inactiveResult,
+    statisticsResult,
   ] = await Promise.all([
     searchParams,
 
@@ -110,19 +108,7 @@ async function ProductsContent({
       required_permission: "master.create",
     }),
 
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true }),
-
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", false),
+    supabase.rpc("get_product_statistics"),
   ]);
 
   const canCreate = createPermissionResult.data === true;
@@ -147,11 +133,12 @@ async function ProductsContent({
   // Hilangkan karakter khusus yang dapat mengganggu filter PostgREST.
   const safeKeyword = searchKeyword.replace(/[,%()]/g, "").trim();
 
-  if (
-    totalResult.error ||
-    activeResult.error ||
-    inactiveResult.error
-  ) {
+  if (statisticsResult.error) {
+    console.error(
+      "Load product statistics failed:",
+      statisticsResult.error
+    );
+
     return (
       <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
         <ErpSidebar activePath="/products" />
@@ -171,9 +158,19 @@ async function ProductsContent({
     );
   }
 
-  const totalProducts = totalResult.count ?? 0;
-  const activeProducts = activeResult.count ?? 0;
-  const inactiveProducts = inactiveResult.count ?? 0;
+  const statistics = statisticsResult.data?.[0];
+
+  const totalProducts = Number(
+    statistics?.total_products ?? 0
+  );
+
+  const activeProducts = Number(
+    statistics?.active_products ?? 0
+  );
+
+  const inactiveProducts = Number(
+    statistics?.inactive_products ?? 0
+  );
 
   // Cari ID kategori dan brand berdasarkan kata kunci.
   let categoryIds: string[] = [];
@@ -182,7 +179,10 @@ async function ProductsContent({
   if (safeKeyword) {
     const pattern = `%${safeKeyword}%`;
 
-    const [categoryResult, brandResult] = await Promise.all([
+    const [
+      categoryResult,
+      brandResult,
+    ] = await Promise.all([
       supabase
         .from("product_categories")
         .select("id")
@@ -222,8 +222,13 @@ async function ProductsContent({
       );
     }
 
-    categoryIds = (categoryResult.data ?? []).map((item) => item.id);
-    brandIds = (brandResult.data ?? []).map((item) => item.id);
+    categoryIds = (categoryResult.data ?? []).map(
+      (item) => item.id
+    );
+
+    brandIds = (brandResult.data ?? []).map(
+      (item) => item.id
+    );
   }
 
   let productQuery = supabase
@@ -301,7 +306,9 @@ async function ProductsContent({
       searchConditions.push("tracking_type.eq.serial");
     }
 
-    productQuery = productQuery.or(searchConditions.join(","));
+    productQuery = productQuery.or(
+      searchConditions.join(",")
+    );
   }
 
   // Filter status tetap terpisah dari pencarian universal.

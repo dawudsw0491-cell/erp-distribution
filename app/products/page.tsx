@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-
+import ProductFilters from "./product-filters";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 
@@ -15,8 +15,6 @@ export const metadata = {
 type ProductsPageProps = {
   searchParams: Promise<{
     q?: string;
-    type?: string;
-    tracking?: string;
     status?: string;
     page?: string;
   }>;
@@ -28,16 +26,12 @@ function buildPageUrl(
   page: number,
   filters: {
     q: string;
-    type: string;
-    tracking: string;
     status: string;
   }
 ) {
   const params = new URLSearchParams();
 
   if (filters.q) params.set("q", filters.q);
-  if (filters.type) params.set("type", filters.type);
-  if (filters.tracking) params.set("tracking", filters.tracking);
   if (filters.status) params.set("status", filters.status);
 
   params.set("page", String(page));
@@ -133,77 +127,25 @@ async function ProductsContent({
 
   const canCreate = createPermissionResult.data === true;
 
+  // Parameter pencarian dan status.
   const keyword = (params.q ?? "").trim().slice(0, 100);
 
-  const productType = ["goods", "service"].includes(params.type ?? "")
-    ? params.type!
-    : "";
+  // Pencarian hanya dijalankan jika minimal 3 karakter.
+  const searchKeyword =
+    keyword.length >= 3 ? keyword : "";
 
-  const tracking = ["quantity", "imei", "serial"].includes(
-    params.tracking ?? ""
-  )
-    ? params.tracking!
-    : "";
-
-  const status = ["active", "inactive"].includes(params.status ?? "")
-    ? params.status!
-    : "";
+  const status =
+    params.status === "active" || params.status === "inactive"
+      ? params.status
+      : "";
 
   const requestedPage = Math.max(
     1,
     Number.parseInt(params.page ?? "1", 10) || 1
   );
 
-  const safeKeyword = keyword.replace(/[,%()]/g, "").trim();
-
-  let productQuery = supabase
-    .from("products")
-    .select(
-      `
-        id,
-        sku,
-        barcode,
-        product_name,
-        product_type,
-        tracking_type,
-        unit,
-        minimum_stock,
-        is_active,
-        created_at,
-        category:product_categories(category_name),
-        brand:brands(brand_name)
-      `,
-      { count: "exact" }
-    )
-    .order("created_at", { ascending: false });
-
-  if (safeKeyword) {
-    const pattern = `%${safeKeyword}%`;
-
-    productQuery = productQuery.or(
-      [
-        `sku.ilike.${pattern}`,
-        `barcode.ilike.${pattern}`,
-        `product_name.ilike.${pattern}`,
-      ].join(",")
-    );
-  }
-
-  if (productType) {
-    productQuery = productQuery.eq("product_type", productType);
-  }
-
-  if (tracking) {
-    productQuery = productQuery.eq("tracking_type", tracking);
-  }
-
-  if (status === "active") {
-    productQuery = productQuery.eq("is_active", true);
-  }
-
-  if (status === "inactive") {
-    productQuery = productQuery.eq("is_active", false);
-  }
+  // Hilangkan karakter khusus yang dapat mengganggu filter PostgREST.
+  const safeKeyword = searchKeyword.replace(/[,%()]/g, "").trim();
 
   if (
     totalResult.error ||
@@ -233,6 +175,144 @@ async function ProductsContent({
   const activeProducts = activeResult.count ?? 0;
   const inactiveProducts = inactiveResult.count ?? 0;
 
+  // Cari ID kategori dan brand berdasarkan kata kunci.
+  let categoryIds: string[] = [];
+  let brandIds: string[] = [];
+
+  if (safeKeyword) {
+    const pattern = `%${safeKeyword}%`;
+
+    const [categoryResult, brandResult] = await Promise.all([
+      supabase
+        .from("product_categories")
+        .select("id")
+        .ilike("category_name", pattern)
+        .limit(500),
+
+      supabase
+        .from("brands")
+        .select("id")
+        .ilike("brand_name", pattern)
+        .limit(500),
+    ]);
+
+    if (categoryResult.error || brandResult.error) {
+      console.error("Product search lookup failed:", {
+        categoryError: categoryResult.error,
+        brandError: brandResult.error,
+      });
+
+      return (
+        <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
+          <ErpSidebar activePath="/products" />
+
+          <main className="min-w-0 flex-1 bg-slate-100 p-6">
+            <div className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6">
+              <h1 className="text-lg font-bold text-red-700">
+                Gagal Menjalankan Pencarian
+              </h1>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Terjadi kesalahan saat mencari kategori atau brand.
+                Silakan coba kembali.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    categoryIds = (categoryResult.data ?? []).map((item) => item.id);
+    brandIds = (brandResult.data ?? []).map((item) => item.id);
+  }
+
+  let productQuery = supabase
+    .from("products")
+    .select(
+      `
+        id,
+        sku,
+        barcode,
+        product_name,
+        product_type,
+        tracking_type,
+        unit,
+        minimum_stock,
+        is_active,
+        created_at,
+        category:product_categories(category_name),
+        brand:brands(brand_name)
+      `,
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false });
+
+  // Pencarian universal:
+  // SKU, barcode, nama, kategori, brand, jenis, dan tracking.
+  if (safeKeyword) {
+    const pattern = `%${safeKeyword}%`;
+
+    const searchConditions = [
+      `sku.ilike.${pattern}`,
+      `barcode.ilike.${pattern}`,
+      `product_name.ilike.${pattern}`,
+    ];
+
+    if (categoryIds.length > 0) {
+      searchConditions.push(
+        `category_id.in.(${categoryIds.join(",")})`
+      );
+    }
+
+    if (brandIds.length > 0) {
+      searchConditions.push(
+        `brand_id.in.(${brandIds.join(",")})`
+      );
+    }
+
+    const normalizedSearch = safeKeyword.toLowerCase();
+
+    const matchesAlias = (aliases: string[]) =>
+      aliases.some(
+        (alias) =>
+          alias.includes(normalizedSearch) ||
+          normalizedSearch.includes(alias)
+      );
+
+    // Jenis produk.
+    if (matchesAlias(["barang", "goods"])) {
+      searchConditions.push("product_type.eq.goods");
+    }
+
+    if (matchesAlias(["jasa", "service"])) {
+      searchConditions.push("product_type.eq.service");
+    }
+
+    // Tracking produk.
+    if (matchesAlias(["kuantitas", "quantity"])) {
+      searchConditions.push("tracking_type.eq.quantity");
+    }
+
+    if (matchesAlias(["imei"])) {
+      searchConditions.push("tracking_type.eq.imei");
+    }
+
+    if (matchesAlias(["serial", "serial number"])) {
+      searchConditions.push("tracking_type.eq.serial");
+    }
+
+    productQuery = productQuery.or(searchConditions.join(","));
+  }
+
+  // Filter status tetap terpisah dari pencarian universal.
+  if (status === "active") {
+    productQuery = productQuery.eq("is_active", true);
+  }
+
+  if (status === "inactive") {
+    productQuery = productQuery.eq("is_active", false);
+  }
+
   const offset = (requestedPage - 1) * PAGE_SIZE;
 
   const {
@@ -245,6 +325,8 @@ async function ProductsContent({
   );
 
   if (error) {
+    console.error("Load products failed:", error);
+
     return (
       <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
         <ErpSidebar activePath="/products" />
@@ -275,8 +357,6 @@ async function ProductsContent({
 
   const filters = {
     q: keyword,
-    type: productType,
-    tracking,
     status,
   };
 
@@ -322,10 +402,10 @@ async function ProductsContent({
               </p>
             </div>
 
-            <div className="rounded-xl border-emerald-400 border bg-emerald-50 p-5 shadow-sm">
+            <div className="rounded-xl border border-emerald-400 bg-emerald-50 p-5 shadow-sm">
               <p className="text-sm font-bold text-slate-800">
-  Produk Aktif
-</p>
+                Produk Aktif
+              </p>
 
               <p className="mt-2 text-2xl font-bold text-emerald-700">
                 {activeProducts}
@@ -343,119 +423,10 @@ async function ProductsContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4">
-              <h2 className="font-semibold text-slate-900">
-                Pencarian dan Filter
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Cari berdasarkan SKU, barcode, atau nama produk.
-              </p>
-            </div>
-
-            <form
-              action="/products"
-              method="GET"
-              className="grid grid-cols-1 gap-4 md:grid-cols-4"
-            >
-              <div className="md:col-span-2">
-                <label
-                  htmlFor="product-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-
-                <input
-                  id="product-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  placeholder="SKU, barcode, atau nama produk..."
-                  maxLength={100}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="product-type"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Jenis Produk
-                </label>
-
-                <select
-                  id="product-type"
-                  name="type"
-                  defaultValue={productType}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Jenis</option>
-                  <option value="goods">Barang</option>
-                  <option value="service">Jasa</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="product-tracking"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Tracking
-                </label>
-
-                <select
-                  id="product-tracking"
-                  name="tracking"
-                  defaultValue={tracking}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Tracking</option>
-                  <option value="quantity">Kuantitas</option>
-                  <option value="imei">IMEI</option>
-                  <option value="serial">Serial Number</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="product-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status
-                </label>
-
-                <select
-                  id="product-status"
-                  name="status"
-                  defaultValue={status}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Status</option>
-                  <option value="active">Aktif</option>
-                  <option value="inactive">Nonaktif</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-4">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/products"
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <ProductFilters
+            initialKeyword={keyword}
+            initialStatus={status}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col justify-between gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
@@ -546,14 +517,14 @@ async function ProductsContent({
                           className="transition hover:bg-blue-50/40"
                         >
                           <td className="whitespace-nowrap px-5 py-4 font-semibold">
-  <Link
-    href={`/products/${product.id}`}
-    className="text-blue-700 hover:text-blue-900 hover:underline"
-    title="Lihat detail produk"
-  >
-    {product.sku}
-  </Link>
-</td>
+                            <Link
+                              href={`/products/${product.id}`}
+                              className="text-blue-700 hover:text-blue-900 hover:underline"
+                              title="Lihat detail produk"
+                            >
+                              {product.sku}
+                            </Link>
+                          </td>
 
                           <td className="px-5 py-4 font-medium text-slate-900">
                             <div>{product.product_name}</div>
@@ -590,16 +561,16 @@ async function ProductsContent({
                           </td>
 
                           <td className="whitespace-nowrap px-5 py-4">
-  {product.is_active ? (
-  <span className="inline-flex items-center rounded-md border border-green-800 bg-green-700 px-3 py-1 text-xs font-semibold text-white">
-    Aktif
-  </span>
-) : (
-  <span className="inline-flex items-center rounded-md border border-red-800 bg-red-700 px-3 py-1 text-xs font-semibold text-white">
-    Nonaktif
-  </span>
-)}
-</td>
+                            {product.is_active ? (
+                              <span className="inline-flex items-center rounded-md border border-green-800 bg-green-700 px-3 py-1 text-xs font-semibold text-white">
+                                Aktif
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-md border border-red-800 bg-red-700 px-3 py-1 text-xs font-semibold text-white">
+                                Nonaktif
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

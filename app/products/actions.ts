@@ -433,8 +433,11 @@ export async function updateProduct(formData: FormData) {
   }
 
   const productName = String(
-    formData.get("product_name") ?? ""
-  ).trim();
+  formData.get("product_name") ?? ""
+)
+  .trim()
+  .replace(/\s+/g, " ")
+  .toUpperCase();
 
   const barcode =
     String(formData.get("barcode") ?? "").trim() || null;

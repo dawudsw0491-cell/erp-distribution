@@ -18,6 +18,9 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi kategori atau brand tidak valid.",
   invalid_category: "Kategori tidak ditemukan atau sudah tidak aktif.",
   invalid_brand: "Brand tidak ditemukan atau sudah tidak aktif.",
+  invalid_condition: "Kondisi produk tidak valid.",
+  condition_required: "Kondisi produk wajib dipilih untuk produk barang.",
+  invalid_subcategory: "Subkategori tidak valid atau tidak sesuai dengan kategori utama.",
   duplicate: "SKU atau barcode sudah digunakan oleh produk lain.",
   save_failed: "Produk gagal disimpan. Silakan coba kembali.",
 };
@@ -58,7 +61,7 @@ export default async function NewProductPage({
   ] = await Promise.all([
     auth.supabase
       .from("product_categories")
-      .select("id, category_name")
+      .select("id, category_name, parent_id")
       .eq("is_active", true)
       .order("category_name", { ascending: true }),
 

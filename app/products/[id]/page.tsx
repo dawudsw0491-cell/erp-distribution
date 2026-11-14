@@ -16,10 +16,6 @@ type ProductDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-type ProductRelation = {
-  category_name?: string;
-} | null;
-
 type BrandRelation = {
   brand_name?: string;
 } | null;
@@ -111,7 +107,9 @@ export default async function ProductDetailPage({
       is_active,
       created_at,
       updated_at,
-      category:product_categories(category_name),
+      category_id,
+      product_subcategory_id,
+      product_condition,
       brand:brands(brand_name)
     `)
     .eq("id", id)
@@ -150,14 +148,62 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  const category =
-    product.category as unknown as ProductRelation;
+  // Ambil nama kategori dan subkategori secara terpisah
+  // untuk menghindari ambiguitas dua foreign key ke tabel yang sama.
+  const categoryIds = [
+    ...new Set(
+      [product.category_id, product.product_subcategory_id].filter(
+        (value): value is string => Boolean(value)
+      )
+    ),
+  ];
 
-  const brand =
-    product.brand as unknown as BrandRelation;
+  let categoryName = "-";
+  let subcategoryName = "-";
+
+  if (categoryIds.length > 0) {
+    const { data: categories, error: categoryError } = await supabase
+      .from("product_categories")
+      .select("id, category_name")
+      .in("id", categoryIds);
+
+    if (categoryError) {
+      console.error("Product category fetch error:", categoryError);
+    } else {
+      const categoryMap = new Map(
+        (categories ?? []).map((item) => [
+          item.id,
+          item.category_name,
+        ])
+      );
+
+      categoryName = product.category_id
+        ? categoryMap.get(product.category_id) ?? "-"
+        : "-";
+
+      subcategoryName = product.product_subcategory_id
+        ? categoryMap.get(product.product_subcategory_id) ?? "-"
+        : "-";
+    }
+  }
+
+  const brand = product.brand as unknown as BrandRelation;
 
   const productType =
     product.product_type === "goods" ? "Barang" : "Jasa";
+
+  const conditionLabels: Record<string, string> = {
+    BARU: "Baru",
+    SECOND: "Second",
+  };
+
+  const productCondition =
+    product.product_type === "service"
+      ? "-"
+      : product.product_condition
+        ? conditionLabels[String(product.product_condition)] ??
+          String(product.product_condition)
+        : "Belum ditentukan (data lama)";
 
   const trackingLabels: Record<string, string> = {
     quantity: "Kuantitas",
@@ -179,7 +225,6 @@ export default async function ProductDetailPage({
 
       <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-5xl space-y-6">
-
           <header className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <Link
@@ -258,11 +303,6 @@ export default async function ProductDetailPage({
               />
 
               <DetailItem
-                label="Kategori"
-                value={category?.category_name ?? "-"}
-              />
-
-              <DetailItem
                 label="Brand"
                 value={brand?.brand_name ?? "-"}
               />
@@ -270,6 +310,21 @@ export default async function ProductDetailPage({
               <DetailItem
                 label="Jenis Produk"
                 value={productType}
+              />
+
+              <DetailItem
+                label="Kondisi Produk"
+                value={productCondition}
+              />
+
+              <DetailItem
+                label="Kategori Utama"
+                value={categoryName}
+              />
+
+              <DetailItem
+                label="Subkategori"
+                value={subcategoryName}
               />
 
               <DetailItem
@@ -321,7 +376,6 @@ export default async function ProductDetailPage({
               />
             </div>
           </section>
-
         </div>
       </main>
     </div>

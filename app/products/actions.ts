@@ -9,6 +9,17 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const MAIN_CATEGORIES = [
+  "SMARTPHONE",
+  "TABLET",
+  "AKSESORIS",
+  "KOMPUTER DAN LAPTOP",
+  "NETWORKING",
+  "KOMPONEN ELEKTRONIK",
+] as const;
+
+type ProductCondition = "BARU" | "SECOND";
+
 type CreateMasterResult =
   | {
       success: true;
@@ -41,7 +52,7 @@ function generateMasterCode(prefix: string, name: string) {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^A-Z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, 24) || "ITEM";
+      .slice(0, 17) || "ITEM";
 
   const suffix = randomUUID()
     .replace(/-/g, "")
@@ -49,6 +60,19 @@ function generateMasterCode(prefix: string, name: string) {
     .toUpperCase();
 
   return `${prefix}-${slug}-${suffix}`;
+}
+
+function getProductCondition(
+  value: FormDataEntryValue | null
+): ProductCondition | null | undefined {
+  const normalized = String(value ?? "").trim().toUpperCase();
+
+  if (!normalized) return null;
+  if (normalized === "BARU" || normalized === "SECOND") {
+    return normalized;
+  }
+
+  return undefined;
 }
 
 export async function createCategory(
@@ -72,24 +96,18 @@ export async function createCategory(
 
   const categoryName = normalizeMasterName(input);
 
-  if (!categoryName) {
+  if (!MAIN_CATEGORIES.includes(categoryName as (typeof MAIN_CATEGORIES)[number])) {
     return {
       success: false,
-      error: "Nama kategori wajib diisi.",
-    };
-  }
-
-  if (categoryName.length > 255) {
-    return {
-      success: false,
-      error: "Nama kategori maksimal 255 karakter.",
+      error: "Kategori utama harus menggunakan salah satu dari enam kategori resmi.",
     };
   }
 
   const { data: existing, error: lookupError } = await auth.supabase
     .from("product_categories")
-    .select("id, category_name, is_active")
+    .select("id, category_name, is_active, parent_id")
     .ilike("category_name", categoryName)
+    .is("parent_id", null)
     .limit(1)
     .maybeSingle();
 
@@ -123,6 +141,7 @@ export async function createCategory(
     .insert({
       category_code: generateMasterCode("CAT", categoryName),
       category_name: categoryName,
+      parent_id: null,
       is_active: true,
     })
     .select("id, category_name")
@@ -138,6 +157,7 @@ export async function createCategory(
   }
 
   revalidatePath("/products/new");
+  revalidatePath("/product-categories");
 
   return {
     success: true,
@@ -244,113 +264,118 @@ export async function createBrand(
 export async function createProduct(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const sku = String(formData.get("sku") ?? "")
-  .trim()
-  .replace(/\s+/g, "")
-  .toUpperCase();
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
 
-const productName = String(
-  formData.get("product_name") ?? ""
-)
-  .trim()
-  .replace(/\s+/g, " ")
-  .toUpperCase();
+  const productName = String(formData.get("product_name") ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
 
-  const barcode =
-    String(formData.get("barcode") ?? "").trim() || null;
+  const barcode = String(formData.get("barcode") ?? "").trim() || null;
+  const productType = String(formData.get("product_type") ?? "goods");
+  const trackingType = String(formData.get("tracking_type") ?? "quantity");
+  const unit = String(formData.get("unit") ?? "pcs").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
 
-  const productType = String(
-    formData.get("product_type") ?? "goods"
+  let categoryId = getOptionalUuid(formData.get("category_id"));
+  let subcategoryId = getOptionalUuid(
+    formData.get("product_subcategory_id")
+  );
+  let productCondition = getProductCondition(
+    formData.get("product_condition")
   );
 
-  const trackingType = String(
-    formData.get("tracking_type") ?? "quantity"
+  const brandId = getOptionalUuid(formData.get("brand_id"));
+  const minimumStock = Number(
+    String(formData.get("minimum_stock") ?? "0").trim()
   );
-
-  const unit = String(
-    formData.get("unit") ?? "pcs"
-  ).trim();
-
-  const description =
-    String(formData.get("description") ?? "").trim() || null;
-
-  const categoryId = getOptionalUuid(
-    formData.get("category_id")
-  );
-
-  const brandId = getOptionalUuid(
-    formData.get("brand_id")
-  );
-
-  const minimumStockInput = String(
-    formData.get("minimum_stock") ?? "0"
-  ).trim();
-
-  const minimumStock = Number(minimumStockInput);
 
   if (!sku || !productName || !unit) {
     redirect("/products/new?error=required");
   }
 
-  if (
-    sku.length > 255 ||
-    productName.length > 255 ||
-    unit.length > 50
-  ) {
+  if (sku.length > 255 || productName.length > 255 || unit.length > 50) {
     redirect("/products/new?error=invalid_length");
   }
-if (!/^[A-Z0-9._-]+$/.test(sku)) {
-  redirect("/products/new?error=invalid_sku_format");
-}
+
+  if (!/^[A-Z0-9._-]+$/.test(sku)) {
+    redirect("/products/new?error=invalid_sku_format");
+  }
+
   if (barcode !== null && barcode.length > 255) {
     redirect("/products/new?error=invalid_barcode");
   }
 
-  if (
-    productType !== "goods" &&
-    productType !== "service"
-  ) {
+  if (!["goods", "service"].includes(productType)) {
     redirect("/products/new?error=invalid_type");
   }
 
-  if (
-    !["quantity", "imei", "serial"].includes(trackingType)
-  ) {
+  if (!["quantity", "imei", "serial"].includes(trackingType)) {
     redirect("/products/new?error=invalid_tracking");
   }
 
-  if (
-    !Number.isFinite(minimumStock) ||
-    minimumStock < 0
-  ) {
+  if (!Number.isFinite(minimumStock) || minimumStock < 0) {
     redirect("/products/new?error=invalid_stock");
   }
 
-  if (
-    categoryId === undefined ||
-    brandId === undefined
-  ) {
+  if (categoryId === undefined || subcategoryId === undefined || brandId === undefined) {
     redirect("/products/new?error=invalid_reference");
+  }
+
+  if (productType === "service") {
+    categoryId = null;
+    subcategoryId = null;
+    productCondition = null;
+  } else {
+    if (productCondition === undefined) {
+      redirect("/products/new?error=invalid_condition");
+    }
+
+    if (productCondition === null) {
+      redirect("/products/new?error=condition_required");
+    }
+
+    if (subcategoryId && !categoryId) {
+      redirect("/products/new?error=invalid_subcategory");
+    }
   }
 
   if (categoryId) {
     const { data: category, error } = await auth.supabase
       .from("product_categories")
-      .select("id")
+      .select("id, category_name, parent_id")
       .eq("id", categoryId)
+      .eq("is_active", true)
+      .is("parent_id", null)
+      .maybeSingle();
+
+    if (
+      error ||
+      !category ||
+      !MAIN_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      )
+    ) {
+      redirect("/products/new?error=invalid_category");
+    }
+  }
+
+  if (subcategoryId) {
+    const { data: subcategory, error } = await auth.supabase
+      .from("product_categories")
+      .select("id, parent_id")
+      .eq("id", subcategoryId)
       .eq("is_active", true)
       .maybeSingle();
 
-    if (error || !category) {
-      redirect("/products/new?error=invalid_category");
+    if (error || !subcategory || subcategory.parent_id !== categoryId) {
+      redirect("/products/new?error=invalid_subcategory");
     }
   }
 
@@ -374,6 +399,8 @@ if (!/^[A-Z0-9._-]+$/.test(sku)) {
       barcode,
       product_name: productName,
       category_id: categoryId,
+      product_subcategory_id: subcategoryId,
+      product_condition: productCondition,
       brand_id: brandId,
       product_type: productType,
       tracking_type: trackingType,
@@ -388,32 +415,21 @@ if (!/^[A-Z0-9._-]+$/.test(sku)) {
   if (error) {
     console.error("Create product failed:", error);
 
-    if (error.code === "23505") {
-      redirect("/products/new?error=duplicate");
-    }
-
-    if (error.code === "23503") {
-      redirect("/products/new?error=invalid_reference");
-    }
+    if (error.code === "23505") redirect("/products/new?error=duplicate");
+    if (error.code === "23503") redirect("/products/new?error=invalid_reference");
 
     redirect("/products/new?error=save_failed");
   }
 
   revalidatePath("/products");
-
   redirect(`/products?created=1&id=${data.id}`);
 }
 
 export async function updateProduct(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("id") ?? "").trim();
 
@@ -421,55 +437,39 @@ export async function updateProduct(formData: FormData) {
     redirect("/products?error=invalid_id");
   }
 
-  const { data: existingProduct, error: lookupError } =
-    await auth.supabase
-      .from("products")
-      .select("id")
-      .eq("id", productId)
-      .maybeSingle();
+  const { data: existingProduct, error: lookupError } = await auth.supabase
+    .from("products")
+    .select("id")
+    .eq("id", productId)
+    .maybeSingle();
 
   if (lookupError || !existingProduct) {
     redirect("/products?error=not_found");
   }
 
-  const productName = String(
-  formData.get("product_name") ?? ""
-)
-  .trim()
-  .replace(/\s+/g, " ")
-  .toUpperCase();
+  const productName = String(formData.get("product_name") ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
 
-  const barcode =
-    String(formData.get("barcode") ?? "").trim() || null;
+  const barcode = String(formData.get("barcode") ?? "").trim() || null;
+  const productType = String(formData.get("product_type") ?? "");
+  const trackingType = String(formData.get("tracking_type") ?? "");
+  const unit = String(formData.get("unit") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
 
-  const productType = String(
-    formData.get("product_type") ?? ""
+  let categoryId = getOptionalUuid(formData.get("category_id"));
+  let subcategoryId = getOptionalUuid(
+    formData.get("product_subcategory_id")
+  );
+  let productCondition = getProductCondition(
+    formData.get("product_condition")
   );
 
-  const trackingType = String(
-    formData.get("tracking_type") ?? ""
+  const brandId = getOptionalUuid(formData.get("brand_id"));
+  const minimumStock = Number(
+    String(formData.get("minimum_stock") ?? "0").trim()
   );
-
-  const unit = String(
-    formData.get("unit") ?? ""
-  ).trim();
-
-  const description =
-    String(formData.get("description") ?? "").trim() || null;
-
-  const categoryId = getOptionalUuid(
-    formData.get("category_id")
-  );
-
-  const brandId = getOptionalUuid(
-    formData.get("brand_id")
-  );
-
-  const minimumStockInput = String(
-    formData.get("minimum_stock") ?? "0"
-  ).trim();
-
-  const minimumStock = Number(minimumStockInput);
 
   if (!productName || !unit) {
     redirect(`/products/${productId}/edit?error=required`);
@@ -483,10 +483,7 @@ export async function updateProduct(formData: FormData) {
     redirect(`/products/${productId}/edit?error=invalid_barcode`);
   }
 
-  if (
-    productType !== "goods" &&
-    productType !== "service"
-  ) {
+  if (!["goods", "service"].includes(productType)) {
     redirect(`/products/${productId}/edit?error=invalid_type`);
   }
 
@@ -498,20 +495,54 @@ export async function updateProduct(formData: FormData) {
     redirect(`/products/${productId}/edit?error=invalid_stock`);
   }
 
-  if (categoryId === undefined || brandId === undefined) {
+  if (categoryId === undefined || subcategoryId === undefined || brandId === undefined) {
     redirect(`/products/${productId}/edit?error=invalid_reference`);
+  }
+
+  if (productType === "service") {
+    categoryId = null;
+    subcategoryId = null;
+    productCondition = null;
+  } else {
+    if (productCondition === undefined) {
+      redirect(`/products/${productId}/edit?error=invalid_condition`);
+    }
+
+    if (subcategoryId && !categoryId) {
+      redirect(`/products/${productId}/edit?error=invalid_subcategory`);
+    }
   }
 
   if (categoryId) {
     const { data: category, error } = await auth.supabase
       .from("product_categories")
-      .select("id")
+      .select("id, category_name, parent_id")
       .eq("id", categoryId)
+      .eq("is_active", true)
+      .is("parent_id", null)
+      .maybeSingle();
+
+    if (
+      error ||
+      !category ||
+      !MAIN_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      )
+    ) {
+      redirect(`/products/${productId}/edit?error=invalid_category`);
+    }
+  }
+
+  if (subcategoryId) {
+    const { data: subcategory, error } = await auth.supabase
+      .from("product_categories")
+      .select("id, parent_id")
+      .eq("id", subcategoryId)
       .eq("is_active", true)
       .maybeSingle();
 
-    if (error || !category) {
-      redirect(`/products/${productId}/edit?error=invalid_category`);
+    if (error || !subcategory || subcategory.parent_id !== categoryId) {
+      redirect(`/products/${productId}/edit?error=invalid_subcategory`);
     }
   }
 
@@ -534,6 +565,8 @@ export async function updateProduct(formData: FormData) {
       barcode,
       product_name: productName,
       category_id: categoryId,
+      product_subcategory_id: subcategoryId,
+      product_condition: productCondition,
       brand_id: brandId,
       product_type: productType,
       tracking_type: trackingType,
@@ -568,13 +601,8 @@ export async function updateProduct(formData: FormData) {
 export async function toggleProductStatus(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("id") ?? "").trim();
 
@@ -623,22 +651,17 @@ export async function toggleProductStatus(formData: FormData) {
   );
 }
 
+/* LEGACY PRODUCT VARIANT FUNCTIONS — dipertahankan */
+
 export async function createProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
 
-  if (!UUID_REGEX.test(productId)) {
-    redirect("/products?error=invalid_id");
-  }
+  if (!UUID_REGEX.test(productId)) redirect("/products?error=invalid_id");
 
   const variantSku = String(formData.get("variant_sku") ?? "")
     .trim()
@@ -650,8 +673,7 @@ export async function createProductVariant(formData: FormData) {
     .trim()
     .replace(/\s+/g, " ");
 
-  const barcode =
-    String(formData.get("barcode") ?? "").trim() || null;
+  const barcode = String(formData.get("barcode") ?? "").trim() || null;
 
   if (!variantSku || !variantName) {
     redirect(`/products/${productId}/variants/new?error=required`);
@@ -679,9 +701,7 @@ export async function createProductVariant(formData: FormData) {
     .eq("id", productId)
     .maybeSingle();
 
-  if (productError || !product) {
-    redirect("/products?error=not_found");
-  }
+  if (productError || !product) redirect("/products?error=not_found");
 
   if (!product.is_active) {
     redirect(`/products/${productId}/variants/new?error=inactive_product`);
@@ -761,17 +781,11 @@ export async function createProductVariant(formData: FormData) {
   redirect(`/products/${productId}/variants?created=1&id=${variant.id}`);
 }
 
-
 export async function updateProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
   const variantId = String(formData.get("variant_id") ?? "").trim();
@@ -793,18 +807,13 @@ export async function updateProductVariant(formData: FormData) {
     redirect(`/products/${productId}/variants/${variantId}?error=lookup_failed`);
   }
 
-  if (!existingVariant) {
-    redirect("/products?error=not_found");
-  }
+  if (!existingVariant) redirect("/products?error=not_found");
 
-  const variantName = String(
-    formData.get("variant_name") ?? ""
-  )
+  const variantName = String(formData.get("variant_name") ?? "")
     .trim()
     .replace(/\s+/g, " ");
 
-  const barcode =
-    String(formData.get("barcode") ?? "").trim() || null;
+  const barcode = String(formData.get("barcode") ?? "").trim() || null;
 
   if (!variantName) {
     redirect(`/products/${productId}/variants/${variantId}/edit?error=required`);
@@ -905,13 +914,8 @@ export async function updateProductVariant(formData: FormData) {
 export async function toggleProductVariantStatus(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
 
-  if (!auth.user) {
-    redirect("/login");
-  }
-
-  if (!auth.authorized) {
-    redirect("/products?error=forbidden");
-  }
+  if (!auth.user) redirect("/login");
+  if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
   const variantId = String(formData.get("variant_id") ?? "").trim();
@@ -932,24 +936,21 @@ export async function toggleProductVariantStatus(formData: FormData) {
     redirect(`/products/${productId}/variants/${variantId}?error=lookup_failed`);
   }
 
-  if (!variant) {
-    redirect("/products?error=not_found");
-  }
+  if (!variant) redirect("/products?error=not_found");
 
   const newStatus = !variant.is_active;
 
-  const { data: updatedVariant, error: updateError } =
-    await auth.supabase
-      .from("product_variants")
-      .update({
-        is_active: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", variantId)
-      .eq("product_id", productId)
-      .eq("is_active", variant.is_active)
-      .select("id")
-      .maybeSingle();
+  const { data: updatedVariant, error: updateError } = await auth.supabase
+    .from("product_variants")
+    .update({
+      is_active: newStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", variantId)
+    .eq("product_id", productId)
+    .eq("is_active", variant.is_active)
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     console.error("Toggle variant status failed:", updateError);
@@ -957,10 +958,9 @@ export async function toggleProductVariantStatus(formData: FormData) {
   }
 
   if (!updatedVariant) {
-  redirect(
-    `/products/${productId}/variants/${variantId}?error=status_conflict`
-  );
-}
+    redirect(`/products/${productId}/variants/${variantId}?error=status_conflict`);
+  }
+
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/products/${productId}/variants`);
   revalidatePath(`/products/${productId}/variants/${variantId}`);
@@ -972,4 +972,3 @@ export async function toggleProductVariantStatus(formData: FormData) {
     }`
   );
 }
-

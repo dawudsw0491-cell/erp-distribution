@@ -11,7 +11,7 @@ export const instant = false;
 export const metadata = {
   title: "Master Data | HEXACORE ERP",
   description:
-    "Pengelolaan master produk, pelanggan, supplier, dan warehouse.",
+    "Pengelolaan master produk, kategori, pelanggan, supplier, dan warehouse.",
 };
 
 const masterDataItems = [
@@ -19,18 +19,26 @@ const masterDataItems = [
     code: "MP",
     title: "Master Product",
     description:
-      "Kelola data produk, model, varian, SKU, atribut, dan karakteristik barang dalam satu area kerja.",
+      "Kelola SKU, barcode, nama produk, brand, satuan, tipe produk, dan metode pelacakan stok.",
     href: "/products",
     available: true,
   },
   {
-  code: "PL",
-  title: "Pelanggan",
-  description:
-    "Kelola identitas pelanggan, kontak, alamat, informasi komersial, dan hubungan bisnis.",
-  href: "/customers",
-  available: true,
-},
+    code: "KT",
+    title: "Kategori Produk",
+    description:
+      "Kelola kode kategori, nama kategori, kategori induk, subkategori, deskripsi, dan status kategori.",
+    href: "/product-categories",
+    available: true,
+  },
+  {
+    code: "PL",
+    title: "Pelanggan",
+    description:
+      "Kelola identitas pelanggan, kontak, alamat, informasi komersial, dan hubungan bisnis.",
+    href: "/customers",
+    available: true,
+  },
   {
     code: "SP",
     title: "Supplier",
@@ -99,8 +107,8 @@ export default async function MasterDataPage() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Pusat pengelolaan data referensi produk, pelanggan,
-              supplier, dan warehouse HEXACORE.
+              Pusat pengelolaan data referensi produk, kategori,
+              pelanggan, supplier, dan warehouse HEXACORE.
             </p>
           </header>
 
@@ -111,12 +119,12 @@ export default async function MasterDataPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-600">
-                Empat submodul untuk mengelola data referensi
+                Lima submodul untuk mengelola data referensi
                 utama perusahaan.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {masterDataItems.map((item) => {
                 const cardContent = (
                   <>
@@ -156,7 +164,7 @@ export default async function MasterDataPage() {
                   </>
                 );
 
-                return item.href ? (
+                return item.href && item.available ? (
                   <Link
                     key={item.code}
                     href={item.href}

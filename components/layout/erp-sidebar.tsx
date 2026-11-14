@@ -21,7 +21,7 @@ import {
   RotateCcw,
   Wallet,
   Settings,
-  BarChart3,
+  Tags,
 } from "lucide-react";
 
 import LogoutButton from "@/components/layout/logout-button";
@@ -58,6 +58,11 @@ const menuGroups: MenuGroup[] = [
         label: "Master Product",
         href: "/products",
         icon: <Package size={16} />,
+      },
+      {
+        label: "Kategori Produk",
+        href: "/product-categories",
+        icon: <Tags size={16} />,
       },
       {
         label: "Pelanggan",
@@ -198,7 +203,6 @@ export default function ErpSidebar({
 
   return (
     <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-      {/* BRAND */}
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
@@ -216,7 +220,6 @@ export default function ErpSidebar({
         </div>
       </div>
 
-      {/* NAVIGATION */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
         <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           Main Navigation
@@ -229,9 +232,9 @@ export default function ErpSidebar({
             ? group.children.some((child) =>
                 isRouteActive(currentPath, child.href)
               )
-              : group.href
-                ? isRouteActive(currentPath, group.href)
-                : false;
+            : group.href
+              ? isRouteActive(currentPath, group.href)
+              : false;
 
           const isExpanded = Boolean(expandedGroups[group.label]);
 
@@ -269,7 +272,6 @@ export default function ErpSidebar({
                   />
                 </button>
 
-                {/* ANIMATED DROPDOWN */}
                 <div
                   className={`grid transition-all duration-300 ease-in-out ${
                     isExpanded
@@ -352,7 +354,6 @@ export default function ErpSidebar({
         })}
       </nav>
 
-      {/* FOOTER */}
       <div className="border-t border-slate-200 p-4">
         <div className="mb-3 rounded-lg bg-slate-50 p-3">
           <p className="text-xs font-semibold text-slate-700">

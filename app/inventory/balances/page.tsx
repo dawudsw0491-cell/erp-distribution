@@ -20,7 +20,7 @@ type SearchParams = Promise<{
 }>;
 
 type BalanceRow = {
-  product_variant_id: string;
+  product_id: string | null;
   warehouse_id: string;
   available_quantity: number;
   reserved_quantity: number;
@@ -32,19 +32,14 @@ type BalanceRow = {
   average_unit_cost: number;
 };
 
-type VariantRow = {
+type ProductRow = {
   id: string;
-  variant_sku: string;
-  variant_name: string;
-  barcode: string | null;
-  product_id: string;
-  products: {
-    sku: string;
-    product_name: string;
-    tracking_type: string;
-    unit: string;
-    minimum_stock: number;
-  } | null;
+  sku: string;
+  product_name: string;
+  tracking_type: string;
+  unit: string;
+  minimum_stock: number;
+  is_active: boolean;
 };
 
 type WarehouseRow = {
@@ -63,7 +58,7 @@ type StockStatus =
   | "zero";
 
 type StockDisplayRow = {
-  variant: VariantRow;
+  product: ProductRow;
   warehouse: WarehouseRow;
   available: number;
   reserved: number;
@@ -260,63 +255,49 @@ async function StockBalanceContent({
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  const [
-    variantResult,
-    warehouseResult,
-    balanceResult,
-  ] = await Promise.all([
-    fetchAllRows<VariantRow>(
-      supabase
-        .from("product_variants")
-        .select(`
-          id,
-          variant_sku,
-          variant_name,
-          barcode,
-          product_id,
-          products!inner (
-            sku,
-            product_name,
-            tracking_type,
-            unit,
-            minimum_stock
+  const [productResult, warehouseResult, balanceResult] =
+    await Promise.all([
+      fetchAllRows<ProductRow>(
+        supabase
+          .from("products")
+          .select(
+            "id, sku, product_name, tracking_type, unit, minimum_stock, is_active"
           )
-        `)
-        .eq("is_active", true)
-        .eq("products.is_active", true)
-        .order("variant_sku", { ascending: true })
-    ),
+          .eq("is_active", true)
+          .order("sku", { ascending: true })
+      ),
 
-    fetchAllRows<WarehouseRow>(
-      supabase
-        .from("warehouses")
-        .select("id, warehouse_code, warehouse_name")
-        .eq("is_active", true)
-        .order("warehouse_name", { ascending: true })
-    ),
+      fetchAllRows<WarehouseRow>(
+        supabase
+          .from("warehouses")
+          .select("id, warehouse_code, warehouse_name")
+          .eq("is_active", true)
+          .order("warehouse_name", { ascending: true })
+      ),
 
-    fetchAllRows<BalanceRow>(
-      supabase
-        .from("inventory_balances")
-        .select(`
-          product_variant_id,
-          warehouse_id,
-          available_quantity,
-          reserved_quantity,
-          quarantine_quantity,
-          damaged_quantity,
-          repair_quantity,
-          on_hand_quantity,
-          inventory_value,
-          average_unit_cost
-        `)
-        .order("product_variant_id", { ascending: true })
-        .order("warehouse_id", { ascending: true })
-    ),
-  ]);
+      fetchAllRows<BalanceRow>(
+        supabase
+          .from("inventory_balances")
+          .select(`
+            product_id,
+            warehouse_id,
+            available_quantity,
+            reserved_quantity,
+            quarantine_quantity,
+            damaged_quantity,
+            repair_quantity,
+            on_hand_quantity,
+            inventory_value,
+            average_unit_cost
+          `)
+          .not("product_id", "is", null)
+          .order("product_id", { ascending: true })
+          .order("warehouse_id", { ascending: true })
+      ),
+    ]);
 
-  if (variantResult.error) {
-    return <StockBalanceError message={variantResult.error.message} />;
+  if (productResult.error) {
+    return <StockBalanceError message={productResult.error.message} />;
   }
 
   if (warehouseResult.error) {
@@ -327,7 +308,7 @@ async function StockBalanceContent({
     return <StockBalanceError message={balanceResult.error.message} />;
   }
 
-  const variants = variantResult.data;
+  const products = productResult.data;
   const warehouses = warehouseResult.data;
   const balances = balanceResult.data;
 
@@ -348,22 +329,24 @@ async function StockBalanceContent({
   const balanceMap = new Map<string, BalanceRow>();
 
   for (const balance of balances) {
+    if (!balance.product_id) continue;
+
     balanceMap.set(
-      `${balance.product_variant_id}:${balance.warehouse_id}`,
+      `${balance.product_id}:${balance.warehouse_id}`,
       balance
     );
   }
 
   const safeKeyword = keyword.toLowerCase();
 
-  let rows: StockDisplayRow[] = variants.flatMap((variant) =>
+  let rows: StockDisplayRow[] = products.flatMap((product) =>
     selectedWarehouses.map((warehouse) => {
       const balance = balanceMap.get(
-        `${variant.id}:${warehouse.id}`
+        `${product.id}:${warehouse.id}`
       );
 
       return {
-        variant,
+        product,
         warehouse,
         available: Number(balance?.available_quantity ?? 0),
         reserved: Number(balance?.reserved_quantity ?? 0),
@@ -373,9 +356,7 @@ async function StockBalanceContent({
         onHand: Number(balance?.on_hand_quantity ?? 0),
         value: Number(balance?.inventory_value ?? 0),
         averageCost: Number(balance?.average_unit_cost ?? 0),
-        minimumStock: Number(
-          variant.products?.minimum_stock ?? 0
-        ),
+        minimumStock: Number(product.minimum_stock ?? 0),
       };
     })
   );
@@ -383,11 +364,8 @@ async function StockBalanceContent({
   if (safeKeyword) {
     rows = rows.filter((row) =>
       [
-        row.variant.variant_sku,
-        row.variant.variant_name,
-        row.variant.barcode ?? "",
-        row.variant.products?.sku ?? "",
-        row.variant.products?.product_name ?? "",
+        row.product.sku,
+        row.product.product_name,
         row.warehouse.warehouse_code,
         row.warehouse.warehouse_name,
       ]
@@ -401,7 +379,6 @@ async function StockBalanceContent({
     rows = rows.filter((row) => row.onHand === 0);
   } else if (statusFilter !== "all") {
     const column = STATUS_COLUMNS[statusFilter];
-
     rows = rows.filter((row) => row[column] > 0);
   }
 
@@ -464,7 +441,7 @@ async function StockBalanceContent({
                 </h1>
               </div>
               <p className="mt-1 text-sm text-slate-600">
-                Saldo persediaan produk berdasarkan varian dan gudang.
+                Saldo persediaan produk berdasarkan Product Master dan gudang.
               </p>
             </div>
           </header>
@@ -476,7 +453,7 @@ async function StockBalanceContent({
                 {numberFormat(totalRows)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Kombinasi varian dan gudang
+                Kombinasi produk dan gudang
               </p>
             </div>
 
@@ -536,7 +513,7 @@ async function StockBalanceContent({
                   type="search"
                   defaultValue={keyword}
                   maxLength={100}
-                  placeholder="SKU, produk, barcode, gudang..."
+                  placeholder="SKU, produk, gudang..."
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
                 />
               </div>
@@ -623,7 +600,7 @@ async function StockBalanceContent({
                   Data tidak ditemukan
                 </h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Tidak ada varian produk aktif atau data tidak sesuai
+                  Tidak ada produk aktif atau data tidak sesuai
                   dengan filter yang dipilih.
                 </p>
               </div>
@@ -634,7 +611,7 @@ async function StockBalanceContent({
                     <thead className="bg-slate-50 text-slate-700">
                       <tr>
                         {[
-                          "Produk / Varian",
+                          "Produk",
                           "SKU",
                           "Gudang",
                           "Available",
@@ -664,21 +641,16 @@ async function StockBalanceContent({
 
                         return (
                           <tr
-                            key={`${row.variant.id}:${row.warehouse.id}`}
+                            key={`${row.product.id}:${row.warehouse.id}`}
                             className="hover:bg-blue-50/40"
                           >
                             <td className="px-4 py-4">
                               <p className="font-semibold text-slate-900">
-                                {row.variant.products?.product_name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {row.variant.variant_name}
+                                {row.product.product_name}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                                  {getTrackingLabel(
-                                    row.variant.products?.tracking_type ?? "-"
-                                  )}
+                                  {getTrackingLabel(row.product.tracking_type)}
                                 </span>
 
                                 {row.onHand === 0 && (
@@ -700,13 +672,8 @@ async function StockBalanceContent({
                               )}
                             </td>
 
-                            <td className="whitespace-nowrap px-4 py-4 text-center">
-                              <p className="font-medium text-slate-800">
-                                {row.variant.variant_sku}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {row.variant.products?.sku ?? "-"}
-                              </p>
+                            <td className="whitespace-nowrap px-4 py-4 text-center font-medium text-slate-800">
+                              {row.product.sku}
                             </td>
 
                             <td className="whitespace-nowrap px-4 py-4 text-center text-slate-700">

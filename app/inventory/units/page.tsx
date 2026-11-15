@@ -26,23 +26,19 @@ type Identifier = {
 
 type UnitRow = {
   id: string;
-  product_variant_id: string;
+  product_id: string | null;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
   received_at: string | null;
-  unit_cost: number;
+  unit_cost: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
-  product_variants: {
-    variant_sku: string;
-    variant_name: string;
-    products: {
-      sku: string;
-      product_name: string;
-      tracking_type: string;
-    } | null;
+  products: {
+    sku: string;
+    product_name: string;
+    tracking_type: string;
   } | null;
   warehouses: {
     warehouse_code: string;
@@ -172,17 +168,16 @@ async function UnitRegistryContent({
     ? params.status!
     : "";
 
-  const requestedPage = Math.max(
-    1,
-    Number.parseInt(params.page ?? "1", 10) || 1
-  );
+  const parsedPage = Number.parseInt(params.page ?? "1", 10);
+  const requestedPage =
+    Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   const [unitResult, warehouseResult] = await Promise.all([
     supabase
       .from("product_units")
       .select(`
         id,
-        product_variant_id,
+        product_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -191,14 +186,10 @@ async function UnitRegistryContent({
         notes,
         created_at,
         updated_at,
-        product_variants!inner (
-          variant_sku,
-          variant_name,
-          products!inner (
-            sku,
-            product_name,
-            tracking_type
-          )
+        products!fk_product_units_product_id (
+          sku,
+          product_name,
+          tracking_type
         ),
         warehouses (
           warehouse_code,
@@ -215,6 +206,7 @@ async function UnitRegistryContent({
     supabase
       .from("warehouses")
       .select("id, warehouse_code, warehouse_name")
+      .eq("is_active", true)
       .order("warehouse_name", { ascending: true }),
   ]);
 
@@ -230,6 +222,9 @@ async function UnitRegistryContent({
             <p className="mt-2 text-sm text-slate-600">
               Data unit, identifier, atau gudang tidak dapat dibaca.
               Periksa relasi tabel dan kebijakan akses database.
+            </p>
+            <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">
+              {unitResult.error?.message ?? warehouseResult.error?.message}
             </p>
           </div>
         </main>
@@ -255,21 +250,19 @@ async function UnitRegistryContent({
 
     rows = rows.filter((unit) => {
       const identifiers = (unit.product_unit_identifiers ?? [])
-        .map((item) => [
-          item.identifier_type,
-          item.identifier_value,
-        ].join(" "))
+        .map((item) =>
+          [item.identifier_type, item.identifier_value].join(" ")
+        )
         .join(" ");
 
       return [
         unit.unit_code,
         unit.unit_status,
         unit.notes ?? "",
-        unit.product_variants?.variant_sku ?? "",
-        unit.product_variants?.variant_name ?? "",
-        unit.product_variants?.products?.sku ?? "",
-        unit.product_variants?.products?.product_name ?? "",
+        unit.products?.sku ?? "",
+        unit.products?.product_name ?? "",
         unit.warehouses?.warehouse_name ?? "",
+        unit.warehouses?.warehouse_code ?? "",
         identifiers,
       ]
         .join(" ")
@@ -334,7 +327,6 @@ async function UnitRegistryContent({
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
-
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -546,7 +538,7 @@ async function UnitRegistryContent({
                       <tr>
                         {[
                           "Unit Code",
-                          "Produk / Varian",
+                          "Produk",
                           "IMEI / Serial Number",
                           "Gudang",
                           "Status",
@@ -576,21 +568,25 @@ async function UnitRegistryContent({
 
                           <td className="px-4 py-4">
                             <p className="font-semibold text-slate-900">
-                              {unit.product_variants?.products?.product_name ?? "-"}
+                              {unit.products?.product_name ?? "Produk legacy"}
                             </p>
-                            <p className="mt-1 text-xs text-slate-600">
-                              {unit.product_variants?.variant_name ?? "-"}
+                            <p className="mt-1 text-xs text-slate-500">
+                              SKU: {unit.products?.sku ?? "-"}
                             </p>
-                            <p className="mt-1 text-xs text-slate-400">
-                              SKU: {unit.product_variants?.variant_sku ?? "-"}
-                            </p>
+                            {unit.products?.tracking_type && (
+                              <p className="mt-1 text-xs text-slate-400">
+                                Tracking: {unit.products.tracking_type.toUpperCase()}
+                              </p>
+                            )}
                           </td>
 
                           <td className="px-4 py-4">
                             {(unit.product_unit_identifiers ?? []).length > 0 ? (
                               <div className="space-y-2">
                                 {unit.product_unit_identifiers.map((identifier) => (
-                                  <div key={`${identifier.identifier_type}:${identifier.identifier_value}`}>
+                                  <div
+                                    key={`${identifier.identifier_type}:${identifier.identifier_value}`}
+                                  >
                                     <p className="text-xs text-slate-500">
                                       {identifier.identifier_type.replaceAll("_", " ")}
                                     </p>
@@ -624,7 +620,7 @@ async function UnitRegistryContent({
                           </td>
 
                           <td className="whitespace-nowrap px-4 py-4 text-right font-medium text-slate-800">
-                            {currencyFormat(Number(unit.unit_cost))}
+                            {currencyFormat(Number(unit.unit_cost ?? 0))}
                           </td>
 
                           <td className="max-w-[200px] px-4 py-4 text-slate-600">
@@ -690,8 +686,9 @@ async function UnitRegistryContent({
             <p className="mt-1 text-sm text-blue-800">
               Setiap unit fisik memiliki identitas tersendiri. IMEI dan serial
               number dikelola melalui tabel identifier, sedangkan status dan
-              lokasi unit mengikuti catatan product_units. Halaman ini hanya
-              untuk pemantauan dan tidak mengubah data unit.
+              lokasi unit mengikuti catatan product_units. Identitas produk
+              mengacu langsung ke Product Master. Halaman ini hanya untuk
+              pemantauan dan tidak mengubah data unit.
             </p>
           </section>
 

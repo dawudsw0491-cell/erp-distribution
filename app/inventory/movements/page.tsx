@@ -16,7 +16,6 @@ export const metadata = {
   description: "Riwayat pergerakan persediaan",
 };
 
-
 type SearchParams = Promise<{
   q?: string;
   type?: string;
@@ -27,11 +26,10 @@ type SearchParams = Promise<{
   error?: string;
 }>;
 
-
 type MovementRow = {
   id: string;
   movement_group_id: string | null;
-  product_variant_id: string;
+  product_id: string;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -53,14 +51,13 @@ type MovementRow = {
   approved_at: string | null;
 };
 
-type VariantRow = {
+type ProductRow = {
   id: string;
-  variant_sku: string;
-  variant_name: string;
-  products: {
-    sku: string;
-    product_name: string;
-  } | null;
+  sku: string;
+  product_name: string;
+  tracking_type: string;
+  unit: string;
+  is_active: boolean;
 };
 
 type WarehouseRow = {
@@ -200,7 +197,7 @@ async function StockMovementContent({
   const params = await searchParams;
 
   const successMessage = params.success ?? "";
-const errorMessage = params.error ?? "";
+  const errorMessage = params.error ?? "";
 
   const keyword = (params.q ?? "").trim().slice(0, 100);
   const typeFilter = params.type ?? "";
@@ -223,87 +220,78 @@ const errorMessage = params.error ?? "";
     ? statusFilter
     : "";
 
-  const [
-    movementResult,
-    warehouseResult,
-  ] = await Promise.all([
-    supabase
-      .from("inventory_movements")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(MAX_RECORDS),
+  const [movementResult, warehouseResult, productResult] =
+    await Promise.all([
+      supabase
+        .from("inventory_movements")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(MAX_RECORDS),
 
-    supabase
-      .from("warehouses")
-      .select("id, warehouse_code, warehouse_name")
-      .order("warehouse_name", { ascending: true }),
-  ]);
+      supabase
+        .from("warehouses")
+        .select("id, warehouse_code, warehouse_name")
+        .eq("is_active", true)
+        .order("warehouse_name", { ascending: true }),
 
-  if (movementResult.error || warehouseResult.error) {
-  if (movementResult.error) {
-    console.error(
-      "[Stock Movement] Database error:",
-      movementResult.error
+      supabase
+        .from("products")
+        .select("id, sku, product_name, tracking_type, unit, is_active")
+        .eq("is_active", true)
+        .order("sku", { ascending: true })
+        .limit(5000),
+    ]);
+
+  if (
+    movementResult.error ||
+    warehouseResult.error ||
+    productResult.error
+  ) {
+    if (movementResult.error) {
+      console.error(
+        "[Stock Movement] Database error:",
+        movementResult.error
+      );
+    }
+
+    if (warehouseResult.error) {
+      console.error(
+        "[Stock Movement] Warehouse error:",
+        warehouseResult.error
+      );
+    }
+
+    if (productResult.error) {
+      console.error(
+        "[Stock Movement] Product error:",
+        productResult.error
+      );
+    }
+
+    return (
+      <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
+        <ErpSidebar activePath="/inventory" />
+        <main className="min-w-0 flex-1 p-5 md:p-8">
+          <div className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6">
+            <h1 className="font-bold text-red-700">
+              Gagal Memuat Stock Movement
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Data pergerakan persediaan, produk, atau gudang tidak dapat dibaca.
+              Silakan periksa koneksi dan hak akses database.
+            </p>
+          </div>
+        </main>
+      </div>
     );
   }
-
-  if (warehouseResult.error) {
-    console.error(
-      "[Stock Movement] Warehouse error:",
-      warehouseResult.error
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
-      <ErpSidebar activePath="/inventory" />
-      <main className="min-w-0 flex-1 p-5 md:p-8">
-        <div className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6">
-          <h1 className="font-bold text-red-700">
-            Gagal Memuat Stock Movement
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Data pergerakan persediaan atau data gudang tidak dapat dibaca.
-            Silakan periksa koneksi dan hak akses database.
-          </p>
-        </div>
-      </main>
-    </div>
-  );
-}
 
   const movements = (movementResult.data ?? []) as MovementRow[];
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
+  const products = (productResult.data ?? []) as ProductRow[];
 
-  
-const variantResult = await supabase
-  .from("product_variants")
-  .select(`
-    id,
-    variant_sku,
-    variant_name,
-    products (
-      sku,
-      product_name
-    )
-  `)
-  .order("variant_sku", { ascending: true })
-  .limit(2000);
-
-if (variantResult.error) {
-  console.error(
-    "[Stock Movement] Product variant error:",
-    variantResult.error
-  );
-
-  throw new Error("Gagal memuat varian produk.");
-}
-
-const variants = (variantResult.data ?? []) as unknown as VariantRow[];
-
-
-  const variantMap = new Map(
-    variants.map((item) => [item.id, item])
+  const productMap = new Map(
+    products.map((item) => [item.id, item])
   );
 
   const warehouseMap = new Map(
@@ -312,7 +300,7 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
 
   let rows = movements.map((movement) => ({
     movement,
-    variant: variantMap.get(movement.product_variant_id),
+    product: productMap.get(movement.product_id),
     warehouse: warehouseMap.get(movement.warehouse_id),
   }));
 
@@ -337,7 +325,7 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
   if (keyword) {
     const search = keyword.toLowerCase();
 
-    rows = rows.filter(({ movement, variant, warehouse }) =>
+    rows = rows.filter(({ movement, product, warehouse }) =>
       [
         movement.id,
         movement.source_reference_number ?? "",
@@ -346,10 +334,8 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
         movement.movement_type,
         movement.status,
         movement.inventory_status ?? "",
-        variant?.variant_sku ?? "",
-        variant?.variant_name ?? "",
-        variant?.products?.sku ?? "",
-        variant?.products?.product_name ?? "",
+        product?.sku ?? "",
+        product?.product_name ?? "",
         warehouse?.warehouse_name ?? "",
         warehouse?.warehouse_code ?? "",
       ]
@@ -416,7 +402,6 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
-
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -443,9 +428,6 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
               Kembali ke Inventory
             </Link>
           </header>
-
-
-          {/* NOTIFIKASI HASIL STOCK MOVEMENT */}
 
           {successMessage === "draft_created" && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -533,142 +515,158 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
             </div>
           </section>
 
+          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Buat Draft Stock Movement
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Buat transaksi mutasi stok sebelum dilakukan posting.
+              </p>
+            </div>
 
-<section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-  <div className="mb-4">
-    <h2 className="text-lg font-semibold text-slate-900">
-      Buat Draft Stock Movement
-    </h2>
-    <p className="mt-1 text-sm text-slate-500">
-      Buat transaksi mutasi stok sebelum dilakukan posting.
-    </p>
-  </div>
+            <form
+              action={createInventoryMovementAction}
+              className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+            >
+              <div>
+                <label
+                  htmlFor="movement-product"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Produk
+                </label>
+                <select
+                  id="movement-product"
+                  name="product_id"
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                >
+                  <option value="">Pilih Produk</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.sku} - {product.product_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-  <form
-    action={createInventoryMovementAction}
-    className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-  >
-    {/* 1. VARIAN PRODUK */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Varian Produk
-      </label>
-      <select
-        name="product_variant_id"
-        required
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-      >
-        <option value="">Pilih Varian Produk</option>
-        {variants.map((variant) => (
-          <option key={variant.id} value={variant.id}>
-            {variant.variant_sku} - {variant.variant_name}
-          </option>
-        ))}
-      </select>
-    </div>
+              <div>
+                <label
+                  htmlFor="movement-warehouse-create"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Warehouse
+                </label>
+                <select
+                  id="movement-warehouse-create"
+                  name="warehouse_id"
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                >
+                  <option value="">Pilih Warehouse</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.warehouse_code} - {warehouse.warehouse_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-    {/* 2. WAREHOUSE */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Warehouse
-      </label>
-      <select
-        name="warehouse_id"
-        required
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-      >
-        <option value="">Pilih Warehouse</option>
-        {warehouses.map((warehouse) => (
-          <option key={warehouse.id} value={warehouse.id}>
-            {warehouse.warehouse_name}
-          </option>
-        ))}
-      </select>
-    </div>
+              <div>
+                <label
+                  htmlFor="movement-type-create"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Jenis Movement
+                </label>
+                <select
+                  id="movement-type-create"
+                  name="movement_type"
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                >
+                  <option value="">Pilih Jenis Movement</option>
+                  <option value="purchase">Purchase (Barang Masuk)</option>
+                  <option value="sale">Sale (Barang Keluar)</option>
+                  <option value="adjustment">Adjustment</option>
+                  <option value="customer_return">Customer Return</option>
+                  <option value="supplier_return">Supplier Return</option>
+                  <option value="opening_balance">Opening Balance</option>
+                </select>
+              </div>
 
-    {/* 3. JENIS MOVEMENT */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Jenis Movement
-      </label>
-      <select
-        name="movement_type"
-        required
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-      >
-        <option value="">Pilih Jenis Movement</option>
-        <option value="purchase">Purchase (Barang Masuk)</option>
-        <option value="sale">Sale (Barang Keluar)</option>
-        <option value="adjustment">Adjustment</option>
-        <option value="customer_return">Customer Return</option>
-        <option value="supplier_return">Supplier Return</option>
-        <option value="opening_balance">Opening Balance</option>
-      </select>
-    </div>
+              <div>
+                <label
+                  htmlFor="movement-quantity"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Quantity Delta
+                </label>
+                <input
+                  id="movement-quantity"
+                  type="number"
+                  name="quantity_delta"
+                  step="any"
+                  required
+                  placeholder="Contoh: 10 atau -5"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Masuk positif, keluar negatif.
+                </p>
+              </div>
 
-    {/* 4. QUANTITY */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Quantity Delta
-      </label>
-      <input
-        type="number"
-        name="quantity_delta"
-        step="any"
-        required
-        placeholder="Contoh: 10 atau -5"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-      />
-      <p className="mt-1 text-xs text-slate-500">
-        Masuk positif, keluar negatif.
-      </p>
-    </div>
+              <div>
+                <label
+                  htmlFor="movement-inventory-status"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Inventory Status
+                </label>
+                <select
+                  id="movement-inventory-status"
+                  name="inventory_status"
+                  required
+                  defaultValue="available"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                >
+                  <option value="available">Available</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="quarantine">Quarantine</option>
+                  <option value="damaged">Damaged</option>
+                  <option value="repair">Repair</option>
+                </select>
+              </div>
 
-    {/* 5. STATUS INVENTORY */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Inventory Status
-      </label>
-      <select
-        name="inventory_status"
-        required
-        defaultValue="available"
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-      >
-        <option value="available">Available</option>
-        <option value="reserved">Reserved</option>
-        <option value="quarantine">Quarantine</option>
-        <option value="damaged">Damaged</option>
-        <option value="repair">Repair</option>
-      </select>
-    </div>
+              <div>
+                <label
+                  htmlFor="movement-notes"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Catatan
+                </label>
+                <input
+                  id="movement-notes"
+                  type="text"
+                  name="notes"
+                  maxLength={500}
+                  placeholder="Masukkan keterangan movement"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                />
+              </div>
 
-    {/* 6. CATATAN */}
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        Catatan
-      </label>
-      <input
-        type="text"
-        name="notes"
-        maxLength={500}
-        placeholder="Masukkan keterangan movement"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-      />
-    </div>
-
-    {/* 7. TOMBOL SIMPAN */}
-    <div className="flex flex-wrap gap-2 xl:col-span-3">
-      <button
-        type="submit"
-        className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-      >
-        Buat Draft Movement
-      </button>
-    </div>
-  </form>
-</section>
-
+              <div className="flex flex-wrap gap-2 xl:col-span-3">
+                <button
+                  type="submit"
+                  disabled={products.length === 0 || warehouses.length === 0}
+                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Buat Draft Movement
+                </button>
+              </div>
+            </form>
+          </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="font-semibold text-slate-900">
@@ -816,35 +814,32 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1200px] text-sm">
-                    
-<thead className="bg-slate-50 text-slate-700">
-  <tr>
-    {[
-      "Tanggal",
-      "Jenis",
-      "Produk / Varian",
-      "Gudang",
-      "Kuantitas",
-      "Status Stok",
-      "Referensi",
-      "Status",
-      "Waktu Posting",
-      "Aksi",
-    ].map((heading) => (
-      <th
-        key={heading}
-        className="whitespace-nowrap px-4 py-4 text-left font-semibold"
-      >
-        {heading}
-      </th>
-    ))}
-  </tr>
-</thead>
-
-
+                    <thead className="bg-slate-50 text-slate-700">
+                      <tr>
+                        {[
+                          "Tanggal",
+                          "Jenis",
+                          "Produk",
+                          "Gudang",
+                          "Kuantitas",
+                          "Status Stok",
+                          "Referensi",
+                          "Status",
+                          "Waktu Posting",
+                          "Aksi",
+                        ].map((heading) => (
+                          <th
+                            key={heading}
+                            className="whitespace-nowrap px-4 py-4 text-left font-semibold"
+                          >
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedRows.map(({ movement, variant, warehouse }) => (
+                      {paginatedRows.map(({ movement, product, warehouse }) => (
                         <tr
                           key={movement.id}
                           className="align-top hover:bg-blue-50/40"
@@ -867,13 +862,10 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
 
                           <td className="px-4 py-4">
                             <p className="font-semibold text-slate-900">
-                              {variant?.products?.product_name ?? "Produk tidak ditemukan"}
+                              {product?.product_name ?? "Produk tidak ditemukan"}
                             </p>
-                            <p className="mt-1 text-xs text-slate-600">
-                              {variant?.variant_name ?? "-"}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-400">
-                              {variant?.variant_sku ?? "-"}
+                            <p className="mt-1 text-xs text-slate-500">
+                              SKU: {product?.sku ?? "-"}
                             </p>
                           </td>
 
@@ -937,57 +929,55 @@ const variants = (variantResult.data ?? []) as unknown as VariantRow[];
                             </span>
                           </td>
 
-                          
-<td className="whitespace-nowrap px-4 py-4 text-slate-600">
-  {formatDate(movement.posted_at)}
-</td>
+                          <td className="whitespace-nowrap px-4 py-4 text-slate-600">
+                            {formatDate(movement.posted_at)}
+                          </td>
 
-<td className="whitespace-nowrap px-4 py-4">
-  {movement.status === "draft" && (
-    <form
-      action={postInventoryMovementAction}
-      className="flex min-w-[150px] flex-col gap-2"
-    >
-      <input
-        type="hidden"
-        name="movement_id"
-        value={movement.id}
-      />
+                          <td className="whitespace-nowrap px-4 py-4">
+                            {movement.status === "draft" && (
+                              <form
+                                action={postInventoryMovementAction}
+                                className="flex min-w-[150px] flex-col gap-2"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="movement_id"
+                                  value={movement.id}
+                                />
 
-      <input
-        type="number"
-        name="unit_cost"
-        min="0"
-        step="any"
-        placeholder="Biaya per unit"
-        className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs"
-      />
+                                <input
+                                  type="number"
+                                  name="unit_cost"
+                                  min="0"
+                                  step="any"
+                                  placeholder="Biaya per unit"
+                                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs"
+                                />
 
-      <button
-        type="submit"
-        className="rounded bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-      >
-        Post Movement
-      </button>
-    </form>
-  )}
+                                <button
+                                  type="submit"
+                                  className="rounded bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                                >
+                                  Post Movement
+                                </button>
+                              </form>
+                            )}
 
-  {movement.status === "posted" && (
-    <span className="text-xs text-slate-500">
-      Immutable
-    </span>
-  )}
+                            {movement.status === "posted" && (
+                              <span className="text-xs text-slate-500">
+                                Immutable
+                              </span>
+                            )}
 
-  {movement.status === "cancelled" && (
-    <span className="text-xs text-slate-500">
-      Tidak tersedia
-    </span>
-  )}
-</td>
-
+                            {movement.status === "cancelled" && (
+                              <span className="text-xs text-slate-500">
+                                Tidak tersedia
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
-                    </tbody> 
+                    </tbody>
                   </table>
                 </div>
 

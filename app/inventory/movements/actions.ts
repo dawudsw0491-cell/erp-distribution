@@ -34,30 +34,13 @@ export async function createInventoryMovementAction(
     "inventory.update"
   );
 
-  const productVariantId = getString(
-    formData,
-    "product_variant_id"
-  );
+  const productId = getString(formData, "product_id");
+  const warehouseId = getString(formData, "warehouse_id");
+  const movementType = getString(formData, "movement_type");
+  const quantityRaw = getString(formData, "quantity_delta");
 
-  const warehouseId = getString(
-    formData,
-    "warehouse_id"
-  );
-
-  const movementType = getString(
-    formData,
-    "movement_type"
-  );
-
-  const quantityRaw = getString(
-    formData,
-    "quantity_delta"
-  );
-
-  const inventoryStatus = getString(
-    formData,
-    "inventory_status"
-  ) || "available";
+  const inventoryStatus =
+    getString(formData, "inventory_status") || "available";
 
   const productUnitId = getOptionalString(
     formData,
@@ -74,13 +57,10 @@ export async function createInventoryMovementAction(
     "status_to"
   );
 
-  const notes = getOptionalString(
-    formData,
-    "notes"
-  );
+  const notes = getOptionalString(formData, "notes");
 
   if (
-    !isValidUUID(productVariantId) ||
+    !isValidUUID(productId) ||
     !isValidUUID(warehouseId)
   ) {
     redirectWithError("Produk atau warehouse tidak valid.");
@@ -92,24 +72,20 @@ export async function createInventoryMovementAction(
     redirectWithError("Jumlah mutasi tidak valid.");
   }
 
-  if (
-    productUnitId &&
-    !isValidUUID(productUnitId)
-  ) {
+  if (productUnitId && !isValidUUID(productUnitId)) {
     redirectWithError("Product unit tidak valid.");
   }
 
-  if (
-    movementType === "status_change" &&
-    !productUnitId
-  ) {
-    redirectWithError("Product unit wajib diisi untuk status change.");
+  if (movementType === "status_change" && !productUnitId) {
+    redirectWithError(
+      "Product unit wajib diisi untuk status change."
+    );
   }
 
   const { error } = await supabase.rpc(
-    "create_inventory_movement",
+    "create_inventory_movement_by_product",
     {
-      p_product_variant_id: productVariantId,
+      p_product_id: productId,
       p_warehouse_id: warehouseId,
       p_movement_type: movementType,
       p_quantity_delta: quantity,
@@ -129,9 +105,7 @@ export async function createInventoryMovementAction(
   revalidatePath("/inventory/balances");
   revalidatePath("/inventory/units");
 
-  redirect(
-    "/inventory/movements?success=draft_created"
-  );
+  redirect("/inventory/movements?success=draft_created");
 }
 
 export async function postInventoryMovementAction(
@@ -141,23 +115,16 @@ export async function postInventoryMovementAction(
     "inventory.update"
   );
 
-  const movementId = getString(
-    formData,
-    "movement_id"
-  );
+  const movementId = getString(formData, "movement_id");
 
   if (!isValidUUID(movementId)) {
     redirectWithError("Movement ID tidak valid.");
   }
 
-  const unitCostRaw = getOptionalString(
-    formData,
-    "unit_cost"
-  );
+  const unitCostRaw = getOptionalString(formData, "unit_cost");
 
-  const unitCost = unitCostRaw === null
-    ? null
-    : Number(unitCostRaw);
+  const unitCost =
+    unitCostRaw === null ? null : Number(unitCostRaw);
 
   if (
     unitCost !== null &&
@@ -182,7 +149,5 @@ export async function postInventoryMovementAction(
   revalidatePath("/inventory/balances");
   revalidatePath("/inventory/units");
 
-  redirect(
-    "/inventory/movements?success=posted"
-  );
+  redirect("/inventory/movements?success=posted");
 }

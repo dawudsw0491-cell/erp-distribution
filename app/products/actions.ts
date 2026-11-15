@@ -62,18 +62,70 @@ function generateMasterCode(prefix: string, name: string) {
   return `${prefix}-${slug}-${suffix}`;
 }
 
+/**
+ * Menghasilkan SKU pendek melalui database sequence.
+ * Format: HXA-000001
+ */
+async function generateProductSku(
+  supabase: Awaited<
+    ReturnType<typeof getAuthorizationContext>
+  >["supabase"]
+): Promise<string> {
+  const { data, error } = await supabase.rpc(
+    "generate_product_sku"
+  );
+
+  if (error || !data) {
+    throw new Error(
+      `Gagal membuat SKU produk: ${
+        error?.message ?? "SKU kosong"
+      }`
+    );
+  }
+
+  return data;
+}
+
 function getProductCondition(
   value: FormDataEntryValue | null
 ): ProductCondition | null | undefined {
   const normalized = String(value ?? "").trim().toUpperCase();
 
   if (!normalized) return null;
+
   if (normalized === "BARU" || normalized === "SECOND") {
     return normalized;
   }
 
   return undefined;
 }
+
+function normalizeProductName(value: FormDataEntryValue | null) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+function getProductType(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function getTrackingType(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function getMinimumStock(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "0").trim();
+
+  if (!normalized) return 0;
+
+  return Number(normalized);
+}
+
+/* =========================================================
+   CATEGORY MASTER
+========================================================= */
 
 export async function createCategory(
   input: string
@@ -96,10 +148,15 @@ export async function createCategory(
 
   const categoryName = normalizeMasterName(input);
 
-  if (!MAIN_CATEGORIES.includes(categoryName as (typeof MAIN_CATEGORIES)[number])) {
+  if (
+    !MAIN_CATEGORIES.includes(
+      categoryName as (typeof MAIN_CATEGORIES)[number]
+    )
+  ) {
     return {
       success: false,
-      error: "Kategori utama harus menggunakan salah satu dari enam kategori resmi.",
+      error:
+        "Kategori utama harus menggunakan salah satu dari enam kategori resmi.",
     };
   }
 
@@ -165,6 +222,10 @@ export async function createCategory(
     name: data.category_name,
   };
 }
+
+/* =========================================================
+   BRAND MASTER
+========================================================= */
 
 export async function createBrand(
   input: string
@@ -253,6 +314,7 @@ export async function createBrand(
   }
 
   revalidatePath("/products/new");
+  revalidatePath("/products");
 
   return {
     success: true,
@@ -261,51 +323,61 @@ export async function createBrand(
   };
 }
 
+/* =========================================================
+   PRODUCT MASTER - CREATE
+========================================================= */
+
 export async function createProduct(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
 
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
 
-  const sku = String(formData.get("sku") ?? "")
-    .trim()
-    .replace(/\s+/g, "")
-    .toUpperCase();
+  // SKU tidak lagi diterima dari form.
+  // Sistem menjadi satu-satunya pihak yang membuat SKU.
+  const sku = await generateProductSku(auth.supabase);
 
-  const productName = String(formData.get("product_name") ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toUpperCase();
+  const productName = normalizeProductName(
+    formData.get("product_name")
+  );
 
-  const barcode = String(formData.get("barcode") ?? "").trim() || null;
-  const productType = String(formData.get("product_type") ?? "goods");
-  const trackingType = String(formData.get("tracking_type") ?? "quantity");
+  const barcode =
+    String(formData.get("barcode") ?? "").trim() || null;
+
+  const productType = getProductType(
+    formData.get("product_type") ?? "goods"
+  );
+
+  let trackingType = getTrackingType(
+    formData.get("tracking_type") ?? "quantity"
+  );
+
   const unit = String(formData.get("unit") ?? "pcs").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
+  const description =
+    String(formData.get("description") ?? "").trim() || null;
 
   let categoryId = getOptionalUuid(formData.get("category_id"));
+
   let subcategoryId = getOptionalUuid(
     formData.get("product_subcategory_id")
   );
+
   let productCondition = getProductCondition(
     formData.get("product_condition")
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
-  const minimumStock = Number(
-    String(formData.get("minimum_stock") ?? "0").trim()
+
+  let minimumStock = getMinimumStock(
+    formData.get("minimum_stock")
   );
 
-  if (!sku || !productName || !unit) {
+  if (!productName || !unit) {
     redirect("/products/new?error=required");
   }
 
-  if (sku.length > 255 || productName.length > 255 || unit.length > 50) {
+  if (productName.length > 255 || unit.length > 50) {
     redirect("/products/new?error=invalid_length");
-  }
-
-  if (!/^[A-Z0-9._-]+$/.test(sku)) {
-    redirect("/products/new?error=invalid_sku_format");
   }
 
   if (barcode !== null && barcode.length > 255) {
@@ -324,14 +396,21 @@ export async function createProduct(formData: FormData) {
     redirect("/products/new?error=invalid_stock");
   }
 
-  if (categoryId === undefined || subcategoryId === undefined || brandId === undefined) {
+  if (
+    categoryId === undefined ||
+    subcategoryId === undefined ||
+    brandId === undefined
+  ) {
     redirect("/products/new?error=invalid_reference");
   }
 
   if (productType === "service") {
+    // Layanan tidak memiliki klasifikasi persediaan barang.
     categoryId = null;
     subcategoryId = null;
     productCondition = null;
+    trackingType = "quantity";
+    minimumStock = 0;
   } else {
     if (productCondition === undefined) {
       redirect("/products/new?error=invalid_condition");
@@ -415,15 +494,25 @@ export async function createProduct(formData: FormData) {
   if (error) {
     console.error("Create product failed:", error);
 
-    if (error.code === "23505") redirect("/products/new?error=duplicate");
-    if (error.code === "23503") redirect("/products/new?error=invalid_reference");
+    if (error.code === "23505") {
+      redirect("/products/new?error=duplicate");
+    }
+
+    if (error.code === "23503") {
+      redirect("/products/new?error=invalid_reference");
+    }
 
     redirect("/products/new?error=save_failed");
   }
 
   revalidatePath("/products");
+
   redirect(`/products?created=1&id=${data.id}`);
 }
+
+/* =========================================================
+   PRODUCT MASTER - UPDATE
+========================================================= */
 
 export async function updateProduct(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
@@ -447,69 +536,92 @@ export async function updateProduct(formData: FormData) {
     redirect("/products?error=not_found");
   }
 
-  const productName = String(formData.get("product_name") ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toUpperCase();
+  const editPath = `/products/${productId}/edit`;
 
-  const barcode = String(formData.get("barcode") ?? "").trim() || null;
-  const productType = String(formData.get("product_type") ?? "");
-  const trackingType = String(formData.get("tracking_type") ?? "");
+  const productName = normalizeProductName(
+    formData.get("product_name")
+  );
+
+  const barcode =
+    String(formData.get("barcode") ?? "").trim() || null;
+
+  const productType = getProductType(formData.get("product_type"));
+
+  let trackingType = getTrackingType(
+    formData.get("tracking_type")
+  );
+
   const unit = String(formData.get("unit") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
+
+  const description =
+    String(formData.get("description") ?? "").trim() || null;
 
   let categoryId = getOptionalUuid(formData.get("category_id"));
+
   let subcategoryId = getOptionalUuid(
     formData.get("product_subcategory_id")
   );
+
   let productCondition = getProductCondition(
     formData.get("product_condition")
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
-  const minimumStock = Number(
-    String(formData.get("minimum_stock") ?? "0").trim()
+
+  let minimumStock = getMinimumStock(
+    formData.get("minimum_stock")
   );
 
   if (!productName || !unit) {
-    redirect(`/products/${productId}/edit?error=required`);
+    redirect(`${editPath}?error=required`);
   }
 
   if (productName.length > 255 || unit.length > 50) {
-    redirect(`/products/${productId}/edit?error=invalid_length`);
+    redirect(`${editPath}?error=invalid_length`);
   }
 
   if (barcode !== null && barcode.length > 255) {
-    redirect(`/products/${productId}/edit?error=invalid_barcode`);
+    redirect(`${editPath}?error=invalid_barcode`);
   }
 
-  if (!["goods", "service"].includes(productType)) {
-    redirect(`/products/${productId}/edit?error=invalid_type`);
+  if (productType !== "goods" && productType !== "service") {
+    redirect(`${editPath}?error=invalid_type`);
   }
 
   if (!["quantity", "imei", "serial"].includes(trackingType)) {
-    redirect(`/products/${productId}/edit?error=invalid_tracking`);
+    redirect(`${editPath}?error=invalid_tracking`);
   }
 
   if (!Number.isFinite(minimumStock) || minimumStock < 0) {
-    redirect(`/products/${productId}/edit?error=invalid_stock`);
+    redirect(`${editPath}?error=invalid_stock`);
   }
 
-  if (categoryId === undefined || subcategoryId === undefined || brandId === undefined) {
-    redirect(`/products/${productId}/edit?error=invalid_reference`);
+  if (
+    categoryId === undefined ||
+    subcategoryId === undefined ||
+    brandId === undefined
+  ) {
+    redirect(`${editPath}?error=invalid_reference`);
   }
 
   if (productType === "service") {
+    // Aturan layanan harus konsisten saat create maupun update.
     categoryId = null;
     subcategoryId = null;
     productCondition = null;
+    trackingType = "quantity";
+    minimumStock = 0;
   } else {
     if (productCondition === undefined) {
-      redirect(`/products/${productId}/edit?error=invalid_condition`);
+      redirect(`${editPath}?error=invalid_condition`);
+    }
+
+    if (productCondition === null) {
+      redirect(`${editPath}?error=condition_required`);
     }
 
     if (subcategoryId && !categoryId) {
-      redirect(`/products/${productId}/edit?error=invalid_subcategory`);
+      redirect(`${editPath}?error=invalid_subcategory`);
     }
   }
 
@@ -529,7 +641,7 @@ export async function updateProduct(formData: FormData) {
         category.category_name as (typeof MAIN_CATEGORIES)[number]
       )
     ) {
-      redirect(`/products/${productId}/edit?error=invalid_category`);
+      redirect(`${editPath}?error=invalid_category`);
     }
   }
 
@@ -542,7 +654,7 @@ export async function updateProduct(formData: FormData) {
       .maybeSingle();
 
     if (error || !subcategory || subcategory.parent_id !== categoryId) {
-      redirect(`/products/${productId}/edit?error=invalid_subcategory`);
+      redirect(`${editPath}?error=invalid_subcategory`);
     }
   }
 
@@ -555,13 +667,15 @@ export async function updateProduct(formData: FormData) {
       .maybeSingle();
 
     if (error || !brand) {
-      redirect(`/products/${productId}/edit?error=invalid_brand`);
+      redirect(`${editPath}?error=invalid_brand`);
     }
   }
 
   const { error } = await auth.supabase
     .from("products")
     .update({
+      // SKU sengaja tidak disertakan.
+      // Identitas SKU tidak boleh berubah setelah produk dibuat.
       barcode,
       product_name: productName,
       category_id: categoryId,
@@ -581,22 +695,26 @@ export async function updateProduct(formData: FormData) {
     console.error("Update product failed:", error);
 
     if (error.code === "23505") {
-      redirect(`/products/${productId}/edit?error=duplicate`);
+      redirect(`${editPath}?error=duplicate`);
     }
 
     if (error.code === "23503") {
-      redirect(`/products/${productId}/edit?error=invalid_reference`);
+      redirect(`${editPath}?error=invalid_reference`);
     }
 
-    redirect(`/products/${productId}/edit?error=save_failed`);
+    redirect(`${editPath}?error=save_failed`);
   }
 
   revalidatePath("/products");
   revalidatePath(`/products/${productId}`);
-  revalidatePath(`/products/${productId}/edit`);
+  revalidatePath(editPath);
 
   redirect(`/products/${productId}?updated=1`);
 }
+
+/* =========================================================
+   PRODUCT MASTER - ACTIVATE / DEACTIVATE
+========================================================= */
 
 export async function toggleProductStatus(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
@@ -647,11 +765,16 @@ export async function toggleProductStatus(formData: FormData) {
   revalidatePath(`/products/${productId}/edit`);
 
   redirect(
-    `/products/${productId}?status=${newStatus ? "activated" : "deactivated"}`
+    `/products/${productId}?status=${
+      newStatus ? "activated" : "deactivated"
+    }`
   );
 }
 
-/* LEGACY PRODUCT VARIANT FUNCTIONS — dipertahankan */
+/* =========================================================
+   LEGACY PRODUCT VARIANT FUNCTIONS
+   Dipertahankan sementara selama proses migrasi.
+========================================================= */
 
 export async function createProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
@@ -661,7 +784,9 @@ export async function createProductVariant(formData: FormData) {
 
   const productId = String(formData.get("product_id") ?? "").trim();
 
-  if (!UUID_REGEX.test(productId)) redirect("/products?error=invalid_id");
+  if (!UUID_REGEX.test(productId)) {
+    redirect("/products?error=invalid_id");
+  }
 
   const variantSku = String(formData.get("variant_sku") ?? "")
     .trim()
@@ -701,7 +826,9 @@ export async function createProductVariant(formData: FormData) {
     .eq("id", productId)
     .maybeSingle();
 
-  if (productError || !product) redirect("/products?error=not_found");
+  if (productError || !product) {
+    redirect("/products?error=not_found");
+  }
 
   if (!product.is_active) {
     redirect(`/products/${productId}/variants/new?error=inactive_product`);
@@ -804,10 +931,14 @@ export async function updateProductVariant(formData: FormData) {
 
   if (lookupError) {
     console.error("Variant lookup failed:", lookupError);
-    redirect(`/products/${productId}/variants/${variantId}?error=lookup_failed`);
+    redirect(
+      `/products/${productId}/variants/${variantId}?error=lookup_failed`
+    );
   }
 
-  if (!existingVariant) redirect("/products?error=not_found");
+  if (!existingVariant) {
+    redirect("/products?error=not_found");
+  }
 
   const variantName = String(formData.get("variant_name") ?? "")
     .trim()
@@ -816,15 +947,21 @@ export async function updateProductVariant(formData: FormData) {
   const barcode = String(formData.get("barcode") ?? "").trim() || null;
 
   if (!variantName) {
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=required`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=required`
+    );
   }
 
   if (variantName.length > 200) {
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=invalid_name`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=invalid_name`
+    );
   }
 
   if (barcode !== null && barcode.length > 100) {
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=invalid_barcode`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=invalid_barcode`
+    );
   }
 
   const { data: duplicateName, error: nameLookupError } =
@@ -839,11 +976,15 @@ export async function updateProductVariant(formData: FormData) {
 
   if (nameLookupError) {
     console.error("Variant name lookup failed:", nameLookupError);
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=lookup_failed`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
+    );
   }
 
   if (duplicateName) {
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=duplicate_name`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=duplicate_name`
+    );
   }
 
   if (barcode !== null) {
@@ -858,11 +999,15 @@ export async function updateProductVariant(formData: FormData) {
 
     if (barcodeLookupError) {
       console.error("Variant barcode lookup failed:", barcodeLookupError);
-      redirect(`/products/${productId}/variants/${variantId}/edit?error=lookup_failed`);
+      redirect(
+        `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
+      );
     }
 
     if (duplicateBarcode) {
-      redirect(`/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`);
+      redirect(
+        `/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`
+      );
     }
 
     const { data: duplicateProductBarcode, error: productBarcodeError } =
@@ -875,11 +1020,15 @@ export async function updateProductVariant(formData: FormData) {
 
     if (productBarcodeError) {
       console.error("Product barcode lookup failed:", productBarcodeError);
-      redirect(`/products/${productId}/variants/${variantId}/edit?error=lookup_failed`);
+      redirect(
+        `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
+      );
     }
 
     if (duplicateProductBarcode) {
-      redirect(`/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`);
+      redirect(
+        `/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`
+      );
     }
   }
 
@@ -897,10 +1046,14 @@ export async function updateProductVariant(formData: FormData) {
     console.error("Update product variant failed:", updateError);
 
     if (updateError.code === "23505") {
-      redirect(`/products/${productId}/variants/${variantId}/edit?error=duplicate`);
+      redirect(
+        `/products/${productId}/variants/${variantId}/edit?error=duplicate`
+      );
     }
 
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=save_failed`);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=save_failed`
+    );
   }
 
   revalidatePath(`/products/${productId}`);
@@ -933,10 +1086,14 @@ export async function toggleProductVariantStatus(formData: FormData) {
 
   if (lookupError) {
     console.error("Variant status lookup failed:", lookupError);
-    redirect(`/products/${productId}/variants/${variantId}?error=lookup_failed`);
+    redirect(
+      `/products/${productId}/variants/${variantId}?error=lookup_failed`
+    );
   }
 
-  if (!variant) redirect("/products?error=not_found");
+  if (!variant) {
+    redirect("/products?error=not_found");
+  }
 
   const newStatus = !variant.is_active;
 
@@ -954,11 +1111,15 @@ export async function toggleProductVariantStatus(formData: FormData) {
 
   if (updateError) {
     console.error("Toggle variant status failed:", updateError);
-    redirect(`/products/${productId}/variants/${variantId}?error=status_update_failed`);
+    redirect(
+      `/products/${productId}/variants/${variantId}?error=status_update_failed`
+    );
   }
 
   if (!updatedVariant) {
-    redirect(`/products/${productId}/variants/${variantId}?error=status_conflict`);
+    redirect(
+      `/products/${productId}/variants/${variantId}?error=status_conflict`
+    );
   }
 
   revalidatePath(`/products/${productId}`);

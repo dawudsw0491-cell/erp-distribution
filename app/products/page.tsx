@@ -245,7 +245,7 @@ async function ProductsContent({
         minimum_stock,
         is_active,
         created_at,
-        category:product_categories(category_name),
+        category:product_categories!products_category_id_fkey(category_name),
         brand:brands(brand_name)
       `,
       { count: "exact" }
@@ -332,7 +332,15 @@ async function ProductsContent({
   );
 
   if (error) {
-    console.error("Load products failed:", error);
+   console.error(
+  "LOAD_PRODUCTS_ERROR:",
+  JSON.stringify({
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+  })
+);
 
     return (
       <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">

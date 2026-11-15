@@ -98,7 +98,16 @@ function getRecommendation(
   } else if (
     /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
     (
-      ["SAMSUNG", "XIAOMI", "OPPO", "VIVO", "REALME", "INFINIX", "TECNO", "POCO"].includes(brand) &&
+      [
+        "SAMSUNG",
+        "XIAOMI",
+        "OPPO",
+        "VIVO",
+        "REALME",
+        "INFINIX",
+        "TECNO",
+        "POCO",
+      ].includes(brand) &&
       /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name)
     )
   ) {
@@ -148,23 +157,21 @@ export default function EditProductForm({
     (item) => item.id === product.category_id
   );
 
-  const initialBrand = brands.find(
-    (item) => item.id === product.brand_id
-  );
-
   const [productName, setProductName] = useState(product.product_name);
   const [brandId, setBrandId] = useState(product.brand_id ?? "");
-  const [condition, setCondition] = useState(product.product_condition ?? "");
+  const [condition, setCondition] = useState(
+    product.product_condition ?? ""
+  );
   const [productType, setProductType] = useState(product.product_type);
-  const [categoryId, setCategoryId] = useState(product.category_id ?? "");
+  const [categoryId, setCategoryId] = useState(
+    product.category_id ?? ""
+  );
   const [subcategoryId, setSubcategoryId] = useState(
     product.product_subcategory_id ?? ""
   );
 
   const selectedBrandName =
-    brands.find((item) => item.id === brandId)?.brand_name ??
-    initialBrand?.brand_name ??
-    "";
+    brands.find((item) => item.id === brandId)?.brand_name ?? "";
 
   const mainCategories = useMemo(
     () =>
@@ -198,7 +205,13 @@ export default function EditProductForm({
             categories
           )
         : null,
-    [productName, selectedBrandName, condition, categories, productType]
+    [
+      productName,
+      selectedBrandName,
+      condition,
+      categories,
+      productType,
+    ]
   );
 
   function applyRecommendation() {
@@ -213,8 +226,11 @@ export default function EditProductForm({
       <input type="hidden" name="id" value={product.id} />
 
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
+        {/* SKU */}
         <div className="min-w-0">
-          <label htmlFor="sku" className={labelClass}>SKU</label>
+          <label htmlFor="sku" className={labelClass}>
+            SKU
+          </label>
           <input
             id="sku"
             value={product.sku}
@@ -226,8 +242,11 @@ export default function EditProductForm({
           </p>
         </div>
 
+        {/* Barcode */}
         <div className="min-w-0">
-          <label htmlFor="barcode" className={labelClass}>Barcode</label>
+          <label htmlFor="barcode" className={labelClass}>
+            Barcode
+          </label>
           <input
             id="barcode"
             name="barcode"
@@ -237,6 +256,7 @@ export default function EditProductForm({
           />
         </div>
 
+        {/* Product Name */}
         <div className="min-w-0 md:col-span-2">
           <label htmlFor="product_name" className={labelClass}>
             Nama Produk <span className="text-red-500">*</span>
@@ -254,8 +274,11 @@ export default function EditProductForm({
           />
         </div>
 
+        {/* Brand */}
         <div className="min-w-0">
-          <label htmlFor="brand_id" className={labelClass}>Brand</label>
+          <label htmlFor="brand_id" className={labelClass}>
+            Brand
+          </label>
           <select
             id="brand_id"
             name="brand_id"
@@ -272,6 +295,7 @@ export default function EditProductForm({
           </select>
         </div>
 
+        {/* Product Type */}
         <div className="min-w-0">
           <label htmlFor="product_type" className={labelClass}>
             Jenis Produk
@@ -280,7 +304,15 @@ export default function EditProductForm({
             id="product_type"
             name="product_type"
             value={productType}
-            onChange={(event) => setProductType(event.target.value)}
+            onChange={(event) => {
+              const nextType = event.target.value;
+              setProductType(nextType);
+
+              if (nextType === "service") {
+                setCategoryId("");
+                setSubcategoryId("");
+              }
+            }}
             className={inputClass}
           >
             <option value="goods">Barang</option>
@@ -288,6 +320,7 @@ export default function EditProductForm({
           </select>
         </div>
 
+        {/* Goods Classification */}
         {productType === "goods" && (
           <>
             <div className="min-w-0">
@@ -304,7 +337,9 @@ export default function EditProductForm({
                 }}
                 className={inputClass}
               >
-                <option value="">Belum ditentukan (data lama)</option>
+                <option value="">
+                  Belum ditentukan (data lama)
+                </option>
                 <option value="BARU">BARU</option>
                 <option value="SECOND">SECOND</option>
               </select>
@@ -325,12 +360,16 @@ export default function EditProductForm({
                 className={inputClass}
               >
                 <option value="">Tanpa Kategori</option>
+
                 {initialCategory &&
-                  !mainCategories.some((item) => item.id === initialCategory.id) && (
+                  !mainCategories.some(
+                    (item) => item.id === initialCategory.id
+                  ) && (
                     <option value={initialCategory.id}>
                       {initialCategory.category_name} (Data lama)
                     </option>
                   )}
+
                 {mainCategories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.category_name}
@@ -340,53 +379,68 @@ export default function EditProductForm({
             </div>
 
             <div className="min-w-0">
-              <label htmlFor="product_subcategory_id" className={labelClass}>
+              <label
+                htmlFor="product_subcategory_id"
+                className={labelClass}
+              >
                 Subkategori
               </label>
               <select
                 id="product_subcategory_id"
                 name="product_subcategory_id"
                 value={subcategoryId}
-                onChange={(event) => setSubcategoryId(event.target.value)}
+                onChange={(event) =>
+                  setSubcategoryId(event.target.value)
+                }
                 disabled={!categoryId}
                 className={inputClass}
               >
                 <option value="">Tanpa Subkategori</option>
+
                 {product.product_subcategory_id &&
                   !subcategories.some(
-                    (item) => item.id === product.product_subcategory_id
+                    (item) =>
+                      item.id === product.product_subcategory_id
                   ) &&
                   subcategoryId === product.product_subcategory_id && (
                     <option value={product.product_subcategory_id}>
                       Subkategori sebelumnya (Data lama)
                     </option>
                   )}
+
                 {subcategories.map((subcategory) => (
-                  <option key={subcategory.id} value={subcategory.id}>
+                  <option
+                    key={subcategory.id}
+                    value={subcategory.id}
+                  >
                     {subcategory.category_name}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="md:col-span-2">
+            {/* Category Recommendation */}
+            <div className="min-w-0 md:col-span-2">
               {recommendation ? (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <p className="text-sm font-semibold text-blue-900">
                     Rekomendasi Klasifikasi Produk
                   </p>
+
                   <p className="mt-2 text-sm text-slate-700">
                     {recommendation.categoryName}
                     {recommendation.subcategoryName
                       ? ` → ${recommendation.subcategoryName}`
                       : ""}
                   </p>
+
                   {recommendation.missingSubcategory && (
                     <p className="mt-1 text-xs text-amber-700">
-                      Subkategori yang sesuai belum tersedia atau tidak aktif.
-                      Kategori utama tetap dapat digunakan.
+                      Subkategori yang sesuai belum tersedia atau tidak
+                      aktif. Kategori utama tetap dapat digunakan.
                     </p>
                   )}
+
                   <button
                     type="button"
                     onClick={applyRecommendation}
@@ -397,30 +451,65 @@ export default function EditProductForm({
                 </div>
               ) : (
                 <p className="text-xs text-slate-500">
-                  Isi nama produk dan kondisi untuk memperoleh rekomendasi
-                  klasifikasi berdasarkan master kategori yang tersedia.
+                  Isi nama produk dan kondisi untuk memperoleh
+                  rekomendasi klasifikasi berdasarkan master kategori
+                  yang tersedia.
                 </p>
               )}
             </div>
           </>
         )}
 
-        <div className="min-w-0">
-          <label htmlFor="tracking_type" className={labelClass}>
-            Metode Tracking
-          </label>
-          <select
-            id="tracking_type"
-            name="tracking_type"
-            defaultValue={product.tracking_type}
-            className={inputClass}
-          >
-            <option value="quantity">Kuantitas</option>
-            <option value="imei">IMEI</option>
-            <option value="serial">Serial Number</option>
-          </select>
-        </div>
+        {/* Goods Tracking and Minimum Stock */}
+        {productType === "goods" ? (
+          <>
+            <div className="min-w-0">
+              <label htmlFor="tracking_type" className={labelClass}>
+                Metode Tracking
+              </label>
+              <select
+                id="tracking_type"
+                name="tracking_type"
+                defaultValue={product.tracking_type}
+                className={inputClass}
+              >
+                <option value="quantity">Kuantitas</option>
+                <option value="imei">IMEI</option>
+                <option value="serial">Serial Number</option>
+              </select>
+            </div>
 
+            <div className="min-w-0">
+              <label htmlFor="minimum_stock" className={labelClass}>
+                Minimum Stock
+              </label>
+              <input
+                id="minimum_stock"
+                name="minimum_stock"
+                type="number"
+                min="0"
+                step="any"
+                defaultValue={String(product.minimum_stock ?? 0)}
+                className={inputClass}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              type="hidden"
+              name="tracking_type"
+              value="quantity"
+            />
+            <input
+              type="hidden"
+              name="minimum_stock"
+              value="0"
+            />
+          </>
+        )}
+
+        {/* Unit */}
         <div className="min-w-0">
           <label htmlFor="unit" className={labelClass}>
             Satuan <span className="text-red-500">*</span>
@@ -434,25 +523,13 @@ export default function EditProductForm({
             className={inputClass}
           />
         </div>
-
-        <div className="min-w-0">
-          <label htmlFor="minimum_stock" className={labelClass}>
-            Minimum Stock
-          </label>
-          <input
-            id="minimum_stock"
-            name="minimum_stock"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={String(product.minimum_stock ?? 0)}
-            className={inputClass}
-          />
-        </div>
       </div>
 
+      {/* Description */}
       <div className="min-w-0">
-        <label htmlFor="description" className={labelClass}>Deskripsi</label>
+        <label htmlFor="description" className={labelClass}>
+          Deskripsi
+        </label>
         <textarea
           id="description"
           name="description"
@@ -462,6 +539,7 @@ export default function EditProductForm({
         />
       </div>
 
+      {/* Actions */}
       <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
         <Link
           href={`/products/${product.id}`}

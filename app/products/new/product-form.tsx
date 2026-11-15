@@ -59,9 +59,7 @@ function getRecommendation(
   let mainCategory = "";
   let subcategory = "";
 
-  if (
-    /\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)
-  ) {
+  if (/\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)) {
     mainCategory = "TABLET";
   } else if (
     /\b(MACBOOK|LAPTOP|NOTEBOOK|CHROMEBOOK|THINKPAD|VIVOBOOK|ZENBOOK)\b/.test(name)
@@ -87,8 +85,10 @@ function getRecommendation(
     subcategory = "SMARTPHONE IOS";
   } else if (
     /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
-    (["SAMSUNG", "XIAOMI", "OPPO", "VIVO", "REALME", "INFINIX", "TECNO", "POCO"].includes(brand) &&
-      /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name))
+    (
+      ["SAMSUNG", "XIAOMI", "OPPO", "VIVO", "REALME", "INFINIX", "TECNO", "POCO"].includes(brand) &&
+      /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name)
+    )
   ) {
     mainCategory = "SMARTPHONE";
     subcategory = "SMARTPHONE ANDROID";
@@ -162,10 +162,13 @@ function BrandSelector({
       setItems((current) => {
         if (current.some((item) => item.id === result.id)) return current;
 
-        return [...current, {
-          id: result.id,
-          brand_name: result.name,
-        }].sort((a, b) => a.brand_name.localeCompare(b.brand_name));
+        return [
+          ...current,
+          {
+            id: result.id,
+            brand_name: result.name,
+          },
+        ].sort((a, b) => a.brand_name.localeCompare(b.brand_name));
       });
 
       onChange(result.id, result.name);
@@ -187,7 +190,9 @@ function BrandSelector({
         value={isManual ? "__manual__" : value}
         className={inputClass}
         onChange={(event) => {
-          const selected = items.find((item) => item.id === event.target.value);
+          const selected = items.find(
+            (item) => item.id === event.target.value
+          );
 
           if (event.target.value === "__manual__") {
             setIsManual(true);
@@ -201,11 +206,13 @@ function BrandSelector({
         }}
       >
         <option value="">Pilih Brand</option>
+
         {items.map((item) => (
           <option key={item.id} value={item.id}>
             {item.brand_name}
           </option>
         ))}
+
         <option value="__manual__">+ Input Brand Baru</option>
       </select>
 
@@ -235,7 +242,9 @@ function BrandSelector({
         </div>
       )}
 
-      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-1.5 text-xs text-red-600">{error}</p>
+      )}
     </div>
   );
 }
@@ -268,9 +277,7 @@ export default function ProductForm({
   const subcategories = useMemo(
     () =>
       categories.filter(
-        (item) =>
-          item.parent_id === categoryId &&
-          item.parent_id !== null
+        (item) => item.parent_id === categoryId
       ),
     [categories, categoryId]
   );
@@ -278,7 +285,12 @@ export default function ProductForm({
   const recommendation = useMemo(
     () =>
       productType === "goods"
-        ? getRecommendation(productName, brandName, condition, categories)
+        ? getRecommendation(
+            productName,
+            brandName,
+            condition,
+            categories
+          )
         : null,
     [productName, brandName, condition, categories, productType]
   );
@@ -298,30 +310,15 @@ export default function ProductForm({
         </h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>
-              SKU <span className="text-red-600">*</span>
-            </label>
-            <input
-              name="sku"
-              required
-              maxLength={255}
-              className={inputClass}
-              placeholder="Contoh: IPH-15-128-BLK"
-              onChange={(event) => {
-                event.target.value = event.target.value.toUpperCase();
-              }}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Barcode</label>
-            <input
-              name="barcode"
-              maxLength={255}
-              className={inputClass}
-              placeholder="Barcode produk"
-            />
+          <div className="md:col-span-2 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-semibold text-blue-900">
+              SKU Otomatis
+            </p>
+            <p className="mt-1 text-sm text-blue-800">
+              SKU akan dibuat oleh sistem saat produk disimpan.
+              Setiap produk memiliki SKU unik dan tidak dapat diubah
+              secara manual.
+            </p>
           </div>
 
           <div className="md:col-span-2">
@@ -335,7 +332,9 @@ export default function ProductForm({
               value={productName}
               className={inputClass}
               placeholder="Nama lengkap produk"
-              onChange={(event) => setProductName(event.target.value.toUpperCase())}
+              onChange={(event) =>
+                setProductName(event.target.value.toUpperCase())
+              }
             />
           </div>
 
@@ -354,8 +353,10 @@ export default function ProductForm({
               name="product_type"
               value={productType}
               onChange={(event) => {
-                setProductType(event.target.value);
-                if (event.target.value === "service") {
+                const nextType = event.target.value;
+                setProductType(nextType);
+
+                if (nextType === "service") {
                   setCategoryId("");
                   setSubcategoryId("");
                 }
@@ -414,7 +415,9 @@ export default function ProductForm({
                   name="product_subcategory_id"
                   value={subcategoryId}
                   disabled={!categoryId}
-                  onChange={(event) => setSubcategoryId(event.target.value)}
+                  onChange={(event) =>
+                    setSubcategoryId(event.target.value)
+                  }
                   className={inputClass}
                 >
                   <option value="">Pilih Subkategori</option>
@@ -432,6 +435,7 @@ export default function ProductForm({
                     <p className="text-sm font-semibold text-blue-900">
                       Rekomendasi Klasifikasi Produk
                     </p>
+
                     <p className="mt-2 text-sm text-slate-700">
                       {recommendation.categoryName}
                       {recommendation.subcategoryName
@@ -441,7 +445,7 @@ export default function ProductForm({
 
                     {recommendation.missingSubcategory && (
                       <p className="mt-1 text-xs text-amber-700">
-                        Subkategori yang sesuai belum tersedia atau tidak aktif.
+                        Subkategori yang sesuai belum tersedia.
                         Kategori utama tetap dapat digunakan.
                       </p>
                     )}
@@ -456,27 +460,46 @@ export default function ProductForm({
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">
-                    Isi nama produk dan kondisi untuk memperoleh rekomendasi
-                    klasifikasi. Sistem hanya menggunakan kategori yang sudah
-                    tersedia.
+                    Isi nama produk dan kondisi untuk memperoleh
+                    rekomendasi klasifikasi. Sistem hanya menggunakan
+                    kategori yang sudah tersedia.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className={labelClass}>Metode Tracking</label>
+                <select
+                  name="tracking_type"
+                  defaultValue="quantity"
+                  className={inputClass}
+                >
+                  <option value="quantity">Quantity</option>
+                  <option value="imei">IMEI</option>
+                  <option value="serial">Serial Number</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={labelClass}>Minimum Stock</label>
+                <input
+                  name="minimum_stock"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue="0"
+                  className={inputClass}
+                />
               </div>
             </>
           )}
 
-          <div>
-            <label className={labelClass}>Metode Tracking</label>
-            <select
-              name="tracking_type"
-              defaultValue="quantity"
-              className={inputClass}
-            >
-              <option value="quantity">Quantity</option>
-              <option value="imei">IMEI</option>
-              <option value="serial">Serial Number</option>
-            </select>
-          </div>
+          {productType === "service" && (
+            <>
+              <input type="hidden" name="tracking_type" value="quantity" />
+              <input type="hidden" name="minimum_stock" value="0" />
+            </>
+          )}
 
           <div>
             <label className={labelClass}>Satuan</label>
@@ -487,20 +510,9 @@ export default function ProductForm({
               defaultValue="PCS"
               className={inputClass}
               onChange={(event) => {
-                event.target.value = event.target.value.toUpperCase();
+                event.target.value =
+                  event.target.value.toUpperCase();
               }}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Minimum Stock</label>
-            <input
-              name="minimum_stock"
-              type="number"
-              min="0"
-              step="0.01"
-              defaultValue="0"
-              className={inputClass}
             />
           </div>
 
@@ -512,7 +524,8 @@ export default function ProductForm({
               className={inputClass}
               placeholder="Keterangan produk (opsional)"
               onChange={(event) => {
-                event.target.value = event.target.value.toUpperCase();
+                event.target.value =
+                  event.target.value.toUpperCase();
               }}
             />
           </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -18,19 +19,16 @@ type Warehouse = {
   warehouse_name: string;
 };
 
-type Variant = {
+type Product = {
   id: string;
-  variant_sku: string;
-  variant_name: string;
-  product_id: string;
-  product_sku: string;
+  sku: string;
   product_name: string;
   product_type: string;
   tracking_type: string;
 };
 
 type PurchaseItem = {
-  product_variant_id: string;
+  product_id: string;
   quantity: string;
   unit_cost: string;
   discount_amount: string;
@@ -41,12 +39,12 @@ type PurchaseItem = {
 type Props = {
   suppliers: Supplier[];
   warehouses: Warehouse[];
-  variants: Variant[];
+  products: Product[];
 };
 
-function createEmptyItem(variantId: string): PurchaseItem {
+function createEmptyItem(productId: string): PurchaseItem {
   return {
-    product_variant_id: variantId,
+    product_id: productId,
     quantity: "1",
     unit_cost: "0",
     discount_amount: "0",
@@ -70,10 +68,13 @@ function formatCurrency(value: number, currency: string) {
 export default function PurchaseOrderForm({
   suppliers,
   warehouses,
-  variants,
+  products,
 }: Props) {
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
-    const [orderDate, setOrderDate] = useState("");
+  const [supplierId, setSupplierId] = useState(
+    suppliers[0]?.id ?? ""
+  );
+
+  const [orderDate, setOrderDate] = useState("");
 
   useEffect(() => {
     const today = new Date();
@@ -86,8 +87,9 @@ export default function PurchaseOrderForm({
 
     setOrderDate(localDate);
   }, []);
+
   const [items, setItems] = useState<PurchaseItem[]>([
-    createEmptyItem(variants[0]?.id ?? ""),
+    createEmptyItem(products[0]?.id ?? ""),
   ]);
 
   const selectedSupplier = suppliers.find(
@@ -98,16 +100,22 @@ export default function PurchaseOrderForm({
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => {
-      return sum + Number(item.quantity || 0) * Number(item.unit_cost || 0);
+      return (
+        sum +
+        Number(item.quantity || 0) *
+          Number(item.unit_cost || 0)
+      );
     }, 0);
 
     const discount = items.reduce(
-      (sum, item) => sum + Number(item.discount_amount || 0),
+      (sum, item) =>
+        sum + Number(item.discount_amount || 0),
       0
     );
 
     const tax = items.reduce(
-      (sum, item) => sum + Number(item.tax_amount || 0),
+      (sum, item) =>
+        sum + Number(item.tax_amount || 0),
       0
     );
 
@@ -136,7 +144,7 @@ export default function PurchaseOrderForm({
   function addItem() {
     setItems((current) => [
       ...current,
-      createEmptyItem(variants[0]?.id ?? ""),
+      createEmptyItem(products[0]?.id ?? ""),
     ]);
   }
 
@@ -146,9 +154,31 @@ export default function PurchaseOrderForm({
     );
   }
 
-  return (
-    <form action={createPurchaseOrderAction} className="space-y-6">
+  const hasInvalidItems = items.some((item) => {
+    const quantity = Number(item.quantity);
+    const unitCost = Number(item.unit_cost);
+    const discount = Number(item.discount_amount);
+    const tax = Number(item.tax_amount);
 
+    return (
+      !item.product_id ||
+      !products.some((product) => product.id === item.product_id) ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(unitCost) ||
+      unitCost < 0 ||
+      !Number.isFinite(discount) ||
+      discount < 0 ||
+      !Number.isFinite(tax) ||
+      tax < 0
+    );
+  });
+
+  return (
+    <form
+      action={createPurchaseOrderAction}
+      className="space-y-6"
+    >
       {/* Informasi PO */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">
@@ -156,7 +186,6 @@ export default function PurchaseOrderForm({
         </h2>
 
         <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-
           <div>
             <label
               htmlFor="supplier_id"
@@ -169,7 +198,9 @@ export default function PurchaseOrderForm({
               id="supplier_id"
               name="supplier_id"
               value={supplierId}
-              onChange={(event) => setSupplierId(event.target.value)}
+              onChange={(event) =>
+                setSupplierId(event.target.value)
+              }
               required
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             >
@@ -220,13 +251,15 @@ export default function PurchaseOrderForm({
               Tanggal PO <span className="text-red-600">*</span>
             </label>
 
-                     <input
+            <input
               id="order_date"
               name="order_date"
               type="date"
               required
               value={orderDate}
-              onChange={(event) => setOrderDate(event.target.value)}
+              onChange={(event) =>
+                setOrderDate(event.target.value)
+              }
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </div>
@@ -243,6 +276,7 @@ export default function PurchaseOrderForm({
               id="expected_date"
               name="expected_date"
               type="date"
+              min={orderDate || undefined}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </div>
@@ -264,7 +298,6 @@ export default function PurchaseOrderForm({
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </div>
-
         </div>
       </section>
 
@@ -275,8 +308,9 @@ export default function PurchaseOrderForm({
             <h2 className="text-lg font-semibold text-slate-900">
               Item Purchase Order
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
-              Tambahkan produk dan varian yang akan dibeli.
+              Pilih produk langsung dari Product Master.
             </p>
           </div>
 
@@ -291,12 +325,13 @@ export default function PurchaseOrderForm({
 
         <div className="mt-5 space-y-5">
           {items.map((item, index) => {
-            const selectedVariant = variants.find(
-              (variant) => variant.id === item.product_variant_id
+            const selectedProduct = products.find(
+              (product) => product.id === item.product_id
             );
 
             const gross =
-              Number(item.quantity || 0) * Number(item.unit_cost || 0);
+              Number(item.quantity || 0) *
+              Number(item.unit_cost || 0);
 
             const lineTotal =
               gross -
@@ -325,82 +360,108 @@ export default function PurchaseOrderForm({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Produk / Varian
+                    <label
+                      htmlFor={`product-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
+                      Produk <span className="text-red-600">*</span>
                     </label>
 
                     <select
-                      value={item.product_variant_id}
+                      id={`product-${index}`}
+                      value={item.product_id}
                       onChange={(event) =>
                         updateItem(
                           index,
-                          "product_variant_id",
+                          "product_id",
                           event.target.value
                         )
                       }
                       required
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     >
-                      {variants.map((variant) => (
-                        <option key={variant.id} value={variant.id}>
-                          {variant.product_sku} - {variant.product_name}
-                          {" | "}
-                          {variant.variant_sku} - {variant.variant_name}
+                      {products.map((product) => (
+                        <option
+                          key={product.id}
+                          value={product.id}
+                        >
+                          {product.sku} - {product.product_name}
                         </option>
                       ))}
                     </select>
 
-                    {selectedVariant && (
+                    {selectedProduct && (
                       <p className="mt-1 text-xs text-slate-500">
-                        Tracking: {selectedVariant.tracking_type}
+                        SKU: {selectedProduct.sku}
+                        {" · "}
+                        Tracking: {selectedProduct.tracking_type}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`quantity-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
                       Kuantitas
                     </label>
 
                     <input
+                      id={`quantity-${index}`}
                       type="number"
                       min="0.001"
                       step="0.001"
                       required
                       value={item.quantity}
                       onChange={(event) =>
-                        updateItem(index, "quantity", event.target.value)
+                        updateItem(
+                          index,
+                          "quantity",
+                          event.target.value
+                        )
                       }
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`unit-cost-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
                       Harga Beli per Unit ({currency})
                     </label>
 
                     <input
+                      id={`unit-cost-${index}`}
                       type="number"
                       min="0"
                       step="0.01"
                       required
                       value={item.unit_cost}
                       onChange={(event) =>
-                        updateItem(index, "unit_cost", event.target.value)
+                        updateItem(
+                          index,
+                          "unit_cost",
+                          event.target.value
+                        )
                       }
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`discount-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
                       Diskon Total ({currency})
                     </label>
 
                     <input
+                      id={`discount-${index}`}
                       type="number"
                       min="0"
                       step="0.01"
@@ -417,45 +478,61 @@ export default function PurchaseOrderForm({
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`tax-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
                       Pajak Total ({currency})
                     </label>
 
                     <input
+                      id={`tax-${index}`}
                       type="number"
                       min="0"
                       step="0.01"
                       value={item.tax_amount}
                       onChange={(event) =>
-                        updateItem(index, "tax_amount", event.target.value)
+                        updateItem(
+                          index,
+                          "tax_amount",
+                          event.target.value
+                        )
                       }
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`item-notes-${index}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
                       Catatan Item
                     </label>
 
                     <input
+                      id={`item-notes-${index}`}
                       type="text"
                       maxLength={500}
                       value={item.notes}
                       onChange={(event) =>
-                        updateItem(index, "notes", event.target.value)
+                        updateItem(
+                          index,
+                          "notes",
+                          event.target.value
+                        )
                       }
                       placeholder="Catatan opsional..."
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     />
                   </div>
-
                 </div>
 
                 <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
                   <span className="text-slate-500">
                     Total item
                   </span>
+
                   <strong className="text-slate-900">
                     {formatCurrency(lineTotal, currency)}
                   </strong>
@@ -481,7 +558,9 @@ export default function PurchaseOrderForm({
         <div className="mt-4 space-y-3 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-600">Subtotal</span>
-            <span>{formatCurrency(totals.subtotal, currency)}</span>
+            <span>
+              {formatCurrency(totals.subtotal, currency)}
+            </span>
           </div>
 
           <div className="flex justify-between">
@@ -493,7 +572,9 @@ export default function PurchaseOrderForm({
 
           <div className="flex justify-between">
             <span className="text-slate-600">Total Pajak</span>
-            <span>{formatCurrency(totals.tax, currency)}</span>
+            <span>
+              {formatCurrency(totals.tax, currency)}
+            </span>
           </div>
 
           <div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-bold">
@@ -540,23 +621,12 @@ export default function PurchaseOrderForm({
 
         <button
           type="submit"
-          disabled={
-            items.length === 0 ||
-            items.some(
-              (item) =>
-                !item.product_variant_id ||
-                Number(item.quantity) <= 0 ||
-                Number(item.unit_cost) < 0 ||
-                Number(item.discount_amount) < 0 ||
-                Number(item.tax_amount) < 0
-            )
-          }
+          disabled={items.length === 0 || hasInvalidItems}
           className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Simpan sebagai Draft
         </button>
       </div>
-
     </form>
   );
 }

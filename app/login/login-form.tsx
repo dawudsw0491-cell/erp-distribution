@@ -3,43 +3,39 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { loginWithUserId } from "./actions";
 
 export default function LoginForm() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [pin, setPin] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setErrorMessage("");
+
+    if (!/^\d{4}$/.test(pin)) {
+      setErrorMessage("PIN harus tepat 4 digit angka.");
+      return;
+    }
+
     setIsLoading(true);
 
-    const supabase = createClient();
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const result = await loginWithUserId(identifier, pin);
 
-      if (error) {
-        setErrorMessage(
-          "Login gagal. Periksa kembali email dan password Anda."
-        );
+      if (!result.success) {
+        setErrorMessage(result.message || "Login gagal.");
         return;
       }
 
       router.replace("/");
       router.refresh();
     } catch {
-      setErrorMessage(
-        "Terjadi kesalahan koneksi. Silakan coba kembali."
-      );
+      setErrorMessage("Terjadi kesalahan koneksi. Silakan coba kembali.");
     } finally {
       setIsLoading(false);
     }
@@ -48,50 +44,42 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleLogin} className="space-y-5">
       <div>
-        <label
-          htmlFor="email"
-          className="mb-2 block text-sm font-medium text-slate-700"
-        >
-          Email
+        <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-slate-700">
+          USER ROLE
         </label>
-
         <input
-  id="email"
-  type="email"
-  autoComplete="email"
-  required
-  value={email}
-  onChange={(event) => setEmail(event.target.value)}
-  placeholder="nama@perusahaan.com"
-  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-/>
+          id="identifier"
+          type="text"
+          autoComplete="username"
+          required
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+          placeholder="Contoh: OWN01 atau owner"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          className="mb-2 block text-sm font-medium text-slate-700"
-        >
-          Password
+        <label htmlFor="pin" className="mb-2 block text-sm font-medium text-slate-700">
+          PASSWORD
         </label>
-
         <input
-  id="password"
-  type="password"
-  autoComplete="current-password"
-  required
-  value={password}
-  onChange={(event) => setPassword(event.target.value)}
-  placeholder="Masukkan password"
-  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-/>
+          id="pin"
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]{4}"
+          maxLength={4}
+          autoComplete="current-password"
+          required
+          value={pin}
+          onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+          placeholder="Masukkan PIN 4 digit"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
       </div>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}
         </div>
       )}

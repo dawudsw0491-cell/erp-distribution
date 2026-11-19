@@ -8,6 +8,7 @@ import ErpSidebar from "@/components/layout/erp-sidebar";
 import {
   approvePurchaseOrderAction,
   rejectPurchaseOrderAction,
+  cancelPurchaseOrderAction,
 } from "../actions";
 
 export const instant = false;
@@ -21,6 +22,7 @@ type PageProps = {
     created?: string;
     approved?: string;
     rejected?: string;
+    cancelled?: string;
   }>;
 };
 
@@ -42,6 +44,8 @@ type PurchaseOrderDetail = {
   approved_at: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   supplier: {
     supplier_code: string;
     supplier_name: string;
@@ -59,13 +63,9 @@ type PurchaseOrderDetail = {
     tax_amount: number;
     line_total: number;
     notes: string | null;
-    variant: {
-      variant_sku: string;
-      variant_name: string;
-      product: {
-        sku: string;
-        product_name: string;
-      } | null;
+    product: {
+      sku: string;
+      product_name: string;
     } | null;
   }[];
 };
@@ -175,6 +175,11 @@ export default async function PurchaseOrderDetailPage({
     redirect("/purchases?error=permission_denied");
   }
 
+  // Periksa hak akses untuk perubahan Purchase Order.
+  const {
+    authorized: canUpdatePurchaseOrder,
+  } = await getAuthorizationContext("purchasing.update");
+
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(`
@@ -195,6 +200,8 @@ export default async function PurchaseOrderDetailPage({
       approved_at,
       rejected_at,
       rejection_reason,
+      cancelled_at,
+      cancellation_reason,
       supplier:suppliers (
         supplier_code,
         supplier_name
@@ -212,13 +219,9 @@ export default async function PurchaseOrderDetailPage({
         tax_amount,
         line_total,
         notes,
-        variant:product_variants (
-          variant_sku,
-          variant_name,
-          product:products (
-            sku,
-            product_name
-          )
+        product:products!fk_purchase_order_items_product_id (
+          sku,
+          product_name
         )
       )
     `)
@@ -289,6 +292,13 @@ export default async function PurchaseOrderDetailPage({
         Number(item.received_quantity)
     );
 
+  // PO hanya dapat dibatalkan jika masih approved dan belum memiliki GR.
+  const canCancelPurchaseOrder =
+    order.status === "approved" &&
+    !receiptError &&
+    goodsReceipts.length === 0 &&
+    canUpdatePurchaseOrder;
+
   return (
     <div className="min-h-screen bg-slate-100 md:flex md:h-screen md:min-h-0 md:overflow-hidden">
       <ErpSidebar activePath="/purchases" />
@@ -355,6 +365,12 @@ export default async function PurchaseOrderDetailPage({
             </div>
           )}
 
+          {query.cancelled === "1" && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+              Purchase Order berhasil dibatalkan.
+            </div>
+          )}
+
           {query.error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               {query.error === "approve_failed" &&
@@ -362,6 +378,9 @@ export default async function PurchaseOrderDetailPage({
 
               {query.error === "reject_failed" &&
                 "Penolakan Purchase Order gagal diproses."}
+
+              {query.error === "cancel_failed" &&
+                "Pembatalan Purchase Order gagal diproses."}
 
               {query.error === "invalid_rejection_reason" &&
                 "Alasan penolakan wajib diisi dan maksimal 1.000 karakter."}
@@ -372,6 +391,7 @@ export default async function PurchaseOrderDetailPage({
               {![
                 "approve_failed",
                 "reject_failed",
+                "cancel_failed",
                 "invalid_rejection_reason",
                 "permission_denied",
               ].includes(query.error) &&
@@ -446,6 +466,58 @@ export default async function PurchaseOrderDetailPage({
                   </button>
                 </form>
               </div>
+            </section>
+          )}
+
+          {/* Cancel Purchase Order */}
+          {canCancelPurchaseOrder && (
+            <section className="rounded-xl border border-red-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="text-lg font-semibold text-red-700">
+                Pembatalan Purchase Order
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Purchase Order ini belum memiliki Goods Receipt
+                dan masih dapat dibatalkan. Pembatalan akan mengubah
+                status PO menjadi Dibatalkan.
+              </p>
+
+              <form
+                action={cancelPurchaseOrderAction}
+                className="mt-4 space-y-3"
+              >
+                <input
+                  type="hidden"
+                  name="purchase_order_id"
+                  value={order.id}
+                />
+
+                <div>
+                  <label
+                    htmlFor="cancellation_reason"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Alasan Pembatalan
+                  </label>
+
+                  <textarea
+                    id="cancellation_reason"
+                    name="cancellation_reason"
+                    required
+                    maxLength={1000}
+                    rows={3}
+                    placeholder="Tuliskan alasan pembatalan Purchase Order..."
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Batalkan Purchase Order
+                </button>
+              </form>
             </section>
           )}
 
@@ -550,7 +622,6 @@ export default async function PurchaseOrderDetailPage({
                 <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Produk</th>
-                    <th className="px-4 py-3">SKU Varian</th>
                     <th className="px-4 py-3 text-right">Qty</th>
                     <th className="px-4 py-3 text-right">Diterima</th>
                     <th className="px-4 py-3 text-right">Sisa</th>
@@ -566,20 +637,11 @@ export default async function PurchaseOrderDetailPage({
                     <tr key={item.id} className="hover:bg-slate-50">
                       <td className="px-4 py-4">
                         <p className="font-medium text-slate-900">
-                          {item.variant?.product?.product_name || "-"}
+                          {item.product?.product_name || "-"}
                         </p>
-
                         <p className="mt-1 text-xs text-slate-500">
-                          {item.variant?.variant_name || "-"}
+                          SKU: {item.product?.sku || "-"}
                         </p>
-
-                        <p className="mt-1 text-xs text-slate-400">
-                          {item.variant?.product?.sku || "-"}
-                        </p>
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {item.variant?.variant_sku || "-"}
                       </td>
 
                       <td className="px-4 py-4 text-right tabular-nums">
@@ -621,7 +683,7 @@ export default async function PurchaseOrderDetailPage({
                   {order.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         className="px-4 py-10 text-center text-slate-500"
                       >
                         Belum ada item Purchase Order.
@@ -678,7 +740,12 @@ export default async function PurchaseOrderDetailPage({
                         className="hover:bg-slate-50"
                       >
                         <td className="px-5 py-4 font-semibold text-blue-700">
-                          {receipt.receipt_number}
+                          <a
+                            href={`/purchases/${id}/goods-receipts/${receipt.id}`}
+                            className="hover:text-blue-900 hover:underline"
+                          >
+                            {receipt.receipt_number}
+                          </a>
                         </td>
 
                         <td className="px-5 py-4 text-slate-600">
@@ -791,6 +858,22 @@ export default async function PurchaseOrderDetailPage({
                 value={
                   <span className="whitespace-pre-wrap text-red-700">
                     {order.rejection_reason || "-"}
+                  </span>
+                }
+              />
+            )}
+
+            <DetailRow
+              label="Waktu Pembatalan"
+              value={formatDateTime(order.cancelled_at)}
+            />
+
+            {order.status === "cancelled" && (
+              <DetailRow
+                label="Alasan Pembatalan"
+                value={
+                  <span className="whitespace-pre-wrap text-red-700">
+                    {order.cancellation_reason || "-"}
                   </span>
                 }
               />

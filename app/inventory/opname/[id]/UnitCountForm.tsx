@@ -1,8 +1,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import UniversalScanner from "@/components/scanner/universal-scanner";
 import { recordStockOpnameUnitCountAction } from "../actions";
+
+type Identifier = {
+  identifier_type: string;
+  identifier_value: string;
+};
 
 type Props = {
   sessionId: string;
@@ -11,7 +17,12 @@ type Props = {
   isPresent: boolean;
   observedStatus: string;
   notes: string;
-  statusOptions: { value: string; label: string }[];
+  statusOptions: {
+    value: string;
+    label: string;
+  }[];
+  identifiers?: Identifier[];
+  unitCode?: string;
 };
 
 export default function UnitCountForm({
@@ -22,23 +33,63 @@ export default function UnitCountForm({
   observedStatus,
   notes,
   statusOptions,
+  identifiers = [],
+  unitCode = "",
 }: Props) {
-  const [present, setPresent] = useState(String(isPresent));
+  const [present, setPresent] = useState(
+    String(isPresent)
+  );
   const [status, setStatus] = useState(observedStatus);
   const [note, setNote] = useState(notes);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
+  const [scanVerified, setScanVerified] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  const handleScan = useCallback(
+    (rawValue: string) => {
+      const scannedValue = rawValue.trim().toUpperCase();
+
+      const identifierMatch = identifiers.some(
+        (identifier) =>
+          identifier.identifier_value.trim().toUpperCase() ===
+          scannedValue
+      );
+
+      const unitCodeMatch =
+        unitCode.trim().toUpperCase() === scannedValue;
+
+      if (!identifierMatch && !unitCodeMatch) {
+        setSuccess(false);
+        setMessage(
+          "Barcode tidak cocok dengan IMEI/Serial unit ini."
+        );
+        return;
+      }
+
+      setPresent("true");
+      setScanVerified(true);
+      setMessage(
+        "Unit berhasil diverifikasi melalui scanner."
+      );
+      setSuccess(true);
+    },
+    [identifiers, unitCode]
+  );
+
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     if (saving) return;
 
     setSaving(true);
     setMessage("");
+    setSuccess(false);
 
     const formData = new FormData();
+
     formData.set("session_id", sessionId);
     formData.set("item_id", itemId);
     formData.set("product_unit_id", productUnitId);
@@ -47,13 +98,20 @@ export default function UnitCountForm({
     formData.set("notes", note);
 
     try {
-      const result = await recordStockOpnameUnitCountAction(formData);
+      const result =
+        await recordStockOpnameUnitCountAction(formData);
 
       setSuccess(result.success);
       setMessage(result.message);
+
+      if (result.success) {
+        setScanVerified(false);
+      }
     } catch {
       setSuccess(false);
-      setMessage("Terjadi kesalahan koneksi. Silakan coba kembali.");
+      setMessage(
+        "Terjadi kesalahan koneksi. Silakan coba kembali."
+      );
     } finally {
       setSaving(false);
     }
@@ -62,67 +120,104 @@ export default function UnitCountForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
+      className="mt-4 space-y-4"
     >
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-700">
-          Hasil Pemeriksaan
-        </label>
-        <select
-          value={present}
-          onChange={(event) => setPresent(event.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="true">Ditemukan</option>
-          <option value="false">Tidak Ditemukan</option>
-        </select>
+      <UniversalScanner
+        label="Scan IMEI / Serial Unit"
+        placeholder="Masukkan IMEI, serial number, atau unit code"
+        onScan={handleScan}
+        disabled={saving}
+      />
+
+      {scanVerified && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <strong>Unit terverifikasi.</strong>
+          {" "}
+          Pastikan kondisi fisik sesuai sebelum menyimpan.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Hasil Pemeriksaan
+          </label>
+
+          <select
+            value={present}
+            onChange={(event) => {
+              setPresent(event.target.value);
+              setScanVerified(false);
+            }}
+            disabled={saving}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+          >
+            <option value="true">Ditemukan</option>
+            <option value="false">Tidak Ditemukan</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Status Fisik
+          </label>
+
+          <select
+            value={status}
+            onChange={(event) =>
+              setStatus(event.target.value)
+            }
+            disabled={present !== "true" || saving}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+          >
+            {statusOptions.map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Catatan Unit
+          </label>
+
+          <input
+            type="text"
+            maxLength={2000}
+            value={note}
+            onChange={(event) =>
+              setNote(event.target.value)
+            }
+            placeholder="Catatan hasil pemeriksaan..."
+            disabled={saving}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+          />
+        </div>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-700">
-          Status Fisik
-        </label>
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          disabled={present !== "true"}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
-        >
-          {statusOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-slate-700">
-          Catatan Unit
-        </label>
-        <input
-          type="text"
-          maxLength={2000}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="Catatan hasil pemeriksaan..."
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={saving}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {saving ? "Menyimpan..." : "Simpan Hasil Unit"}
+          {saving
+            ? "Menyimpan..."
+            : "Simpan Hasil Unit"}
         </button>
 
         {message && (
           <span
+            role="status"
             className={`text-sm ${
-              success ? "text-green-600" : "text-red-600"
+              success
+                ? "text-green-600"
+                : "text-red-600"
             }`}
           >
             {message}

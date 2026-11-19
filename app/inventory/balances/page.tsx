@@ -6,6 +6,7 @@ import { connection } from "next/server";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import StockBalanceRealtime from "@/app/inventory/stock-balance-realtime";
 
 export const metadata = {
   title: "Stock Balance | HEXACORE ERP",
@@ -52,7 +53,6 @@ type StockStatus =
   | "all"
   | "available"
   | "reserved"
-  | "quarantine"
   | "damaged"
   | "repair"
   | "zero";
@@ -62,7 +62,6 @@ type StockDisplayRow = {
   warehouse: WarehouseRow;
   available: number;
   reserved: number;
-  quarantine: number;
   damaged: number;
   repair: number;
   onHand: number;
@@ -78,12 +77,11 @@ const STATUS_COLUMNS: Record<
   Exclude<StockStatus, "all" | "zero">,
   keyof Pick<
     StockDisplayRow,
-    "available" | "reserved" | "quarantine" | "damaged" | "repair"
+    "available" | "reserved" | "damaged" | "repair"
   >
 > = {
   available: "available",
   reserved: "reserved",
-  quarantine: "quarantine",
   damaged: "damaged",
   repair: "repair",
 };
@@ -140,9 +138,11 @@ function buildPageUrl(
   const params = new URLSearchParams();
 
   if (filters.q) params.set("q", filters.q);
+
   if (filters.warehouse) {
     params.set("warehouse", filters.warehouse);
   }
+
   if (filters.status && filters.status !== "all") {
     params.set("status", filters.status);
   }
@@ -170,18 +170,22 @@ function StockBalanceError({
   return (
     <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
       <ErpSidebar activePath="/inventory" />
+
       <main className="min-w-0 flex-1 p-5 md:p-8">
         <div className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6">
           <h1 className="font-bold text-red-700">
             Gagal Memuat Stock Balance
           </h1>
+
           <p className="mt-2 text-sm text-slate-600">
             Data persediaan belum dapat ditampilkan. Silakan coba
             kembali atau hubungi administrator sistem.
           </p>
+
           <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">
             {message}
           </p>
+
           <Link
             href="/inventory/balances"
             className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
@@ -210,14 +214,17 @@ async function StockBalanceContent({
     return (
       <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
         <ErpSidebar activePath="/inventory" />
+
         <main className="flex flex-1 items-center justify-center p-5">
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center">
             <h1 className="text-xl font-bold text-slate-900">
               Akses Ditolak
             </h1>
+
             <p className="mt-3 text-sm text-slate-600">
               Anda tidak memiliki permission untuk melihat Stock Balance.
             </p>
+
             <Link
               href="/"
               className="mt-6 inline-block rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white"
@@ -239,7 +246,6 @@ async function StockBalanceContent({
     "all",
     "available",
     "reserved",
-    "quarantine",
     "damaged",
     "repair",
     "zero",
@@ -252,8 +258,11 @@ async function StockBalanceContent({
     : "all";
 
   const parsedPage = Number.parseInt(params.page ?? "1", 10);
+
   const requestedPage =
-    Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    Number.isFinite(parsedPage) && parsedPage > 0
+      ? parsedPage
+      : 1;
 
   const [productResult, warehouseResult, balanceResult] =
     await Promise.all([
@@ -312,6 +321,14 @@ async function StockBalanceContent({
   const warehouses = warehouseResult.data;
   const balances = balanceResult.data;
 
+  const productMap = new Map(
+    products.map((product) => [product.id, product])
+  );
+
+  const warehouseMap = new Map(
+    warehouses.map((warehouse) => [warehouse.id, warehouse])
+  );
+
   const validWarehouse = warehouses.some(
     (warehouse) => warehouse.id === warehouseFilter
   );
@@ -319,12 +336,6 @@ async function StockBalanceContent({
   const effectiveWarehouseFilter = validWarehouse
     ? warehouseFilter
     : "";
-
-  const selectedWarehouses = effectiveWarehouseFilter
-    ? warehouses.filter(
-        (warehouse) => warehouse.id === effectiveWarehouseFilter
-      )
-    : warehouses;
 
   const balanceMap = new Map<string, BalanceRow>();
 
@@ -339,27 +350,36 @@ async function StockBalanceContent({
 
   const safeKeyword = keyword.toLowerCase();
 
-  let rows: StockDisplayRow[] = products.flatMap((product) =>
-    selectedWarehouses.map((warehouse) => {
-      const balance = balanceMap.get(
-        `${product.id}:${warehouse.id}`
-      );
+  // Stock Balance hanya dibentuk dari kombinasi produk-gudang
+  // yang benar-benar mempunyai record inventory_balances.
+  let rows: StockDisplayRow[] = balances.flatMap((balance) => {
+    if (!balance.product_id) return [];
 
-      return {
-        product,
-        warehouse,
-        available: Number(balance?.available_quantity ?? 0),
-        reserved: Number(balance?.reserved_quantity ?? 0),
-        quarantine: Number(balance?.quarantine_quantity ?? 0),
-        damaged: Number(balance?.damaged_quantity ?? 0),
-        repair: Number(balance?.repair_quantity ?? 0),
-        onHand: Number(balance?.on_hand_quantity ?? 0),
-        value: Number(balance?.inventory_value ?? 0),
-        averageCost: Number(balance?.average_unit_cost ?? 0),
-        minimumStock: Number(product.minimum_stock ?? 0),
-      };
-    })
-  );
+    const product = productMap.get(balance.product_id);
+    const warehouse = warehouseMap.get(balance.warehouse_id);
+
+    if (!product || !warehouse) return [];
+
+    if (
+      effectiveWarehouseFilter &&
+      warehouse.id !== effectiveWarehouseFilter
+    ) {
+      return [];
+    }
+
+    return [{
+      product,
+      warehouse,
+      available: Number(balance.available_quantity ?? 0),
+      reserved: Number(balance.reserved_quantity ?? 0),
+      damaged: Number(balance.damaged_quantity ?? 0),
+      repair: Number(balance.repair_quantity ?? 0),
+      onHand: Number(balance.on_hand_quantity ?? 0),
+      value: Number(balance.inventory_value ?? 0),
+      averageCost: Number(balance.average_unit_cost ?? 0),
+      minimumStock: Number(product.minimum_stock ?? 0),
+    }];
+  });
 
   if (safeKeyword) {
     rows = rows.filter((row) =>
@@ -384,6 +404,7 @@ async function StockBalanceContent({
 
   const totalRows = rows.length;
   const totalPages = Math.ceil(totalRows / PAGE_SIZE);
+
   const currentPage = Math.min(
     requestedPage,
     Math.max(totalPages, 1)
@@ -425,7 +446,7 @@ async function StockBalanceContent({
       <ErpSidebar activePath="/inventory" />
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="mx-auto max-w-[1600px] space-y-6">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -435,11 +456,14 @@ async function StockBalanceContent({
                 >
                   Inventory
                 </Link>
+
                 <span className="text-slate-400">/</span>
+
                 <h1 className="text-2xl font-bold text-slate-900">
                   Stock Balance
                 </h1>
               </div>
+
               <p className="mt-1 text-sm text-slate-600">
                 Saldo persediaan produk berdasarkan Product Master dan gudang.
               </p>
@@ -478,9 +502,7 @@ async function StockBalanceContent({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                Nilai Persediaan
-              </p>
+              <p className="text-sm text-slate-500">Nilai Persediaan</p>
               <p className="mt-2 break-words text-xl font-bold text-slate-900">
                 {currencyFormat(totals.value)}
               </p>
@@ -507,6 +529,7 @@ async function StockBalanceContent({
                 >
                   Kata Kunci
                 </label>
+
                 <input
                   id="balance-search"
                   name="q"
@@ -525,6 +548,7 @@ async function StockBalanceContent({
                 >
                   Gudang
                 </label>
+
                 <select
                   id="warehouse-filter"
                   name="warehouse"
@@ -532,6 +556,7 @@ async function StockBalanceContent({
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                 >
                   <option value="">Semua Gudang</option>
+
                   {warehouses.map((warehouse) => (
                     <option key={warehouse.id} value={warehouse.id}>
                       {warehouse.warehouse_code} - {warehouse.warehouse_name}
@@ -547,6 +572,7 @@ async function StockBalanceContent({
                 >
                   Status Persediaan
                 </label>
+
                 <select
                   id="stock-status"
                   name="status"
@@ -556,7 +582,6 @@ async function StockBalanceContent({
                   <option value="all">Semua Status</option>
                   <option value="available">Available</option>
                   <option value="reserved">Reserved</option>
-                  <option value="quarantine">Quarantine</option>
                   <option value="damaged">Damaged</option>
                   <option value="repair">Repair</option>
                   <option value="zero">Stok Kosong</option>
@@ -570,6 +595,7 @@ async function StockBalanceContent({
                 >
                   Terapkan Filter
                 </button>
+
                 <Link
                   href="/inventory/balances"
                   className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -585,6 +611,7 @@ async function StockBalanceContent({
               <h2 className="font-semibold text-slate-900">
                 Daftar Saldo Persediaan
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Menampilkan {totalRows === 0 ? 0 : offset + 1}
                 {" - "}
@@ -599,37 +626,40 @@ async function StockBalanceContent({
                 <h3 className="font-semibold text-slate-800">
                   Data tidak ditemukan
                 </h3>
+
                 <p className="mt-2 text-sm text-slate-500">
-                  Tidak ada produk aktif atau data tidak sesuai
-                  dengan filter yang dipilih.
+                  Tidak ada record saldo persediaan yang sesuai dengan filter.
                 </p>
               </div>
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1350px] text-sm">
+                  <table className="w-full min-w-[1460px] table-fixed text-sm">
+                    <colgroup>
+                      <col style={{ width: "300px" }} />
+                      <col style={{ width: "190px" }} />
+                      <col style={{ width: "190px" }} />
+                      <col style={{ width: "105px" }} />
+                      <col style={{ width: "105px" }} />
+                      <col style={{ width: "105px" }} />
+                      <col style={{ width: "105px" }} />
+                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "150px" }} />
+                      <col style={{ width: "170px" }} />
+                    </colgroup>
+
                     <thead className="bg-slate-50 text-slate-700">
                       <tr>
-                        {[
-                          "Produk",
-                          "SKU",
-                          "Gudang",
-                          "Available",
-                          "Reserved",
-                          "Quarantine",
-                          "Damaged",
-                          "Repair",
-                          "On Hand",
-                          "Avg. Cost",
-                          "Inventory Value",
-                        ].map((heading) => (
-                          <th
-                            key={heading}
-                            className="whitespace-nowrap px-4 py-4 text-center font-semibold"
-                          >
-                            {heading}
-                          </th>
-                        ))}
+                        <th className="px-4 py-4 text-left font-semibold">Produk</th>
+                        <th className="px-4 py-4 text-left font-semibold">SKU</th>
+                        <th className="px-4 py-4 text-left font-semibold">Gudang</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Available</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Reserved</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Damaged</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Repair</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">On Hand</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Avg. Cost</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Inventory Value</th>
                       </tr>
                     </thead>
 
@@ -642,12 +672,13 @@ async function StockBalanceContent({
                         return (
                           <tr
                             key={`${row.product.id}:${row.warehouse.id}`}
-                            className="hover:bg-blue-50/40"
+                            className="align-top hover:bg-blue-50/40"
                           >
-                            <td className="px-4 py-4">
-                              <p className="font-semibold text-slate-900">
+                            <td className="px-4 py-4 align-top">
+                              <p className="whitespace-normal break-words font-semibold leading-5 text-slate-900">
                                 {row.product.product_name}
                               </p>
+
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
                                   {getTrackingLabel(row.product.tracking_type)}
@@ -665,6 +696,7 @@ async function StockBalanceContent({
                                   </span>
                                 )}
                               </div>
+
                               {row.minimumStock > 0 && (
                                 <p className="mt-1 text-xs text-slate-400">
                                   Minimum: {numberFormat(row.minimumStock)}
@@ -672,41 +704,40 @@ async function StockBalanceContent({
                               )}
                             </td>
 
-                            <td className="whitespace-nowrap px-4 py-4 text-center font-medium text-slate-800">
-                              {row.product.sku}
+                            <td className="px-4 py-4 text-left align-top font-medium text-slate-800">
+                              <span className="block whitespace-normal break-all leading-5">
+                                {row.product.sku}
+                              </span>
                             </td>
 
-                            <td className="whitespace-nowrap px-4 py-4 text-center text-slate-700">
-                              <p className="font-medium">
+                            <td className="px-4 py-4 text-left align-top text-slate-700">
+                              <p className="whitespace-normal break-words font-medium leading-5">
                                 {row.warehouse.warehouse_name}
                               </p>
-                              <p className="mt-1 text-xs text-slate-400">
+                              <p className="mt-1 whitespace-normal break-all text-xs leading-4 text-slate-400">
                                 {row.warehouse.warehouse_code}
                               </p>
                             </td>
 
-                            <td className="px-4 py-4 text-center font-semibold text-emerald-700">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top font-semibold tabular-nums text-emerald-700">
                               {numberFormat(row.available)}
                             </td>
-                            <td className="px-4 py-4 text-center">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top tabular-nums">
                               {numberFormat(row.reserved)}
                             </td>
-                            <td className="px-4 py-4 text-center">
-                              {numberFormat(row.quarantine)}
-                            </td>
-                            <td className="px-4 py-4 text-center">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top tabular-nums">
                               {numberFormat(row.damaged)}
                             </td>
-                            <td className="px-4 py-4 text-center">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top tabular-nums">
                               {numberFormat(row.repair)}
                             </td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-900">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top font-bold tabular-nums text-slate-900">
                               {numberFormat(row.onHand)}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-right">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top tabular-nums">
                               {currencyFormat(row.averageCost)}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-right font-semibold text-slate-900">
+                            <td className="whitespace-nowrap px-3 py-4 text-right align-top font-semibold tabular-nums text-slate-900">
                               {currencyFormat(row.value)}
                             </td>
                           </tr>

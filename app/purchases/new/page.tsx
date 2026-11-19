@@ -1,3 +1,4 @@
+
 export const instant = false;
 
 import { Suspense } from "react";
@@ -16,7 +17,6 @@ export const metadata = {
 };
 
 async function PurchaseOrderPageContent() {
-  // Memastikan proses berikutnya dijalankan pada waktu request.
   await connection();
 
   const {
@@ -32,7 +32,7 @@ async function PurchaseOrderPageContent() {
     redirect("/purchases?error=permission_denied");
   }
 
-  const [supplierResult, warehouseResult, variantResult] =
+  const [supplierResult, warehouseResult, productResult] =
     await Promise.all([
       supabase
         .from("suppliers")
@@ -49,29 +49,19 @@ async function PurchaseOrderPageContent() {
         .order("warehouse_name"),
 
       supabase
-        .from("product_variants")
-        .select(`
-          id,
-          variant_sku,
-          variant_name,
-          product:products!inner (
-            id,
-            sku,
-            product_name,
-            product_type,
-            tracking_type,
-            is_active
-          )
-        `)
+        .from("products")
+        .select(
+          "id, sku, product_name, product_type, tracking_type"
+        )
         .eq("is_active", true)
-        .eq("products.is_active", true)
-        .order("variant_sku"),
+        .eq("product_type", "goods")
+        .order("product_name"),
     ]);
 
   const loadError =
     supplierResult.error ||
     warehouseResult.error ||
-    variantResult.error;
+    productResult.error;
 
   if (loadError) {
     console.error("Purchase Order master data error:", loadError);
@@ -79,25 +69,7 @@ async function PurchaseOrderPageContent() {
 
   const suppliers = supplierResult.data ?? [];
   const warehouses = warehouseResult.data ?? [];
-
-  const variants = (variantResult.data ?? [])
-    .map((variant: any) => {
-      const product = Array.isArray(variant.product)
-        ? variant.product[0]
-        : variant.product;
-
-      return {
-        id: variant.id,
-        variant_sku: variant.variant_sku,
-        variant_name: variant.variant_name,
-        product_id: product?.id ?? "",
-        product_sku: product?.sku ?? "",
-        product_name: product?.product_name ?? "",
-        product_type: product?.product_type ?? "",
-        tracking_type: product?.tracking_type ?? "",
-      };
-    })
-    .filter((variant: any) => variant.product_id);
+  const products = productResult.data ?? [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -129,21 +101,21 @@ async function PurchaseOrderPageContent() {
         </div>
       ) : suppliers.length === 0 ||
         warehouses.length === 0 ||
-        variants.length === 0 ? (
+        products.length === 0 ? (
         <div className="rounded-xl border border-amber-200 bg-white p-6">
           <h2 className="font-semibold text-amber-800">
             Data master belum lengkap
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Pastikan tersedia supplier aktif, warehouse aktif, serta
-            produk dan varian aktif sebelum membuat Purchase Order.
+            Pastikan tersedia supplier aktif, warehouse aktif, dan
+            produk barang aktif sebelum membuat Purchase Order.
           </p>
         </div>
       ) : (
         <PurchaseOrderForm
           suppliers={suppliers}
           warehouses={warehouses}
-          variants={variants}
+          products={products}
         />
       )}
     </div>

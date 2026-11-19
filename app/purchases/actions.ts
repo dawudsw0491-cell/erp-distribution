@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 
 type PurchaseOrderItemInput = {
-  product_variant_id: string;
+  product_id: string;
   quantity: string | number;
   unit_cost: string | number;
   discount_amount?: string | number;
@@ -98,6 +98,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
+/**
+ * Create Purchase Order.
+ */
 export async function createPurchaseOrderAction(
   formData: FormData
 ): Promise<never> {
@@ -171,15 +174,15 @@ export async function createPurchaseOrderAction(
       redirect("/purchases/new?error=invalid_item_data");
     }
 
-    const variantId = item.product_variant_id;
+    const productId = item.product_id;
     const quantity = item.quantity;
     const unitCost = item.unit_cost;
     const discountAmount = item.discount_amount ?? "0";
     const taxAmount = item.tax_amount ?? "0";
 
     if (
-      typeof variantId !== "string" ||
-      !isValidUUID(variantId) ||
+      typeof productId !== "string" ||
+      !isValidUUID(productId) ||
       !isValidAmount(quantity, 3) ||
       !isValidAmount(unitCost, 2) ||
       !isValidAmount(discountAmount, 2) ||
@@ -202,7 +205,7 @@ export async function createPurchaseOrderAction(
     }
 
     items.push({
-      product_variant_id: variantId,
+      product_id: productId,
       quantity: String(quantity),
       unit_cost: String(unitCost),
       discount_amount: String(discountAmount),
@@ -212,7 +215,7 @@ export async function createPurchaseOrderAction(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_purchase_order",
+    "create_purchase_order_by_product",
     {
       p_supplier_id: supplierId,
       p_warehouse_id: warehouseId,
@@ -226,7 +229,6 @@ export async function createPurchaseOrderAction(
 
   if (error || !data) {
     console.error("Create Purchase Order failed:", error);
-
     redirect("/purchases/new?error=save_failed");
   }
 
@@ -235,6 +237,9 @@ export async function createPurchaseOrderAction(
   redirect(`/purchases/${data}?created=1`);
 }
 
+/**
+ * Approve Purchase Order.
+ */
 export async function approvePurchaseOrderAction(
   formData: FormData
 ): Promise<never> {
@@ -281,6 +286,9 @@ export async function approvePurchaseOrderAction(
   redirect(`/purchases/${purchaseOrderId}?approved=1`);
 }
 
+/**
+ * Reject Purchase Order.
+ */
 export async function rejectPurchaseOrderAction(
   formData: FormData
 ): Promise<never> {
@@ -340,6 +348,80 @@ export async function rejectPurchaseOrderAction(
   revalidatePath(`/purchases/${purchaseOrderId}`);
 
   redirect(`/purchases/${purchaseOrderId}?rejected=1`);
+}
+
+/**
+ * Cancel Purchase Order.
+ *
+ * Hanya PO approved yang dapat dibatalkan.
+ * Pemeriksaan status, Goods Receipt, permission,
+ * dan audit trail dilakukan oleh database RPC.
+ */
+export async function cancelPurchaseOrderAction(
+  formData: FormData
+): Promise<never> {
+  const purchaseOrderId = getString(
+    formData,
+    "purchase_order_id"
+  );
+
+  const cancellationReason = getString(
+    formData,
+    "cancellation_reason"
+  );
+
+  if (!isValidUUID(purchaseOrderId)) {
+    redirect("/purchases?error=invalid_id");
+  }
+
+  if (
+    !cancellationReason ||
+    cancellationReason.length > 1000
+  ) {
+    redirect(
+      `/purchases/${purchaseOrderId}?error=invalid_cancellation_reason`
+    );
+  }
+
+  const {
+    supabase,
+    user,
+    profile,
+    authorized,
+  } = await getAuthorizationContext("purchasing.update");
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!profile || !authorized) {
+    redirect(
+      `/purchases/${purchaseOrderId}?error=permission_denied`
+    );
+  }
+
+  const { error } = await supabase.rpc(
+    "cancel_purchase_order",
+    {
+      p_purchase_order_id: purchaseOrderId,
+      p_cancellation_reason: cancellationReason,
+    }
+  );
+
+  if (error) {
+    console.error("Cancel Purchase Order failed:", error);
+
+    redirect(
+      `/purchases/${purchaseOrderId}?error=cancel_failed`
+    );
+  }
+
+  revalidatePath("/purchases");
+  revalidatePath(`/purchases/${purchaseOrderId}`);
+
+  redirect(
+    `/purchases/${purchaseOrderId}?cancelled=1`
+  );
 }
 
 /**
@@ -548,7 +630,7 @@ export async function createGoodsReceiptAction(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_goods_receipt",
+    "create_goods_receipt_by_product",
     {
       p_purchase_order_id: purchaseOrderId,
       p_receipt_date: receiptDate,
@@ -569,4 +651,66 @@ export async function createGoodsReceiptAction(
   redirect(
     `/purchases/${purchaseOrderId}/goods-receipts/${data}?created=1`
   );
+}
+
+/**
+ * Post Goods Receipt and update inventory.
+ */
+export async function postGoodsReceiptAction(
+  formData: FormData
+): Promise<never> {
+  const goodsReceiptId = getString(
+    formData,
+    "goods_receipt_id"
+  );
+
+  const purchaseOrderId = getString(
+    formData,
+    "purchase_order_id"
+  );
+
+  if (
+    !isValidUUID(goodsReceiptId) ||
+    !isValidUUID(purchaseOrderId)
+  ) {
+    redirect("/purchases?error=invalid_id");
+  }
+
+  const {
+    supabase,
+    user,
+    profile,
+    authorized,
+  } = await getAuthorizationContext("purchasing.approve");
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const returnUrl = `/purchases/${purchaseOrderId}`;
+
+  if (!profile || !authorized) {
+    redirect(`${returnUrl}?error=permission_denied`);
+  }
+
+  const { error } = await supabase.rpc(
+    "post_goods_receipt_by_product",
+    {
+      p_goods_receipt_id: goodsReceiptId,
+    }
+  );
+
+  if (error) {
+    console.error("Post Goods Receipt failed:", error);
+
+    redirect(`${returnUrl}?error=post_failed`);
+  }
+
+  revalidatePath("/purchases");
+  revalidatePath(returnUrl);
+  revalidatePath("/inventory/balances");
+  revalidatePath("/inventory/movements");
+  revalidatePath("/inventory/units");
+
+  redirect(`${returnUrl}?receipt_posted=1`);
 }

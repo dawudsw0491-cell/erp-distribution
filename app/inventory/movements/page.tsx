@@ -10,6 +10,7 @@ import {
   createInventoryMovementAction,
   postInventoryMovementAction,
 } from "./actions";
+import MovementFilters from "./movement-filters";
 
 export const metadata = {
   title: "Stock Movement | HEXACORE ERP",
@@ -90,7 +91,7 @@ const statusLabels: Record<string, string> = {
 const inventoryStatusLabels: Record<string, string> = {
   available: "Available",
   reserved: "Reserved",
-  quarantine: "Quarantine",
+  quarantine: "Quarantine (Historis)",
   damaged: "Damaged",
   repair: "Repair",
 };
@@ -633,7 +634,6 @@ async function StockMovementContent({
                 >
                   <option value="available">Available</option>
                   <option value="reserved">Reserved</option>
-                  <option value="quarantine">Quarantine</option>
                   <option value="damaged">Damaged</option>
                   <option value="repair">Repair</option>
                 </select>
@@ -673,110 +673,15 @@ async function StockMovementContent({
               Pencarian dan Filter
             </h2>
 
-            <form
-              action="/inventory/movements"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
-            >
-              <div>
-                <label
-                  htmlFor="movement-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-                <input
-                  id="movement-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="Referensi, produk, catatan..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="movement-type"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Jenis Movement
-                </label>
-                <select
-                  id="movement-type"
-                  name="type"
-                  defaultValue={selectedType}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Jenis</option>
-                  {Object.entries(movementLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="movement-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status
-                </label>
-                <select
-                  id="movement-status"
-                  name="status"
-                  defaultValue={selectedStatus}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Status</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="movement-warehouse"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Gudang
-                </label>
-                <select
-                  id="movement-warehouse"
-                  name="warehouse"
-                  defaultValue={warehouseFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Gudang</option>
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.warehouse_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-4">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-                <Link
-                  href="/inventory/movements"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
+            <div className="mt-4">
+              <MovementFilters
+                warehouses={warehouses}
+                initialQuery={keyword}
+                initialType={selectedType}
+                initialStatus={selectedStatus}
+                initialWarehouse={warehouseFilter}
+              />
+            </div>
           </section>
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

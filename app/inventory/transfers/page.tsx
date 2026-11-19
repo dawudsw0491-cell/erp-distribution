@@ -23,17 +23,12 @@ type SearchParams = Promise<{
   posted?: string;
 }>;
 
-type VariantRow = {
+type ProductRow = {
   id: string;
-  variant_sku: string;
-  variant_name: string;
-  product_id: string;
-  products: {
-    sku: string;
-    product_name: string;
-    tracking_type: string;
-    unit: string;
-  } | null;
+  sku: string;
+  product_name: string;
+  tracking_type: string;
+  unit: string;
 };
 
 type WarehouseRow = {
@@ -44,7 +39,7 @@ type WarehouseRow = {
 
 type UnitRow = {
   id: string;
-  product_variant_id: string;
+  product_id: string;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -57,7 +52,7 @@ type UnitRow = {
 type MovementRow = {
   id: string;
   movement_group_id: string | null;
-  product_variant_id: string;
+  product_id: string;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -72,10 +67,17 @@ type MovementRow = {
 const STATUS_LABELS: Record<string, string> = {
   available: "Available",
   reserved: "Reserved",
-  quarantine: "Quarantine",
   damaged: "Damaged",
   repair: "Repair",
+  quarantine: "Quarantine (Historis)",
 };
+
+const OPERATIONAL_STATUSES = [
+  "available",
+  "reserved",
+  "damaged",
+  "repair",
+] as const;
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_reference: "Referensi produk atau gudang tidak valid.",
@@ -174,28 +176,16 @@ async function StockTransferContent({
   const params = await searchParams;
 
   const [
-    variantResult,
+    productResult,
     warehouseResult,
     unitResult,
     movementResult,
   ] = await Promise.all([
     supabase
-      .from("product_variants")
-      .select(`
-        id,
-        variant_sku,
-        variant_name,
-        product_id,
-        products!inner (
-          sku,
-          product_name,
-          tracking_type,
-          unit
-        )
-      `)
+      .from("products")
+      .select("id, sku, product_name, tracking_type, unit")
       .eq("is_active", true)
-      .eq("products.is_active", true)
-      .order("variant_sku", { ascending: true }),
+      .order("sku", { ascending: true }),
 
     supabase
       .from("warehouses")
@@ -207,7 +197,7 @@ async function StockTransferContent({
       .from("product_units")
       .select(`
         id,
-        product_variant_id,
+        product_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -224,7 +214,7 @@ async function StockTransferContent({
       .select(`
         id,
         movement_group_id,
-        product_variant_id,
+        product_id,
         warehouse_id,
         product_unit_id,
         movement_type,
@@ -241,14 +231,14 @@ async function StockTransferContent({
   ]);
 
   const hasError =
-    variantResult.error ||
+    productResult.error ||
     warehouseResult.error ||
     unitResult.error ||
     movementResult.error;
 
   if (hasError) {
     console.error("Stock Transfer query failed:", {
-      variant: variantResult.error,
+      product: productResult.error,
       warehouse: warehouseResult.error,
       unit: unitResult.error,
       movement: movementResult.error,
@@ -272,13 +262,13 @@ async function StockTransferContent({
     );
   }
 
-  const variants = (variantResult.data ?? []) as unknown as VariantRow[];
+  const products = (productResult.data ?? []) as ProductRow[];
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
   const units = (unitResult.data ?? []) as unknown as UnitRow[];
   const movements = (movementResult.data ?? []) as MovementRow[];
 
-  const variantMap = new Map(
-    variants.map((item) => [item.id, item])
+  const productMap = new Map(
+    products.map((item) => [item.id, item])
   );
 
   const warehouseMap = new Map(
@@ -302,9 +292,7 @@ async function StockTransferContent({
         outbound.movement_group_id
       );
 
-      const variant = variantMap.get(
-        outbound.product_variant_id
-      );
+      const product = productMap.get(outbound.product_id);
 
       const sourceWarehouse = warehouseMap.get(
         outbound.warehouse_id
@@ -317,7 +305,7 @@ async function StockTransferContent({
       return {
         id: outbound.movement_group_id!,
         reference: outbound.source_reference_number ?? "-",
-        variant,
+        product,
         sourceWarehouse,
         destinationWarehouse,
         quantity: Math.abs(Number(outbound.quantity_delta)),
@@ -327,7 +315,12 @@ async function StockTransferContent({
         createdAt: outbound.created_at,
         consistent:
           !!inbound &&
-          inbound.status === outbound.status,
+          inbound.status === outbound.status &&
+          inbound.product_id === outbound.product_id &&
+          inbound.quantity_delta === -outbound.quantity_delta &&
+          inbound.inventory_status === outbound.inventory_status &&
+          inbound.product_unit_id === outbound.product_unit_id &&
+          inbound.warehouse_id !== outbound.warehouse_id,
       };
     });
 
@@ -441,9 +434,9 @@ async function StockTransferContent({
                 Transfer memerlukan minimal dua gudang aktif.
                 Tambahkan gudang melalui Master Data terlebih dahulu.
               </div>
-            ) : variants.length === 0 ? (
+            ) : products.length === 0 ? (
               <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Belum tersedia varian produk aktif untuk ditransfer.
+                Belum tersedia produk aktif untuk ditransfer.
               </div>
             ) : (
               <form
@@ -455,25 +448,22 @@ async function StockTransferContent({
                     htmlFor="transfer-product"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    Produk / Varian
+                    Produk
                   </label>
                   <select
                     id="transfer-product"
-                    name="product_variant_id"
+                    name="product_id"
                     required
                     defaultValue=""
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                   >
                     <option value="" disabled>
-                      Pilih produk / varian
+                      Pilih produk
                     </option>
-                    {variants.map((variant) => (
-                      <option key={variant.id} value={variant.id}>
-                        {variant.products?.product_name ?? "-"} -{" "}
-                        {variant.variant_name} ({variant.variant_sku}) -{" "}
-                        {trackingLabel(
-                          variant.products?.tracking_type ?? "-"
-                        )}
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.product_name} ({product.sku}) -{" "}
+                        {trackingLabel(product.tracking_type)}
                       </option>
                     ))}
                   </select>
@@ -543,13 +533,11 @@ async function StockTransferContent({
                     defaultValue="available"
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                   >
-                    {Object.entries(STATUS_LABELS).map(
-                      ([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      )
-                    )}
+                    {OPERATIONAL_STATUSES.map((value) => (
+                      <option key={value} value={value}>
+                        {STATUS_LABELS[value]}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -587,7 +575,7 @@ async function StockTransferContent({
                     id="transfer-unit"
                     name="product_unit_id"
                     defaultValue=""
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   >
                     <option value="">
                       Tidak menggunakan unit individual
@@ -600,20 +588,30 @@ async function StockTransferContent({
                         .map((item) => item.identifier_value)
                         .join(" / ");
 
+                      const product = productMap.get(unit.product_id);
+                      const warehouse = unit.warehouse_id
+                        ? warehouseMap.get(unit.warehouse_id)
+                        : undefined;
+
                       return (
                         <option key={unit.id} value={unit.id}>
+                          {product?.sku ?? unit.unit_code}
+                          {" - "}
                           {unit.unit_code}
                           {identifierText
                             ? ` - ${identifierText}`
                             : ""}
                           {" - "}
-                          {unit.unit_status}
+                          {warehouse?.warehouse_name ?? "Gudang tidak diketahui"}
+                          {" - "}
+                          {STATUS_LABELS[unit.unit_status] ?? unit.unit_status}
                         </option>
                       );
                     })}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
-                    Untuk produk IMEI/serial, pilih unit dari gudang asal.
+                    Pilih unit yang sesuai dengan produk dan gudang asal.
+                    Validasi akhir dilakukan oleh database.
                   </p>
                 </div>
 
@@ -672,7 +670,7 @@ async function StockTransferContent({
                     <tr>
                       {[
                         "Referensi",
-                        "Produk / Varian",
+                        "Produk",
                         "Gudang Asal",
                         "Gudang Tujuan",
                         "Quantity",
@@ -710,14 +708,16 @@ async function StockTransferContent({
 
                         <td className="px-4 py-4">
                           <p className="font-semibold text-slate-900">
-                            {transfer.variant?.products?.product_name ?? "-"}
+                            {transfer.product?.product_name ?? "Produk tidak ditemukan"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {transfer.variant?.variant_name ?? "-"}
+                            {transfer.product?.sku ?? "-"}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {transfer.variant?.variant_sku ?? "-"}
-                          </p>
+                          {transfer.product && (
+                            <p className="mt-1 text-xs text-slate-400">
+                              {trackingLabel(transfer.product.tracking_type)}
+                            </p>
+                          )}
                         </td>
 
                         <td className="px-4 py-4">

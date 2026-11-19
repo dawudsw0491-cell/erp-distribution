@@ -11,7 +11,9 @@ function getString(formData: FormData, key: string): string {
 }
 
 function isValidUUID(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
 }
 
 function isValidQuantity(value: string): boolean {
@@ -112,7 +114,6 @@ export async function startStockOpnameAction(
   redirect(`/inventory/opname/${sessionId}?started=1`);
 }
 
-
 export async function recordStockOpnameCountAction(
   formData: FormData
 ): Promise<{ success: boolean; message: string }> {
@@ -122,15 +123,24 @@ export async function recordStockOpnameCountAction(
   const notes = getString(formData, "notes");
 
   if (!isValidUUID(sessionId) || !isValidUUID(itemId)) {
-    return { success: false, message: "ID sesi atau item tidak valid." };
+    return {
+      success: false,
+      message: "ID sesi atau item tidak valid.",
+    };
   }
 
   if (!isValidQuantity(countedQuantity)) {
-    return { success: false, message: "Quantity tidak valid." };
+    return {
+      success: false,
+      message: "Quantity tidak valid.",
+    };
   }
 
   if (notes.length > 2000) {
-    return { success: false, message: "Catatan maksimal 2.000 karakter." };
+    return {
+      success: false,
+      message: "Catatan maksimal 2.000 karakter.",
+    };
   }
 
   const { supabase } = await authorizeOpname();
@@ -146,6 +156,66 @@ export async function recordStockOpnameCountAction(
 
   if (error) {
     console.error("Record Stock Opname Count failed:", error);
+
+    return {
+      success: false,
+      message: "Gagal menyimpan hasil penghitungan.",
+    };
+  }
+
+  refreshOpname(sessionId);
+
+  return {
+    success: true,
+    message: "Hasil penghitungan berhasil disimpan.",
+  };
+}
+
+/**
+ * Autosave hasil penghitungan satu item Stock Opname.
+ * Tidak melakukan refresh atau revalidasi halaman.
+ */
+export async function autoSaveStockOpnameCountAction(
+  sessionId: string,
+  itemId: string,
+  countedQuantity: string,
+  notes: string
+): Promise<{ success: boolean; message: string }> {
+  if (!isValidUUID(sessionId) || !isValidUUID(itemId)) {
+    return {
+      success: false,
+      message: "ID sesi atau item tidak valid.",
+    };
+  }
+
+  if (!isValidQuantity(countedQuantity)) {
+    return {
+      success: false,
+      message: "Quantity tidak valid.",
+    };
+  }
+
+  if (notes.length > 2000) {
+    return {
+      success: false,
+      message: "Catatan maksimal 2.000 karakter.",
+    };
+  }
+
+  const { supabase } = await authorizeOpname();
+
+  const { error } = await supabase.rpc(
+    "record_stock_opname_count",
+    {
+      p_item_id: itemId,
+      p_counted_quantity: Number(countedQuantity),
+      p_notes: notes.trim() || null,
+    }
+  );
+
+  if (error) {
+    console.error("Auto-save Stock Opname failed:", error);
+
     return {
       success: false,
       message: "Gagal menyimpan hasil penghitungan.",
@@ -158,7 +228,95 @@ export async function recordStockOpnameCountAction(
   };
 }
 
+/**
+ * Bulk save hasil penghitungan Stock Opname.
+ * Menggunakan satu RPC database untuk seluruh item.
+ */
+export async function recordStockOpnameCountsBulkAction(
+  sessionId: string,
+  items: {
+    item_id: string;
+    counted_quantity: number;
+    notes?: string;
+  }[]
+): Promise<{
+  success: boolean;
+  message: string;
+  updatedCount?: number;
+}> {
+  if (!isValidUUID(sessionId)) {
+    return {
+      success: false,
+      message: "ID sesi tidak valid.",
+    };
+  }
 
+  if (!Array.isArray(items) || items.length === 0) {
+    return {
+      success: false,
+      message: "Tidak ada item untuk disimpan.",
+    };
+  }
+
+  if (items.length > 5000) {
+    return {
+      success: false,
+      message: "Maksimal 5.000 item per penyimpanan.",
+    };
+  }
+
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    if (
+      !item ||
+      !isValidUUID(item.item_id) ||
+      seen.has(item.item_id) ||
+      !Number.isFinite(item.counted_quantity) ||
+      !isValidQuantity(String(item.counted_quantity)) ||
+      (item.notes ?? "").length > 2000
+    ) {
+      return {
+        success: false,
+        message:
+          "Data penghitungan tidak valid atau terdapat item duplikat.",
+      };
+    }
+
+    seen.add(item.item_id);
+  }
+
+  const { supabase } = await authorizeOpname();
+
+  const { data, error } = await supabase.rpc(
+    "record_stock_opname_counts_bulk",
+    {
+      p_session_id: sessionId,
+      p_items: items.map((item) => ({
+        item_id: item.item_id,
+        counted_quantity: item.counted_quantity,
+        notes: item.notes?.trim() || null,
+      })),
+    }
+  );
+
+  if (error) {
+    console.error("Bulk Stock Opname Count failed:", error);
+
+    return {
+      success: false,
+      message: "Gagal menyimpan penghitungan massal.",
+    };
+  }
+
+  refreshOpname(sessionId);
+
+  return {
+    success: true,
+    message: "Penghitungan massal berhasil disimpan.",
+    updatedCount: Number(data),
+  };
+}
 
 export async function recordStockOpnameUnitCountAction(
   formData: FormData
@@ -175,15 +333,27 @@ export async function recordStockOpnameUnitCountAction(
     !isValidUUID(itemId) ||
     !isValidUUID(productUnitId)
   ) {
-    return { success: false, message: "ID sesi, item, atau unit tidak valid." };
+    return {
+      success: false,
+      message: "ID sesi, item, atau unit tidak valid.",
+    };
   }
 
-  if (isPresentValue !== "true" && isPresentValue !== "false") {
-    return { success: false, message: "Hasil pemeriksaan tidak valid." };
+  if (
+    isPresentValue !== "true" &&
+    isPresentValue !== "false"
+  ) {
+    return {
+      success: false,
+      message: "Hasil pemeriksaan tidak valid.",
+    };
   }
 
   if (notes.length > 2000) {
-    return { success: false, message: "Catatan maksimal 2.000 karakter." };
+    return {
+      success: false,
+      message: "Catatan maksimal 2.000 karakter.",
+    };
   }
 
   const isPresent = isPresentValue === "true";
@@ -196,25 +366,29 @@ export async function recordStockOpnameUnitCountAction(
       p_item_id: itemId,
       p_product_unit_id: productUnitId,
       p_is_present: isPresent,
-      p_observed_status: isPresent ? observedStatus || null : null,
+      p_observed_status: isPresent
+        ? observedStatus || null
+        : null,
       p_notes: notes || null,
     }
   );
 
   if (error) {
     console.error("Record Stock Opname Unit Count failed:", error);
+
     return {
       success: false,
       message: "Gagal menyimpan pemeriksaan unit.",
     };
   }
 
+  refreshOpname(sessionId);
+
   return {
     success: true,
     message: "Pemeriksaan unit berhasil disimpan.",
   };
 }
-
 
 export async function submitStockOpnameReviewAction(
   formData: FormData

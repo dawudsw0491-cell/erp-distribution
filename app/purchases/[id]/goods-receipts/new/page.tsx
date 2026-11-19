@@ -27,19 +27,12 @@ type PurchaseOrderRow = {
 
 type PurchaseOrderItemRow = {
   id: string;
-  product_variant_id: string;
+  product_id: string;
   quantity: number;
   received_quantity: number;
   unit_cost: number;
   discount_amount: number;
   tax_amount: number;
-};
-
-type VariantRow = {
-  id: string;
-  product_id: string;
-  variant_sku: string;
-  variant_name: string;
 };
 
 type ProductRow = {
@@ -86,7 +79,11 @@ const errorMessages: Record<string, string> = {
 
 function getErrorMessage(error?: string): string | undefined {
   if (!error) return undefined;
-  return errorMessages[error] ?? "Terjadi kesalahan saat membuat Goods Receipt.";
+
+  return (
+    errorMessages[error] ??
+    "Terjadi kesalahan saat membuat Goods Receipt."
+  );
 }
 
 export default async function NewGoodsReceiptPage({
@@ -109,7 +106,9 @@ export default async function NewGoodsReceiptPage({
     .maybeSingle();
 
   if (poError) {
-    throw new Error(`Gagal mengambil Purchase Order: ${poError.message}`);
+    throw new Error(
+      `Gagal mengambil Purchase Order: ${poError.message}`
+    );
   }
 
   if (!poData) {
@@ -118,7 +117,11 @@ export default async function NewGoodsReceiptPage({
 
   const purchaseOrder = poData as PurchaseOrderRow;
 
-  if (!["approved", "partially_received"].includes(purchaseOrder.status)) {
+  if (
+    !["approved", "partially_received"].includes(
+      purchaseOrder.status
+    )
+  ) {
     redirect(`/purchases/${id}`);
   }
 
@@ -141,27 +144,33 @@ export default async function NewGoodsReceiptPage({
   ]);
 
   if (supplierError) {
-    throw new Error(`Gagal mengambil supplier: ${supplierError.message}`);
+    throw new Error(
+      `Gagal mengambil supplier: ${supplierError.message}`
+    );
   }
 
   if (warehouseError) {
-    throw new Error(`Gagal mengambil warehouse: ${warehouseError.message}`);
+    throw new Error(
+      `Gagal mengambil warehouse: ${warehouseError.message}`
+    );
   }
 
   const supplier = supplierData as SupplierRow | null;
   const warehouse = warehouseData as WarehouseRow | null;
 
-  // Item PO
+  // Item Purchase Order
   const { data: itemData, error: itemError } = await supabase
     .from("purchase_order_items")
     .select(
-      "id, product_variant_id, quantity, received_quantity, unit_cost, discount_amount, tax_amount"
+      "id, product_id, quantity, received_quantity, unit_cost, discount_amount, tax_amount"
     )
     .eq("purchase_order_id", id)
     .order("created_at", { ascending: true });
 
   if (itemError) {
-    throw new Error(`Gagal mengambil item PO: ${itemError.message}`);
+    throw new Error(
+      `Gagal mengambil item PO: ${itemError.message}`
+    );
   }
 
   const poItems = (itemData ?? []) as PurchaseOrderItemRow[];
@@ -201,6 +210,7 @@ export default async function NewGoodsReceiptPage({
     draftItems = (data ?? []) as GoodsReceiptDraftItem[];
   }
 
+  // Akumulasi kuantitas yang sudah ada di draft GR
   const draftQuantityMap = new Map<string, number>();
 
   for (const draftItem of draftItems) {
@@ -213,35 +223,9 @@ export default async function NewGoodsReceiptPage({
     );
   }
 
-  // Product variants
-  const variantIds = [
-    ...new Set(
-      poItems.map(
-        (item: PurchaseOrderItemRow) => item.product_variant_id
-      )
-    ),
-  ];
-
-  let variants: VariantRow[] = [];
-
-  if (variantIds.length > 0) {
-    const { data, error } = await supabase
-      .from("product_variants")
-      .select("id, product_id, variant_sku, variant_name")
-      .in("id", variantIds);
-
-    if (error) {
-      throw new Error(`Gagal mengambil varian produk: ${error.message}`);
-    }
-
-    variants = (data ?? []) as VariantRow[];
-  }
-
-  // Products dan tracking type
+  // Ambil produk langsung dari Product Master
   const productIds = [
-    ...new Set(
-      variants.map((variant: VariantRow) => variant.product_id)
-    ),
+    ...new Set(poItems.map((item) => item.product_id)),
   ];
 
   let products: ProductRow[] = [];
@@ -253,32 +237,27 @@ export default async function NewGoodsReceiptPage({
       .in("id", productIds);
 
     if (error) {
-      throw new Error(`Gagal mengambil master produk: ${error.message}`);
+      throw new Error(
+        `Gagal mengambil master produk: ${error.message}`
+      );
     }
 
     products = (data ?? []) as ProductRow[];
   }
 
-  const variantMap = new Map<string, VariantRow>(
-    variants.map((variant: VariantRow) => [variant.id, variant])
-  );
-
   const productMap = new Map<string, ProductRow>(
-    products.map((product: ProductRow) => [product.id, product])
+    products.map((product) => [product.id, product])
   );
 
-  // Bentuk data untuk komponen form
+  // Bentuk data untuk komponen Goods Receipt Form
   const receiptItems: GoodsReceiptFormItem[] = poItems
-    .map((item: PurchaseOrderItemRow) => {
-      const variant = variantMap.get(item.product_variant_id) ?? null;
-
-      const product = variant
-        ? productMap.get(variant.product_id) ?? null
-        : null;
+    .map((item) => {
+      const product = productMap.get(item.product_id) ?? null;
 
       const orderedQuantity = Number(item.quantity);
       const receivedQuantity = Number(item.received_quantity);
-      const draftQuantity = draftQuantityMap.get(item.id) ?? 0;
+      const draftQuantity =
+        draftQuantityMap.get(item.id) ?? 0;
 
       const remainingQuantity = Math.max(
         0,
@@ -286,19 +265,19 @@ export default async function NewGoodsReceiptPage({
       );
 
       const trackingType: GoodsReceiptFormItem["tracking_type"] =
-  product?.tracking_type === "imei"
-    ? "imei"
-    : product?.tracking_type === "serial"
-      ? "serial"
-      : "quantity";
+        product?.tracking_type === "imei"
+          ? "imei"
+          : product?.tracking_type === "serial"
+            ? "serial"
+            : "quantity";
 
       return {
         id: item.id,
-        product_variant_id: item.product_variant_id,
+        product_variant_id: "",
         product_name: product?.product_name ?? "Unknown Product",
         product_sku: product?.sku ?? "-",
-        variant_name: variant?.variant_name ?? "-",
-        variant_sku: variant?.variant_sku ?? "-",
+        variant_name: "",
+        variant_sku: "",
         tracking_type: trackingType,
         ordered_quantity: orderedQuantity,
         received_quantity: receivedQuantity,
@@ -325,7 +304,10 @@ export default async function NewGoodsReceiptPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="mb-2 text-sm text-slate-500">
-              <Link href="/purchases" className="hover:underline">
+              <Link
+                href="/purchases"
+                className="hover:underline"
+              >
                 Purchases
               </Link>
               {" / "}

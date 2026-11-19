@@ -5,19 +5,11 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import { createBrandRecord } from "@/lib/master-data/brands";
+import {
+  createBrandRecord,
+  type CreateBrandResult,
+} from "@/lib/master-data/brands";
 
-type CreateBrandResult =
-  | {
-      success: true;
-      id: string;
-      name: string;
-      existing?: boolean;
-    }
-  | {
-      success: false;
-      error: string;
-    };
 
 type ActionResult =
   | {

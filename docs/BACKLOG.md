@@ -5,7 +5,7 @@ Priority definitions: P0 Critical, P1 High, P2 Medium, P3 Low.
 | ID | Priority | Work item | Dependency | Status |
 |---|---|---|---|---|
 | MD-001 | P1 | Expose all existing Master Data routes from the Master Data Hub | Existing route pages | Done on work branch |
-| MD-002 | P1 | Consolidate Brand creation into one canonical action/path | Brand schema, current Product and Product Model actions | Open |
+| MD-002 | P1 | Consolidate Brand creation into one canonical action/path | Brand schema, current Product and Product Model actions | Done on work branch; shared server-only helper |
 | MD-003 | P1 | Confirm canonical product attribute assignment/value grain | Live DB schema and representative data | Blocked on schema evidence |
 | MD-004 | P1 | Add or recover source-controlled DDL for Product Model and legacy attribute relation tables | Supabase schema history | Open |
 | QA-001 | P1 | Establish build, lint, and automated test evidence | Installable environment | Open |

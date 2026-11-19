@@ -27,6 +27,7 @@ This is a source-level status, not a production-readiness certification. Runtime
 
 - Baseline repository audit documentation.
 - Master Data Hub navigation now includes the existing Product Models, Product Attributes, and Product Attribute Values routes.
+- Brand creation logic shared between Product and Product Model workflows.
 - No database schema or Inventory workflow was changed.
 
 ## Remaining priorities

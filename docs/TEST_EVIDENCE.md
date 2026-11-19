@@ -35,3 +35,10 @@
 - Static verification: change is limited to the existing card array and explanatory label; existing destination routes were confirmed in repository tree.
 
 Do not interpret Vercel status success as proof that all application flows pass tests.
+
+## Shared Brand action refactor
+
+- Static source verification: both Product and Product Model wrappers delegate to `createBrandRecord`.
+- Shared helper performs authorization with `master.create`, normalization, duplicate lookup, insert, and route revalidation.
+- Build/lint/test commands: NOT RUN.
+- Vercel status for the latest refactor commit was pending at the last status check; no pass/fail claim is made.

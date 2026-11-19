@@ -41,7 +41,7 @@
 Master Data Hub now exposes all eight existing top-level Master Data work areas:
 Product, Category, Customer, Supplier, Warehouse, Product Models, Product Attributes, and Product Attribute Values.
 
-No database table, function, trigger, policy, Inventory logic, or existing CRUD route was changed.
+Brand creation is now centralized in `lib/master-data/brands.ts`; both Product and Product Model entry points delegate to the shared server-only helper. The existing form call contracts remain unchanged. No database table, function, trigger, policy, Inventory logic, or existing CRUD route was changed.
 
 ## Deferred decisions
 

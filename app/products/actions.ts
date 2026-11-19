@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { createBrandRecord } from "@/lib/master-data/brands";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -230,97 +231,12 @@ export async function createCategory(
 export async function createBrand(
   input: string
 ): Promise<CreateMasterResult> {
-  const auth = await getAuthorizationContext("master.create");
-
-  if (!auth.user) {
-    return {
-      success: false,
-      error: "Sesi login telah berakhir. Silakan login kembali.",
-    };
-  }
-
-  if (!auth.authorized) {
-    return {
-      success: false,
-      error: "Anda tidak memiliki izin membuat brand.",
-    };
-  }
-
-  const brandName = normalizeMasterName(input);
-
-  if (!brandName) {
-    return {
-      success: false,
-      error: "Nama brand wajib diisi.",
-    };
-  }
-
-  if (brandName.length > 255) {
-    return {
-      success: false,
-      error: "Nama brand maksimal 255 karakter.",
-    };
-  }
-
-  const { data: existing, error: lookupError } = await auth.supabase
-    .from("brands")
-    .select("id, brand_name, is_active")
-    .ilike("brand_name", brandName)
-    .limit(1)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("Brand lookup failed:", lookupError);
-
-    return {
-      success: false,
-      error: "Gagal memeriksa brand yang sudah tersedia.",
-    };
-  }
-
-  if (existing) {
-    if (!existing.is_active) {
-      return {
-        success: false,
-        error: "Brand sudah ada tetapi tidak aktif.",
-      };
-    }
-
-    return {
-      success: true,
-      id: existing.id,
-      name: existing.brand_name,
-      existing: true,
-    };
-  }
-
-  const { data, error } = await auth.supabase
-    .from("brands")
-    .insert({
-      brand_code: generateMasterCode("BRD", brandName),
-      brand_name: brandName,
-      is_active: true,
-    })
-    .select("id, brand_name")
-    .single();
-
-  if (error) {
-    console.error("Create brand failed:", error);
-
-    return {
-      success: false,
-      error: "Gagal menyimpan brand baru ke database.",
-    };
-  }
-
-  revalidatePath("/products/new");
-  revalidatePath("/products");
-
-  return {
-    success: true,
-    id: data.id,
-    name: data.brand_name,
-  };
+  return createBrandRecord(input, [
+    "/products/new",
+    "/products",
+    "/product-models",
+    "/product-models/new",
+  ]);
 }
 
 /* =========================================================

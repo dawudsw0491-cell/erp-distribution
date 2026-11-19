@@ -1,44 +1,37 @@
 # Test Evidence
 
-## Baseline commit
+## Reviewed implementation branch
 
-- Commit: `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`
-- GitHub/Vercel status check: **success**
+- Branch: `work/master-data-baseline-20261119`
+- Reviewed commit: `61e817bd8f6cf3f2cfbe296bf5412c06923e244e`
+- Baseline master commit: `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`
+- GitHub/Vercel status check for reviewed commit: **SUCCESS**.
 - Package scripts: dev, build, start, lint.
 - Test script: not defined in package.json.
 - Test suite directory: not identified in inspected tree.
 
-## Baseline checks
+## Verification matrix
 
 | Check | Result | Notes |
 |---|---|---|
-| GitHub repository access | PASS | Public repository and master branch readable |
-| HEAD verification | PASS | Branch master points to 8eadef2 |
-| Vercel commit status | PASS | Status context Vercel returned success |
-| Source tree inspection | PASS | 258 tree entries |
-| Dependency manifest inspection | PASS | package.json and package-lock.json read |
-| Build | NOT RUN | No local checkout/build runtime used |
-| Lint | NOT RUN | No local checkout/dependency install used |
-| Unit tests | NOT RUN | No test command/suite identified |
-| Integration tests | NOT RUN | Requires executable app and database |
-| RLS/role tests | NOT RUN | Requires non-production Supabase roles |
-| Inventory transaction tests | NOT RUN | Requires non-production DB and fixtures |
+| Repository access | PASS | Public repository readable |
+| Master branch integrity | PASS | Master remains at baseline commit |
+| Work branch | PASS | Reviewed branch points to reviewed commit |
+| Recursive source tree | PASS | 271 entries inspected |
+| Dependencies | PASS | package.json and lockfile presence inspected |
+| Vercel status | PASS | Latest reviewed commit status returned success |
+| Master Data Hub routes | PASS | Eight work areas link to existing routes |
+| Shared Brand action | PASS | Both existing entry points delegate to shared helper |
+| Build | NOT RUN | Vercel status is separate evidence; no local build run |
+| Lint | NOT RUN | No local lint run |
+| Unit tests | NOT RUN | No test script/suite identified |
+| Integration/E2E | NOT RUN | No execution environment/fixtures |
+| Live Supabase schema | NOT RUN | No live DB introspection |
+| RLS and grants | STATIC REVIEW ONLY | SQL source inspected; not executed against live DB |
+| Purchasing/Inventory transaction flows | NOT RUN | RPCs and SQL reviewed, not executed |
 
-## Master Data Hub change
+## Important interpretation
 
-- Change: add three existing routes to the Hub card list.
-- Files changed: `app/master-data/page.tsx`.
-- Database changes: none.
-- Inventory changes: none.
-- Authentication/RLS changes: none.
-- Runtime verification: not run in this environment.
-- Static verification: change is limited to the existing card array and explanatory label; existing destination routes were confirmed in repository tree.
+A successful Vercel status check is a positive deployment/build signal for the reviewed commit. It does not establish that all database migrations, RLS policies, user-role combinations, or business transactions pass.
 
-Do not interpret Vercel status success as proof that all application flows pass tests.
-
-## Shared Brand action refactor
-
-- Static source verification: both Product and Product Model wrappers delegate to `createBrandRecord`.
-- Shared helper performs authorization with `master.create`, normalization, duplicate lookup, insert, and route revalidation.
-- Build/lint/test commands: NOT RUN.
-- Vercel status for the latest refactor commit was pending at the last status check; no pass/fail claim is made.
+See `docs/VERIFICATION_REPORT_20261119.md` for the findings register and next verification sequence.

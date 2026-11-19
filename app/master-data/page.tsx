@@ -55,6 +55,30 @@ const masterDataItems = [
     href: "/warehouses",
     available: true,
   },
+  {
+    code: "PM",
+    title: "Product Models",
+    description:
+      "Kelola model produk dan pengelompokan spesifikasi yang digunakan oleh produk.",
+    href: "/product-models",
+    available: true,
+  },
+  {
+    code: "PA",
+    title: "Product Attributes",
+    description:
+      "Kelola kamus atribut spesifikasi, tipe data, satuan, dan penerapan kategori.",
+    href: "/product-attributes",
+    available: true,
+  },
+  {
+    code: "AV",
+    title: "Product Attribute Values",
+    description:
+      "Kelola nilai atribut spesifikasi yang telah dikaitkan dengan varian produk.",
+    href: "/product-attribute-values",
+    available: true,
+  },
 ];
 
 export default async function MasterDataPage() {
@@ -119,7 +143,7 @@ export default async function MasterDataPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-600">
-                Lima submodul untuk mengelola data referensi
+                Delapan area kerja untuk mengelola data referensi
                 utama perusahaan.
               </p>
             </div>

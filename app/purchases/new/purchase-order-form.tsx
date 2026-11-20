@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { createPurchaseOrderAction } from "../actions";
 
@@ -75,19 +75,14 @@ export default function PurchaseOrderForm({
     suppliers[0]?.id ?? ""
   );
 
-  const [orderDate, setOrderDate] = useState("");
-
-  useEffect(() => {
+  const [orderDate, setOrderDate] = useState(() => {
     const today = new Date();
-
-    const localDate = [
+    return [
       today.getFullYear(),
       String(today.getMonth() + 1).padStart(2, "0"),
       String(today.getDate()).padStart(2, "0"),
     ].join("-");
-
-    setOrderDate(localDate);
-  }, []);
+  });
 
   const [items, setItems] = useState<PurchaseItem[]>([
     createEmptyItem(products[0]?.id ?? ""),

@@ -1,6 +1,8 @@
 -- MD-013: count identified IMEI units and untagged SKU aggregate stock separately.
+-- NULL means the aggregate physical count has not been recorded yet.
+-- A recorded zero remains distinct from an item that has not been counted.
 ALTER TABLE public.stock_opname_items
-    ADD COLUMN IF NOT EXISTS counted_aggregate_quantity numeric(18,3) NOT NULL DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS counted_aggregate_quantity numeric(18,3);
 
 CREATE OR REPLACE FUNCTION public.record_stock_opname_count(p_item_id uuid, p_counted_quantity numeric, p_notes text DEFAULT NULL::text)
  RETURNS uuid
@@ -411,7 +413,14 @@ BEGIN
 
     UPDATE public.stock_opname_items
     SET
-        counted_quantity = v_present_count + COALESCE(counted_aggregate_quantity, 0),
+        counted_quantity = CASE
+            WHEN v_tracking_type = 'imei'
+                 AND counted_aggregate_quantity IS NULL
+                THEN NULL
+            WHEN v_tracking_type = 'imei'
+                THEN v_present_count + counted_aggregate_quantity
+            ELSE v_present_count
+        END,
         counted_by = v_user_id,
         counted_at = v_counted_at,
         updated_at = v_counted_at,

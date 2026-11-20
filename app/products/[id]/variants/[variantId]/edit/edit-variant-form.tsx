@@ -11,6 +11,8 @@ type EditVariantFormProps = {
   variantSku: string;
   initialVariantName: string;
   initialBarcode: string;
+  initialWarranty: string;
+  warrantyTemplates: string[];
 };
 
 export default function EditVariantForm({
@@ -19,9 +21,12 @@ export default function EditVariantForm({
   variantSku,
   initialVariantName,
   initialBarcode,
+  initialWarranty,
+  warrantyTemplates,
 }: EditVariantFormProps) {
   const [variantName, setVariantName] = useState(initialVariantName);
   const [barcode, setBarcode] = useState(initialBarcode);
+  const [warranty, setWarranty] = useState(initialWarranty);
 
   return (
     <form
@@ -74,6 +79,34 @@ export default function EditVariantForm({
 
         <p className="mt-1 text-xs text-slate-500">
           Maksimal 200 karakter.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="warranty"
+          className="mb-2 block text-sm font-medium text-slate-700"
+        >
+          Warranty
+        </label>
+        <input
+          id="warranty"
+          name="warranty"
+          type="text"
+          maxLength={100}
+          list="warranty-template-options"
+          value={warranty}
+          onChange={(event) => setWarranty(event.target.value)}
+          placeholder="Pilih template atau ketik warranty baru"
+          className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+        <datalist id="warranty-template-options">
+          {warrantyTemplates.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+        <p className="mt-1 text-xs text-slate-500">
+          Teks baru otomatis disimpan sebagai template setelah perubahan variant disimpan.
         </p>
       </div>
 

@@ -57,29 +57,6 @@ function generateMasterCode(prefix: string, name: string) {
   return `${prefix}-${slug}-${suffix}`;
 }
 
-/**
- * Menghasilkan SKU pendek melalui database sequence.
- * Format: HXA-000001
- */
-async function generateProductSku(
-  supabase: Awaited<
-    ReturnType<typeof getAuthorizationContext>
-  >["supabase"]
-): Promise<string> {
-  const { data, error } = await supabase.rpc(
-    "generate_product_sku"
-  );
-
-  if (error || !data) {
-    throw new Error(
-      `Gagal membuat SKU produk: ${
-        error?.message ?? "SKU kosong"
-      }`
-    );
-  }
-
-  return data;
-}
 
 function getProductCondition(
   value: FormDataEntryValue | null
@@ -243,10 +220,6 @@ export async function createProduct(formData: FormData) {
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
 
-  // SKU tidak lagi diterima dari form.
-  // Sistem menjadi satu-satunya pihak yang membuat SKU.
-  const sku = await generateProductSku(auth.supabase);
-
   const productName = normalizeProductName(
     formData.get("product_name")
   );
@@ -396,44 +369,48 @@ export async function createProduct(formData: FormData) {
     }
   }
 
-  const { data, error } = await auth.supabase
-    .from("products")
-    .insert({
-      sku,
-      barcode,
-      product_name: productName,
-      category_id: categoryId,
-      product_subcategory_id: subcategoryId,
-      product_condition: productCondition,
-      brand_id: brandId,
-      model_id: productType === "goods" ? modelId : null,
-      product_type: productType,
-      tracking_type: trackingType,
-      unit,
-      description,
-      minimum_stock: minimumStock,
-      is_active: true,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("Create product failed:", error);
-
-    if (error.code === "23505") {
-      redirect("/products/new?error=duplicate");
-    }
-
-    if (error.code === "23503") {
-      redirect("/products/new?error=invalid_reference");
-    }
-
+  let variants: Array<{
+    variant_name: string; barcode: string | null; ram: string; rom: string; color: string; warranty: string;
+  }>;
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("variants_json") ?? "[]"));
+    if (!Array.isArray(parsed)) throw new Error("Invalid variants payload");
+    variants = parsed.map((item: unknown) => {
+      if (!item || typeof item !== "object") throw new Error("Invalid variant");
+      const row = item as Record<string, unknown>;
+      return {
+        variant_name: String(row.variant_name ?? "").trim().replace(/\s+/g, " "),
+        barcode: String(row.barcode ?? "").trim() || null,
+        ram: String(row.ram ?? "").trim(), rom: String(row.rom ?? "").trim(),
+        color: String(row.color ?? "").trim(), warranty: String(row.warranty ?? "").trim(),
+      };
+    });
+  } catch { redirect("/products/new?error=invalid_variants"); }
+  if (productType === "goods" && (variants.length < 1 || variants.length > 100)) redirect("/products/new?error=variant_required");
+  if (productType === "service" && variants.length > 0) redirect("/products/new?error=service_variants");
+  const variantNames = new Set<string>();
+  const variantBarcodes = new Set<string>();
+  for (const variant of variants) {
+    const normalizedName = variant.variant_name.toLocaleLowerCase("id-ID");
+    if (!variant.variant_name || variant.variant_name.length > 200 || variantNames.has(normalizedName)) redirect("/products/new?error=invalid_variants");
+    variantNames.add(normalizedName);
+    if (variant.barcode && (variant.barcode.length > 100 || variantBarcodes.has(variant.barcode))) redirect("/products/new?error=invalid_variants");
+    if (variant.barcode) variantBarcodes.add(variant.barcode);
+    if ([variant.ram, variant.rom, variant.color, variant.warranty].some((value) => value.length > 100)) redirect("/products/new?error=invalid_variants");
+  }
+  const productPayload = { barcode, product_name: productName, category_id: categoryId, product_subcategory_id: subcategoryId, product_condition: productCondition, brand_id: brandId, model_id: productType === "goods" ? modelId : null, product_type: productType, tracking_type: trackingType, unit, description, minimum_stock: minimumStock };
+  const { data, error } = await auth.supabase.rpc("create_product_with_variants", { p_product: productPayload, p_variants: variants });
+  if (error || !data?.product_id) {
+    console.error("Create product with variants failed:", error);
+    if (error?.code === "23505") redirect("/products/new?error=duplicate");
+    if (error?.code === "23503") redirect("/products/new?error=invalid_reference");
+    if (error?.message?.toLowerCase().includes("permission")) redirect("/products/new?error=forbidden");
     redirect("/products/new?error=save_failed");
   }
-
   revalidatePath("/products");
-
-  redirect(`/products?created=1&id=${data.id}`);
+  revalidatePath("/products/" + data.product_id);
+  revalidatePath("/products/" + data.product_id + "/variants");
+  redirect("/products/" + data.product_id + "?created=1");
 }
 
 /* =========================================================

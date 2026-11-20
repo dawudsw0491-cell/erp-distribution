@@ -66,6 +66,6 @@
 ## Next concrete Master Data work
 
 - Trace all writes/reads and PostgREST relationship embeds for `brand_id`, `model_id`, `category_id`, `product_subcategory_id`, `product_id`, and variant attribute relations.
-- Product create/edit currently does not persist `model_id`; implement model assignment only after choosing one canonical brand source (model-inherited vs product override).
+- Product create/edit already exposes `model_id`, filters models by selected Brand, validates that the model belongs to the selected Brand, and persists the relation. Do not rebuild this feature. Remaining issue is duplicated brand state on Product and Product Model; decide whether Product.brand_id is a deliberate denormalized snapshot or should be derived.
 - Decide canonical ownership and derive fields where safe.
 - Produce a migration proposal with constraints, rollback, and application compatibility checks before changing schema.

@@ -29,7 +29,6 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi produk tidak valid.",
   lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
-  specifications_save_failed: "Varian sudah tersimpan, tetapi spesifikasi belum lengkap tersimpan. Periksa kembali dan simpan ulang spesifikasinya.",
 };
 
 export default async function NewProductVariantPage({

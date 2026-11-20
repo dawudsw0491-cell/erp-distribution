@@ -37,10 +37,15 @@ export default function AttributeValueFilters({
 
   // Sinkronisasi ketika pengguna menggunakan tombol Back/Forward browser.
   useEffect(() => {
-    setQuery(searchParams.get("q") ?? "");
-    setAttribute(searchParams.get("attribute") ?? "");
-    setStatus(searchParams.get("status") ?? "all");
-  }, [currentParams, searchParams]);
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(currentParams);
+      setQuery(params.get("q") ?? "");
+      setAttribute(params.get("attribute") ?? "");
+      setStatus(params.get("status") ?? "all");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [currentParams]);
 
   // Live Search dengan debounce 400 ms.
   useEffect(() => {

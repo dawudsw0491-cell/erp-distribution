@@ -4,6 +4,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { updateProduct } from "../../actions";
+import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
 type CategoryOption = ProductCategoryOption;
 
@@ -44,7 +45,6 @@ type EditProductFormProps = {
 };
 
 import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
-import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
 const inputClass =
   "box-border w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";

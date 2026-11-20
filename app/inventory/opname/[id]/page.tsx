@@ -472,7 +472,9 @@ async function StockOpnameDetailContent({
         snapshot_quantity: Number(item.snapshot_quantity ?? 0),
         counted_quantity:
           product?.tracking_type === "imei"
-            ? Number(item.counted_aggregate_quantity ?? 0)
+            ? item.counted_aggregate_quantity === null
+              ? null
+              : Number(item.counted_aggregate_quantity)
             : item.counted_quantity === null
               ? null
               : Number(item.counted_quantity),
@@ -938,8 +940,8 @@ async function StockOpnameDetailContent({
               </h2>
 
               <p className="mt-2 text-sm text-blue-800">
-                Gunakan tabel bulk untuk produk Quantity. Produk
-                IMEI/Serial tetap diperiksa berdasarkan unit terdaftar.
+                Gunakan tabel bulk untuk produk Quantity dan stok agregat IMEI.
+                Unit IMEI/Serial yang terdaftar tetap diperiksa satu per satu.
               </p>
 
               {!canManageOpname && (
@@ -958,8 +960,8 @@ async function StockOpnameDetailContent({
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Produk Quantity dikelola melalui tabel penghitungan massal.
-                Produk IMEI/Serial dikelola berdasarkan unit.
+                Produk Quantity dan stok agregat IMEI dihitung melalui tabel massal.
+                Unit IMEI/Serial yang terdaftar dihitung satu per satu.
               </p>
             </div>
 

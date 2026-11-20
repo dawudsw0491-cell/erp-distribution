@@ -105,9 +105,8 @@ export default async function EditProductVariantPage({
             .in("attribute_id", specificationAttributeIds),
           auth.supabase
             .from("product_attribute_values")
-            .select("id, attribute_id, value_name")
+            .select("id, attribute_id, value_name, is_active")
             .in("attribute_id", specificationAttributeIds)
-            .eq("is_active", true)
             .order("value_name", { ascending: true }),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
@@ -143,7 +142,7 @@ export default async function EditProductVariantPage({
       return [
         field.code,
         (specificationValues ?? [])
-          .filter((item) => item.attribute_id === attribute?.id)
+          .filter((item) => item.attribute_id === attribute?.id && item.is_active)
           .map((item) => item.value_name),
       ];
     })

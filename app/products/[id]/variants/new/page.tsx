@@ -17,17 +17,15 @@ type PageProps = {
 };
 
 const errorMessages: Record<string, string> = {
-  required: "SKU dan nama varian wajib diisi.",
-  invalid_sku: "Format atau panjang SKU varian tidak valid.",
-  invalid_sku_format: "SKU hanya boleh menggunakan huruf, angka, titik, garis bawah, dan tanda hubung.",
+  required: "Nama varian wajib diisi.",
   invalid_name: "Nama varian melebihi batas 200 karakter.",
   invalid_barcode: "Barcode melebihi batas 100 karakter.",
   inactive_product: "Produk sudah nonaktif. Varian tidak dapat ditambahkan.",
   invalid_product_type: "Varian hanya dapat ditambahkan pada produk barang (goods).",
-  duplicate_sku: "SKU sudah digunakan oleh produk atau varian lain.",
   duplicate: "SKU atau barcode sudah terdaftar.",
   invalid_reference: "Referensi produk tidak valid.",
-  lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
+  invalid_specification: "Spesifikasi maksimal 100 karakter.",
+  forbidden: "Anda tidak memiliki izin membuat varian.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
 };
 
@@ -165,26 +163,9 @@ if (error || !product) {
           >
             <input type="hidden" name="product_id" value={product.id} />
 
-            <div>
-              <label
-                htmlFor="variant_sku"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                SKU Varian <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="variant_sku"
-                name="variant_sku"
-                type="text"
-                required
-                maxLength={50}
-                placeholder="Contoh: PROD001-BLK"
-                className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Maksimal 50 karakter. Gunakan huruf kapital, angka, titik,
-                garis bawah, atau tanda hubung.
-              </p>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-semibold text-blue-900">SKU Varian Otomatis</p>
+              <p className="mt-1 text-sm text-blue-800">Sistem membuat SKU berdasarkan SKU produk utama dan nomor urut berikutnya. SKU tidak perlu diinput dan tidak berubah saat varian diedit.</p>
             </div>
 
             <div>

@@ -717,100 +717,154 @@ export async function toggleProductStatus(formData: FormData) {
    PRODUCT VARIANT WARRANTY TEMPLATE
 ========================================================= */
 
-async function saveVariantWarranty(
+const VARIANT_SPECIFICATION_CODES = ["RAM", "ROM", "COLOR", "WARRANTY"] as const;
+
+async function saveVariantSpecifications(
   supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
   productId: string,
   variantId: string,
-  warrantyInput: string
+  formData: FormData
 ) {
-  const warranty = warrantyInput.trim().replace(/\s+/g, " ").toUpperCase();
-
-  const { data: attribute, error: attributeError } = await supabase
+  const { data: attributes, error: attributesError } = await supabase
     .from("product_attributes")
-    .select("id")
-    .eq("attribute_code", "WARRANTY")
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (attributeError || !attribute) {
-    throw new Error("Master attribute WARRANTY belum tersedia.");
-  }
-
-  // Empty input means no warranty is assigned; do not invoke DELETE
-  // because variant creation permission does not imply master.delete.
-  if (!warranty) return;
-
-  const { data: existingValues, error: valuesError } = await supabase
-    .from("product_attribute_values")
-    .select("id, value_name")
-    .eq("attribute_id", attribute.id)
+    .select("id, attribute_code")
+    .in("attribute_code", [...VARIANT_SPECIFICATION_CODES])
     .eq("is_active", true);
 
-  if (valuesError) throw valuesError;
+  if (attributesError) throw attributesError;
 
-  let value = existingValues?.find(
-    (item) => item.value_name.trim().toUpperCase() === warranty
+  const attributeByCode = new Map(
+    (attributes ?? []).map((attribute) => [attribute.attribute_code, attribute])
   );
 
-  if (!value) {
-    const codeBase = warranty
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Z0-9]+/g, "_")
-      .replace(/^_|_$/g, "")
-      .slice(0, 35) || "WARRANTY";
-    const valueCode = `${codeBase}_${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+  for (const code of VARIANT_SPECIFICATION_CODES) {
+    const attribute = attributeByCode.get(code);
+    if (!attribute) {
+      throw new Error(`Attribute ${code} belum tersedia atau tidak aktif.`);
+    }
 
-    const { data: createdValue, error: createValueError } = await supabase
+    const valueName = String(formData.get(`spec_${code}`) ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toUpperCase();
+
+    if (valueName.length > 100) {
+      throw new Error(`Nilai spesifikasi ${code} melebihi 100 karakter.`);
+    }
+
+    const { data: existingMapping, error: mappingLookupError } = await supabase
+      .from("product_variant_attribute_values")
+      .select("id, attribute_value_id")
+      .eq("product_variant_id", variantId)
+      .eq("attribute_id", attribute.id)
+      .maybeSingle();
+
+    if (mappingLookupError) throw mappingLookupError;
+
+    if (!valueName) {
+      if (existingMapping) {
+        const { error: deleteMappingError } = await supabase
+          .from("product_variant_attribute_values")
+          .delete()
+          .eq("id", existingMapping.id);
+
+        if (deleteMappingError) throw deleteMappingError;
+      }
+      continue;
+    }
+
+    const { data: values, error: valuesError } = await supabase
       .from("product_attribute_values")
-      .insert({
-        attribute_id: attribute.id,
-        value_code: valueCode,
-        value_name: warranty,
-        description: "Warranty template reusable untuk product variant.",
-        is_active: true,
-      })
       .select("id, value_name")
-      .single();
+      .eq("attribute_id", attribute.id)
+      .eq("is_active", true);
 
-    if (createValueError || !createdValue) throw createValueError ?? new Error("Gagal menyimpan template warranty.");
-    value = createdValue;
-  }
+    if (valuesError) throw valuesError;
 
-  const { data: existingAssignment, error: assignmentLookupError } = await supabase
-    .from("product_attribute_assignments")
-    .select("id")
-    .eq("product_id", productId)
-    .eq("attribute_id", attribute.id)
-    .maybeSingle();
-
-  if (assignmentLookupError) throw assignmentLookupError;
-
-  if (!existingAssignment) {
-    const { error: assignmentInsertError } = await supabase
-      .from("product_attribute_assignments")
-      .insert({
-        product_id: productId,
-        attribute_id: attribute.id,
-        is_required: false,
-        is_active: true,
-      });
-    if (assignmentInsertError) throw assignmentInsertError;
-  }
-
-  const { error: mappingError } = await supabase
-    .from("product_variant_attribute_values")
-    .upsert(
-      {
-        product_id: productId,
-        product_variant_id: variantId,
-        attribute_id: attribute.id,
-        attribute_value_id: value.id,
-      },
-      { onConflict: "product_variant_id,attribute_id" }
+    let selectedValue = (values ?? []).find(
+      (item) => item.value_name.trim().toUpperCase() === valueName
     );
 
-  if (mappingError) throw mappingError;
+    if (!selectedValue) {
+      const codeBase =
+        valueName
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^A-Z0-9]+/g, "_")
+          .replace(/^_|_$/g, "")
+          .slice(0, 35) || code;
+
+      const valueCode = `${codeBase}_${randomUUID()
+        .replace(/-/g, "")
+        .slice(0, 8)
+        .toUpperCase()}`;
+
+      const { data: createdValue, error: createValueError } = await supabase
+        .from("product_attribute_values")
+        .insert({
+          attribute_id: attribute.id,
+          value_code: valueCode,
+          value_name: valueName,
+          description: `Reusable ${code} specification template for product variants.`,
+          is_active: true,
+        })
+        .select("id, value_name")
+        .single();
+
+      if (createValueError || !createdValue) {
+        throw createValueError ?? new Error(`Gagal menyimpan template ${code}.`);
+      }
+
+      selectedValue = createdValue;
+    }
+
+    const { data: assignment, error: assignmentLookupError } = await supabase
+      .from("product_attribute_assignments")
+      .select("id")
+      .eq("product_id", productId)
+      .eq("attribute_id", attribute.id)
+      .maybeSingle();
+
+    if (assignmentLookupError) throw assignmentLookupError;
+
+    if (!assignment) {
+      const { error: assignmentInsertError } = await supabase
+        .from("product_attribute_assignments")
+        .insert({
+          product_id: productId,
+          attribute_id: attribute.id,
+          is_required: false,
+          is_active: true,
+        });
+
+      if (assignmentInsertError) throw assignmentInsertError;
+    }
+
+    if (existingMapping) {
+      if (existingMapping.attribute_value_id !== selectedValue.id) {
+        const { error: updateMappingError } = await supabase
+          .from("product_variant_attribute_values")
+          .update({
+            attribute_value_id: selectedValue.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingMapping.id);
+
+        if (updateMappingError) throw updateMappingError;
+      }
+    } else {
+      const { error: insertMappingError } = await supabase
+        .from("product_variant_attribute_values")
+        .insert({
+          product_id: productId,
+          product_variant_id: variantId,
+          attribute_id: attribute.id,
+          attribute_value_id: selectedValue.id,
+        });
+
+      if (insertMappingError) throw insertMappingError;
+    }
+  }
 }
 
 /* =========================================================
@@ -945,16 +999,19 @@ export async function createProductVariant(formData: FormData) {
   }
 
   try {
-    await saveVariantWarranty(
+    await saveVariantSpecifications(
       auth.supabase,
       productId,
       variant.id,
-      String(formData.get("warranty") ?? "")
+      formData
     );
-  } catch (warrantyError) {
-    console.error("Save variant warranty failed:", warrantyError);
-    await auth.supabase.from("product_variants").delete().eq("id", variant.id).eq("product_id", productId);
-    redirect(`/products/${productId}/variants/new?error=warranty_save_failed`);
+  } catch (specificationError) {
+    console.error("Save variant specifications failed:", specificationError);
+    // Variant insert already succeeded. RLS intentionally has no variant DELETE
+    // policy, so do not claim rollback or attempt a privileged cleanup.
+    redirect(
+      `/products/${productId}/variants/${variant.id}/edit?error=specifications_save_failed`
+    );
   }
 
   revalidatePath(`/products/${productId}`);
@@ -1112,15 +1169,17 @@ export async function updateProductVariant(formData: FormData) {
   }
 
   try {
-    await saveVariantWarranty(
+    await saveVariantSpecifications(
       auth.supabase,
       productId,
       variantId,
-      String(formData.get("warranty") ?? "")
+      formData
     );
-  } catch (warrantyError) {
-    console.error("Update variant warranty failed:", warrantyError);
-    redirect(`/products/${productId}/variants/${variantId}/edit?error=warranty_save_failed`);
+  } catch (specificationError) {
+    console.error("Update variant specifications failed:", specificationError);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=specifications_save_failed`
+    );
   }
 
   revalidatePath(`/products/${productId}`);

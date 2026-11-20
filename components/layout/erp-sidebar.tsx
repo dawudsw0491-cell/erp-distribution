@@ -15,6 +15,8 @@ import {
   Boxes,
   ArrowLeftRight,
   ChevronDown,
+  ClipboardList,
+  Smartphone,
   ShoppingBag,
   RotateCcw,
   Wallet,

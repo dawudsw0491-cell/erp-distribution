@@ -93,7 +93,7 @@ begin
   v_product_name := upper(regexp_replace(btrim(coalesce(p_product->>'product_name','')), '[[:space:]]+', ' ', 'g'));
   v_product_type := lower(btrim(coalesce(p_product->>'product_type','goods')));
   v_tracking_type := lower(btrim(coalesce(p_product->>'tracking_type','quantity')));
-  v_unit := upper(regexp_replace(btrim(coalesce(p_product->>'unit','PCS')), '[[:space:]]+', ' ', 'g'));
+  v_unit := upper(regexp_replace(btrim(coalesce(p_product->>'unit','Unit')), '[[:space:]]+', ' ', 'g'));
   v_category_id := nullif(p_product->>'category_id','')::uuid;
   v_subcategory_id := nullif(p_product->>'product_subcategory_id','')::uuid;
   v_brand_id := nullif(p_product->>'brand_id','')::uuid;

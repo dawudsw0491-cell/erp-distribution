@@ -16,14 +16,17 @@ type PageProps = {
     id: string;
     variantId: string;
   }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 export default async function EditProductVariantPage({
   params,
+  searchParams,
 }: PageProps) {
   await connection();
 
   const { id, variantId } = await params;
+  const { error: errorCode } = await searchParams;
 
   if (!UUID_REGEX.test(id) || !UUID_REGEX.test(variantId)) {
     notFound();
@@ -72,50 +75,79 @@ export default async function EditProductVariantPage({
     notFound();
   }
 
-  const { data: warrantyAttribute, error: warrantyAttributeError } = await auth.supabase
-    .from("product_attributes")
-    .select("id")
-    .eq("attribute_code", "WARRANTY")
-    .eq("is_active", true)
-    .maybeSingle();
+  const specificationFields = [
+    { code: "RAM", label: "RAM" },
+    { code: "ROM", label: "ROM" },
+    { code: "COLOR", label: "Warna" },
+    { code: "WARRANTY", label: "Warranty" },
+  ] as const;
 
-  if (warrantyAttributeError) {
-    console.error("Load warranty attribute failed:", warrantyAttributeError);
+  const { data: specificationAttributes, error: specificationAttributeError } =
+    await auth.supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("attribute_code", specificationFields.map((field) => field.code))
+      .eq("is_active", true);
+
+  if (specificationAttributeError) {
+    console.error("Load variant specification attributes failed:", specificationAttributeError);
+    throw new Error("Gagal memuat atribut spesifikasi.");
   }
 
-  const [{ data: warrantyMapping, error: warrantyMappingError }, { data: warrantyValues, error: warrantyValuesError }] =
-    warrantyAttribute
+  const specificationAttributeIds = (specificationAttributes ?? []).map((item) => item.id);
+  const [{ data: specificationMappings, error: specificationMappingError }, { data: specificationValues, error: specificationValuesError }] =
+    specificationAttributeIds.length
       ? await Promise.all([
           auth.supabase
             .from("product_variant_attribute_values")
-            .select("attribute_value_id")
+            .select("attribute_id, attribute_value_id")
             .eq("product_variant_id", variantId)
-            .eq("attribute_id", warrantyAttribute.id)
-            .maybeSingle(),
+            .in("attribute_id", specificationAttributeIds),
           auth.supabase
             .from("product_attribute_values")
-            .select("value_name")
-            .eq("attribute_id", warrantyAttribute.id)
+            .select("id, attribute_id, value_name")
+            .in("attribute_id", specificationAttributeIds)
             .eq("is_active", true)
             .order("value_name", { ascending: true }),
         ])
-      : [{ data: null, error: null }, { data: [], error: null }];
+      : [{ data: [], error: null }, { data: [], error: null }];
 
-  if (warrantyMappingError) console.error("Load variant warranty failed:", warrantyMappingError);
-  if (warrantyValuesError) console.error("Load warranty templates failed:", warrantyValuesError);
-
-  let currentWarranty = "";
-  if (warrantyMapping?.attribute_value_id && warrantyAttribute) {
-    const { data: warrantyValue, error: warrantyValueError } = await auth.supabase
-      .from("product_attribute_values")
-      .select("value_name")
-      .eq("id", warrantyMapping.attribute_value_id)
-      .eq("attribute_id", warrantyAttribute.id)
-      .maybeSingle();
-
-    if (warrantyValueError) console.error("Load current warranty text failed:", warrantyValueError);
-    currentWarranty = warrantyValue?.value_name ?? "";
+  if (specificationMappingError || specificationValuesError) {
+    console.error("Load variant specifications failed:", {
+      specificationMappingError,
+      specificationValuesError,
+    });
+    throw new Error("Gagal memuat nilai spesifikasi varian.");
   }
+
+  const initialSpecifications = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      const mapping = specificationMappings?.find(
+        (item) => item.attribute_id === attribute?.id
+      );
+      const value = specificationValues?.find(
+        (item) => item.id === mapping?.attribute_value_id
+      );
+      return [field.code, value?.value_name ?? ""];
+    })
+  );
+
+  const specificationOptions = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      return [
+        field.code,
+        (specificationValues ?? [])
+          .filter((item) => item.attribute_id === attribute?.id)
+          .map((item) => item.value_name),
+      ];
+    })
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
@@ -144,14 +176,19 @@ export default async function EditProductVariantPage({
             </p>
           </div>
 
+          {errorCode === "specifications_save_failed" && (
+            <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Data dasar varian sudah tersimpan, tetapi sebagian spesifikasi gagal disimpan. Periksa izin master.create dan simpan kembali spesifikasi.
+            </div>
+          )}
           <EditVariantForm
             productId={id}
             variantId={variantId}
             variantSku={variant.variant_sku}
             initialVariantName={variant.variant_name}
             initialBarcode={variant.barcode ?? ""}
-            initialWarranty={currentWarranty}
-            warrantyTemplates={(warrantyValues ?? []).map((item) => item.value_name)}
+            initialSpecifications={initialSpecifications}
+            specificationOptions={specificationOptions}
           />
         </div>
       </main>

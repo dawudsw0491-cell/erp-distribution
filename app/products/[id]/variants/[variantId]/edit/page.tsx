@@ -72,6 +72,51 @@ export default async function EditProductVariantPage({
     notFound();
   }
 
+  const { data: warrantyAttribute, error: warrantyAttributeError } = await auth.supabase
+    .from("product_attributes")
+    .select("id")
+    .eq("attribute_code", "WARRANTY")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (warrantyAttributeError) {
+    console.error("Load warranty attribute failed:", warrantyAttributeError);
+  }
+
+  const [{ data: warrantyMapping, error: warrantyMappingError }, { data: warrantyValues, error: warrantyValuesError }] =
+    warrantyAttribute
+      ? await Promise.all([
+          auth.supabase
+            .from("product_variant_attribute_values")
+            .select("attribute_value_id")
+            .eq("product_variant_id", variantId)
+            .eq("attribute_id", warrantyAttribute.id)
+            .maybeSingle(),
+          auth.supabase
+            .from("product_attribute_values")
+            .select("value_name")
+            .eq("attribute_id", warrantyAttribute.id)
+            .eq("is_active", true)
+            .order("value_name", { ascending: true }),
+        ])
+      : [{ data: null, error: null }, { data: [], error: null }];
+
+  if (warrantyMappingError) console.error("Load variant warranty failed:", warrantyMappingError);
+  if (warrantyValuesError) console.error("Load warranty templates failed:", warrantyValuesError);
+
+  let currentWarranty = "";
+  if (warrantyMapping?.attribute_value_id && warrantyAttribute) {
+    const { data: warrantyValue, error: warrantyValueError } = await auth.supabase
+      .from("product_attribute_values")
+      .select("value_name")
+      .eq("id", warrantyMapping.attribute_value_id)
+      .eq("attribute_id", warrantyAttribute.id)
+      .maybeSingle();
+
+    if (warrantyValueError) console.error("Load current warranty text failed:", warrantyValueError);
+    currentWarranty = warrantyValue?.value_name ?? "";
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
       <ErpSidebar activePath="/products" />
@@ -105,6 +150,8 @@ export default async function EditProductVariantPage({
             variantSku={variant.variant_sku}
             initialVariantName={variant.variant_name}
             initialBarcode={variant.barcode ?? ""}
+            initialWarranty={currentWarranty}
+            warrantyTemplates={(warrantyValues ?? []).map((item) => item.value_name)}
           />
         </div>
       </main>

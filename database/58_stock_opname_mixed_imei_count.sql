@@ -208,9 +208,9 @@ BEGIN
 
     UPDATE public.stock_opname_items i
     SET
-        counted_aggregate_quantity = CASE WHEN p.tracking_type = 'imei' THEN x.counted_quantity ELSE 0 END,
+        counted_aggregate_quantity = CASE WHEN (SELECT tracking_type FROM public.products WHERE id = i.product_id) = 'imei' THEN x.counted_quantity ELSE 0 END,
         counted_quantity = x.counted_quantity + CASE
-            WHEN p.tracking_type = 'imei' THEN (
+            WHEN (SELECT tracking_type FROM public.products WHERE id = i.product_id) = 'imei' THEN (
                 SELECT COUNT(*)::numeric
                 FROM public.stock_opname_unit_counts c
                 WHERE c.opname_item_id = i.id AND c.is_present = TRUE

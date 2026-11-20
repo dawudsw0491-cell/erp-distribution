@@ -220,7 +220,7 @@ async function DashboardContent() {
         balances: BalanceRow[];
         warehouseCount: number | null;
         variantCount: number | null;
-        postedMovementCount: number;
+        postedMovementCount: number | null;
       }
     | null = null;
 
@@ -232,30 +232,24 @@ async function DashboardContent() {
     inventoryAccess.profile &&
     inventoryAccess.authorized
   ) {
-    const [balanceResult, movementResult] = await Promise.all([
-      inventoryAccess.supabase
-        .from("inventory_balances")
-        .select(`
-          product_id,
-          product_variant_id,
-          warehouse_id,
-          available_quantity,
-          reserved_quantity,
-          quarantine_quantity,
-          damaged_quantity,
-          repair_quantity,
-          on_hand_quantity,
-          inventory_value
-        `),
-
-      inventoryAccess.supabase
-        .from("inventory_movements")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "posted"),
-    ]);
+    const balanceResult = await inventoryAccess.supabase
+      .from("inventory_balances")
+      .select(`
+        product_id,
+        product_variant_id,
+        warehouse_id,
+        available_quantity,
+        reserved_quantity,
+        quarantine_quantity,
+        damaged_quantity,
+        repair_quantity,
+        on_hand_quantity,
+        inventory_value
+      `);
 
     let warehouseCount: number | null = null;
     let variantCount: number | null = null;
+    let activeWarehouseIds: string[] | null = null;
 
     // Warehouse dan Product Variant memakai policy master.view di live DB.
     // Jangan menjalankannya melalui context inventory.view karena RLS dapat
@@ -264,7 +258,7 @@ async function DashboardContent() {
       const [warehouseResult, variantResult] = await Promise.all([
         masterAccess.supabase
           .from("warehouses")
-          .select("id", { count: "exact", head: true })
+          .select("id", { count: "exact" })
           .eq("is_active", true),
 
         masterAccess.supabase
@@ -277,18 +271,55 @@ async function DashboardContent() {
         masterReferenceLoadError = true;
       } else {
         warehouseCount = warehouseResult.count ?? 0;
+        activeWarehouseIds = (warehouseResult.data ?? []).map(
+          (warehouse) => warehouse.id
+        );
         variantCount = variantResult.count ?? 0;
       }
     }
 
-    if (balanceResult.error || movementResult.error) {
+    if (balanceResult.error) {
       inventoryLoadError = true;
     } else {
+      const visibleBalanceRows = (balanceResult.data ?? []) as BalanceRow[];
+      const candidateWarehouseIds = masterAccess.authorized
+        ? activeWarehouseIds ?? []
+        : [...new Set(visibleBalanceRows.map((row) => row.warehouse_id))];
+
+      const warehouseScopeCheck = await filterActivityByWarehouseAccess(
+        inventoryAccess.supabase,
+        candidateWarehouseIds.map((warehouseId) => ({
+          warehouse_id: warehouseId,
+        }))
+      );
+
+      let postedMovementCount: number | null = null;
+
+      if (!warehouseScopeCheck.hasError) {
+        const visibleWarehouseIds = warehouseScopeCheck.rows.map(
+          (row) => row.warehouse_id
+        );
+
+        if (visibleWarehouseIds.length === 0) {
+          postedMovementCount = 0;
+        } else {
+          const movementCountResult = await inventoryAccess.supabase
+            .from("inventory_movements")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "posted")
+            .in("warehouse_id", visibleWarehouseIds);
+
+          if (!movementCountResult.error) {
+            postedMovementCount = movementCountResult.count ?? 0;
+          }
+        }
+      }
+
       inventoryData = {
-        balances: (balanceResult.data ?? []) as BalanceRow[],
+        balances: visibleBalanceRows,
         warehouseCount,
         variantCount,
-        postedMovementCount: movementResult.count ?? 0,
+        postedMovementCount,
       };
     }
   }
@@ -759,7 +790,9 @@ async function DashboardContent() {
                       Aktivitas Inventory
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {formatNumber(inventoryData.postedMovementCount)} transaksi movement berstatus Posted.
+                      {inventoryData.postedMovementCount === null
+                        ? "Jumlah movement tidak tersedia untuk lingkup akses ini."
+                        : `${formatNumber(inventoryData.postedMovementCount)} transaksi movement berstatus Posted pada gudang yang dapat diakses.`}
                     </p>
                   </div>
                   <p className="text-xs text-slate-500">

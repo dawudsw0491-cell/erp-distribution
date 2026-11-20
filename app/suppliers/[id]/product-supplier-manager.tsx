@@ -129,7 +129,11 @@ export default function ProductSupplierManager({
   }, [supplierId]);
 
   useEffect(() => {
-    void loadRelations();
+    const timer = window.setTimeout(() => {
+      void loadRelations();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadRelations]);
 
   useEffect(() => {

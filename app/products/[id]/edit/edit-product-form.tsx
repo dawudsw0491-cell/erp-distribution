@@ -5,12 +5,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { updateProduct } from "../../actions";
 
-type CategoryOption = {
-  id: string;
-  category_name: string;
-  parent_id: string | null;
-  is_active?: boolean;
-};
+type CategoryOption = ProductCategoryOption;
 
 type BrandOption = {
   id: string;
@@ -49,6 +44,7 @@ type EditProductFormProps = {
 };
 
 import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
+import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
 const inputClass =
   "box-border w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -58,96 +54,6 @@ const labelClass =
 
 function normalize(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function getRecommendation(
-  productName: string,
-  brandName: string,
-  condition: string,
-  categories: CategoryOption[]
-) {
-  const name = normalize(productName);
-  const brand = normalize(brandName);
-
-  if (!name || !condition) return null;
-
-  let mainCategory = "";
-  let subcategory = "";
-
-  if (
-    /\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)
-  ) {
-    mainCategory = "TABLET";
-  } else if (
-    /\b(MACBOOK|LAPTOP|NOTEBOOK|CHROMEBOOK|THINKPAD|VIVOBOOK|ZENBOOK)\b/.test(name)
-  ) {
-    mainCategory = "KOMPUTER DAN LAPTOP";
-  } else if (
-    /\b(ROUTER|SWITCH|ACCESS POINT|ACCESS-POINT|MODEM|ONT|OLT|REPEATER|MESH WIFI)\b/.test(name)
-  ) {
-    mainCategory = "NETWORKING";
-  } else if (
-    /\b(IC|MIKROKONTROLER|RESISTOR|KAPASITOR|TRANSISTOR|DIODE|PCB|ARDUINO|SENSOR|MOSFET)\b/.test(name)
-  ) {
-    mainCategory = "KOMPONEN ELEKTRONIK";
-  } else if (
-    /\b(AIRPODS|EARBUDS|HEADSET|HEADPHONE|EARPHONE|CHARGER|ADAPTER|CABLE|KABEL|CASE|COVER|POWERBANK|TEMPERED GLASS|SCREEN PROTECTOR|MOUSE|KEYBOARD|USB HUB|DOCKING)\b/.test(name)
-  ) {
-    mainCategory = "AKSESORIS";
-  } else if (/\b(IPHONE)\b/.test(name)) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE IOS";
-  } else if (
-    /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
-    (
-      [
-        "SAMSUNG",
-        "XIAOMI",
-        "OPPO",
-        "VIVO",
-        "REALME",
-        "INFINIX",
-        "TECNO",
-        "POCO",
-      ].includes(brand) &&
-      /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name)
-    )
-  ) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE ANDROID";
-  }
-
-  if (!mainCategory) return null;
-
-  if (condition === "SECOND") {
-    subcategory = `${mainCategory} SECONDHAND`;
-  }
-
-  const main = categories.find(
-    (item) =>
-      item.category_name === mainCategory &&
-      item.parent_id === null &&
-      item.is_active !== false
-  );
-
-  if (!main) return null;
-
-  const child = subcategory
-    ? categories.find(
-        (item) =>
-          item.category_name === subcategory &&
-          item.parent_id === main.id &&
-          item.is_active !== false
-      )
-    : undefined;
-
-  return {
-    categoryId: main.id,
-    categoryName: main.category_name,
-    subcategoryId: child?.id ?? "",
-    subcategoryName: child?.category_name ?? "",
-    missingSubcategory: Boolean(subcategory && !child),
-  };
 }
 
 export default function EditProductForm({
@@ -202,7 +108,7 @@ export default function EditProductForm({
   const recommendation = useMemo(
     () =>
       productType === "goods"
-        ? getRecommendation(
+        ? recommendProductCategory(
             productName,
             selectedBrandName,
             condition,

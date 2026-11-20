@@ -21,6 +21,53 @@ type BalanceRow = {
   inventory_value: number;
 };
 
+type PurchaseOrderActivityRow = {
+  id: string;
+  po_number: string;
+  status: string;
+  warehouse_id: string;
+  created_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  cancelled_at: string | null;
+};
+
+type GoodsReceiptActivityRow = {
+  id: string;
+  receipt_number: string;
+  purchase_order_id: string;
+  warehouse_id: string;
+  posted_at: string;
+  created_at: string;
+};
+
+type InventoryMovementActivityRow = {
+  id: string;
+  warehouse_id: string;
+  movement_type: string;
+  source_reference_type: string | null;
+  source_reference_number: string | null;
+  posted_at: string;
+  created_at: string;
+};
+
+type ScopedActivityRow =
+  | ({ kind: "purchase_order" } & PurchaseOrderActivityRow)
+  | ({ kind: "goods_receipt" } & GoodsReceiptActivityRow)
+  | ({ kind: "inventory_movement" } & InventoryMovementActivityRow);
+
+type ActivityRecord = {
+  id: string;
+  occurredAt: string;
+  source: string;
+  activity: string;
+  reference: string;
+  status: string;
+  href: string;
+};
+
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("id-ID", {
     maximumFractionDigits: 2,
@@ -33,6 +80,74 @@ function formatCurrency(value: number) {
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(value || 0);
+}
+
+function formatActivityDateTime(value: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+async function filterActivityByWarehouseAccess<T extends { warehouse_id: string }>(
+  supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
+  rows: T[]
+): Promise<T[]> {
+  const warehouseIds = [...new Set(rows.map((row) => row.warehouse_id))];
+
+  const accessChecks = await Promise.all(
+    warehouseIds.map(async (warehouseId) => {
+      const { data, error } = await supabase.rpc("has_warehouse_access", {
+        target_warehouse_id: warehouseId,
+      });
+
+      return {
+        warehouseId,
+        allowed: !error && data === true,
+      };
+    })
+  );
+
+  const allowedWarehouseIds = new Set(
+    accessChecks
+      .filter((check) => check.allowed)
+      .map((check) => check.warehouseId)
+  );
+
+  return rows.filter((row) => allowedWarehouseIds.has(row.warehouse_id));
+}
+
+function getPurchaseOrderActivityStatus(status: string) {
+  const labels: Record<string, string> = {
+    draft: "Draft",
+    submitted: "Diajukan",
+    approved: "Disetujui",
+    rejected: "Ditolak",
+    partially_received: "Diterima Sebagian",
+    received: "Selesai Diterima",
+    cancelled: "Dibatalkan",
+  };
+
+  return labels[status] ?? status;
+}
+
+function getInventoryMovementActivityLabel(movementType: string) {
+  const labels: Record<string, string> = {
+    purchase: "Penerimaan Pembelian",
+    sale: "Pengeluaran Penjualan",
+    transfer_in: "Transfer Masuk",
+    transfer_out: "Transfer Keluar",
+    adjustment: "Penyesuaian Stok",
+    customer_return: "Retur Pelanggan",
+    supplier_return: "Retur Supplier",
+    opening_balance: "Saldo Awal",
+    status_change: "Perubahan Status Stok",
+  };
+
+  return labels[movementType] ?? movementType;
 }
 
 async function DashboardContent() {
@@ -205,6 +320,178 @@ async function DashboardContent() {
       .map((row) => row.product_id ?? row.product_variant_id)
       .filter((id): id is string => Boolean(id))
   ).size;
+
+  // BUSINESS ACTIVITY FEED
+  // Setiap sumber menggunakan permission modulnya sendiri; baris kemudian
+  // disaring lagi dengan has_warehouse_access agar tidak melewati lingkup gudang.
+  const [purchasingAccess, goodsReceiptAccess] = await Promise.all([
+    getAuthorizationContext("purchasing.view"),
+    getAuthorizationContext("goods_receipt.view"),
+  ]);
+
+  let authorizedActivitySourceCount = 0;
+  const activityLoadErrors: string[] = [];
+  let purchaseOrderActivityRows: PurchaseOrderActivityRow[] = [];
+  let goodsReceiptActivityRows: GoodsReceiptActivityRow[] = [];
+  let inventoryMovementActivityRows: InventoryMovementActivityRow[] = [];
+
+  const activityQueries: Promise<void>[] = [];
+
+  if (
+    purchasingAccess.user &&
+    purchasingAccess.profile &&
+    purchasingAccess.authorized
+  ) {
+    authorizedActivitySourceCount += 1;
+    activityQueries.push((async () => {
+      const { data, error } = await purchasingAccess.supabase
+        .from("purchase_orders")
+        .select(`
+          id,
+          po_number,
+          status,
+          warehouse_id,
+          created_at,
+          updated_at,
+          submitted_at,
+          approved_at,
+          rejected_at,
+          cancelled_at
+        `)
+        .neq("status", "draft")
+        .order("updated_at", { ascending: false })
+        .limit(12);
+
+      if (error) {
+        activityLoadErrors.push("Purchase Order");
+      } else {
+        purchaseOrderActivityRows = (data ?? []) as PurchaseOrderActivityRow[];
+      }
+    })());
+  }
+
+  if (
+    goodsReceiptAccess.user &&
+    goodsReceiptAccess.profile &&
+    goodsReceiptAccess.authorized
+  ) {
+    authorizedActivitySourceCount += 1;
+    activityQueries.push((async () => {
+      const { data, error } = await goodsReceiptAccess.supabase
+        .from("goods_receipts")
+        .select("id, receipt_number, purchase_order_id, warehouse_id, posted_at, created_at")
+        .eq("status", "posted")
+        .not("posted_at", "is", null)
+        .order("posted_at", { ascending: false })
+        .limit(12);
+
+      if (error) {
+        activityLoadErrors.push("Goods Receipt");
+      } else {
+        goodsReceiptActivityRows = (data ?? []) as GoodsReceiptActivityRow[];
+      }
+    })());
+  }
+
+  if (
+    inventoryAccess.user &&
+    inventoryAccess.profile &&
+    inventoryAccess.authorized
+  ) {
+    authorizedActivitySourceCount += 1;
+    activityQueries.push((async () => {
+      const { data, error } = await inventoryAccess.supabase
+        .from("inventory_movements")
+        .select(`
+          id,
+          warehouse_id,
+          movement_type,
+          source_reference_type,
+          source_reference_number,
+          posted_at,
+          created_at
+        `)
+        .eq("status", "posted")
+        .not("posted_at", "is", null)
+        .order("posted_at", { ascending: false })
+        .limit(12);
+
+      if (error) {
+        activityLoadErrors.push("Inventory Movement");
+      } else {
+        inventoryMovementActivityRows =
+          (data ?? []) as InventoryMovementActivityRow[];
+      }
+    })());
+  }
+
+  await Promise.all(activityQueries);
+
+  const candidateActivityRows: ScopedActivityRow[] = [
+    ...purchaseOrderActivityRows.map((row) => ({
+      ...row,
+      kind: "purchase_order" as const,
+    })),
+    ...goodsReceiptActivityRows.map((row) => ({
+      ...row,
+      kind: "goods_receipt" as const,
+    })),
+    ...inventoryMovementActivityRows.map((row) => ({
+      ...row,
+      kind: "inventory_movement" as const,
+    })),
+  ];
+
+  // RPC per warehouse dijalankan dengan identitas pengguna yang sedang login.
+  // Jika pemeriksaan gagal, baris ditolak (fail closed), tidak ditampilkan.
+  const visibleActivityRows = await filterActivityByWarehouseAccess(
+    inventoryAccess.supabase,
+    candidateActivityRows
+  );
+
+  const activityItems: ActivityRecord[] = visibleActivityRows.map((row) => {
+    if (row.kind === "purchase_order") {
+      return {
+        id: `po-${row.id}`,
+        occurredAt:
+          row.updated_at ??
+          row.approved_at ??
+          row.submitted_at ??
+          row.created_at,
+        source: "Purchasing",
+        activity: "Purchase Order",
+        reference: row.po_number,
+        status: getPurchaseOrderActivityStatus(row.status),
+        href: `/purchases/${row.id}`,
+      };
+    }
+
+    if (row.kind === "goods_receipt") {
+      return {
+        id: `gr-${row.id}`,
+        occurredAt: row.posted_at,
+        source: "Goods Receipt",
+        activity: "Penerimaan Barang",
+        reference: row.receipt_number,
+        status: "Posted",
+        href: `/purchases/${row.purchase_order_id}/goods-receipts/${row.id}`,
+      };
+    }
+
+    return {
+      id: `movement-${row.id}`,
+      occurredAt: row.posted_at,
+      source: "Inventory",
+      activity: getInventoryMovementActivityLabel(row.movement_type),
+      reference:
+        row.source_reference_number ??
+        row.source_reference_type ??
+        `MOV-${row.id.slice(0, 8)}`,
+      status: "Posted",
+      href: `/inventory/movements?q=${encodeURIComponent(row.source_reference_number ?? row.movement_type)}&status=posted`,
+    };
+  }).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, 10);
 
   // KPI penjualan dan piutang tidak menampilkan nol sebelum sumber
   // transaksi terposting tersedia. Nilai kosong dibedakan dari nol riil.
@@ -484,8 +771,14 @@ async function DashboardContent() {
                 Aktivitas Bisnis
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                Ringkasan transaksi terbaru
+                Purchase Order non-draft, Goods Receipt Posted, dan Inventory Movement Posted
               </p>
+
+              {activityLoadErrors.length > 0 && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Sebagian sumber aktivitas gagal dimuat: {activityLoadErrors.join(", ")}.
+                </p>
+              )}
 
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -497,13 +790,50 @@ async function DashboardContent() {
                       <th className="pb-3 font-medium">Status</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} className="py-10 text-center text-slate-400">
-                        Belum ada transaksi. Data akan tampil setelah modul
-                        operasional terhubung.
-                      </td>
-                    </tr>
+                  <tbody className="divide-y divide-slate-100">
+                    {activityItems.length > 0 ? (
+                      activityItems.map((item) => (
+                        <tr key={item.id} className="align-top hover:bg-blue-50/40">
+                          <td className="whitespace-nowrap py-4 pr-4 text-xs text-slate-500">
+                            {formatActivityDateTime(item.occurredAt)}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <Link
+                              href={item.href}
+                              className="font-semibold text-blue-700 hover:underline"
+                            >
+                              {item.activity}
+                            </Link>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {item.source}
+                            </p>
+                          </td>
+                          <td className="py-4 pr-4">
+                            <Link
+                              href={item.href}
+                              className="break-all text-slate-700 hover:text-blue-700 hover:underline"
+                            >
+                              {item.reference}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap py-4">
+                            <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="py-10 text-center text-slate-400">
+                          {authorizedActivitySourceCount === 0
+                            ? "Tidak ada permission untuk membaca sumber aktivitas bisnis."
+                            : activityLoadErrors.length > 0
+                              ? "Aktivitas tidak dapat dimuat dari sumber yang diizinkan."
+                              : "Belum ada aktivitas terposting pada sumber yang dapat Anda akses."}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

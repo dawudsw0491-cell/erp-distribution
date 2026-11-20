@@ -418,6 +418,7 @@ async function UnitRegistryContent({
           </section>
 
           <RealtimeFilterBar
+            key={[keyword, statusFilter, warehouseFilter].join("|")}
             initialKeyword={keyword}
             searchLabel="Pencarian Unit"
             searchPlaceholder="IMEI, serial, kode unit, SKU, produk..."

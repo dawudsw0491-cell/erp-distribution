@@ -81,32 +81,64 @@ export default async function ProductVariantDetailPage({ params }: Props) {
 
   if (!variant) notFound();
 
-  const { data: warrantyAttribute } = await supabase
-    .from("product_attributes")
-    .select("id")
-    .eq("attribute_code", "WARRANTY")
-    .eq("is_active", true)
-    .maybeSingle();
+  const specificationFields = [
+    { code: "RAM", label: "RAM" },
+    { code: "ROM", label: "ROM" },
+    { code: "COLOR", label: "Warna" },
+    { code: "WARRANTY", label: "Warranty" },
+  ] as const;
 
-  let warrantyName = "";
-  if (warrantyAttribute) {
-    const { data: warrantyMapping } = await supabase
-      .from("product_variant_attribute_values")
-      .select("attribute_value_id")
-      .eq("product_variant_id", variantId)
-      .eq("attribute_id", warrantyAttribute.id)
-      .maybeSingle();
+  const { data: specificationAttributes, error: specificationAttributeError } =
+    await supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("attribute_code", specificationFields.map((field) => field.code))
+      .eq("is_active", true);
 
-    if (warrantyMapping?.attribute_value_id) {
-      const { data: warrantyValue } = await supabase
-        .from("product_attribute_values")
-        .select("value_name")
-        .eq("id", warrantyMapping.attribute_value_id)
-        .eq("attribute_id", warrantyAttribute.id)
-        .maybeSingle();
-      warrantyName = warrantyValue?.value_name ?? "";
-    }
+  if (specificationAttributeError) {
+    console.error("Load variant specification attributes failed:", specificationAttributeError);
+    throw new Error("Gagal memuat atribut spesifikasi varian.");
   }
+
+  const specificationAttributeIds = (specificationAttributes ?? []).map((item) => item.id);
+  const [{ data: specificationMappings, error: specificationMappingError }, { data: specificationValues, error: specificationValuesError }] =
+    specificationAttributeIds.length
+      ? await Promise.all([
+          supabase
+            .from("product_variant_attribute_values")
+            .select("attribute_id, attribute_value_id")
+            .eq("product_variant_id", variantId)
+            .in("attribute_id", specificationAttributeIds),
+          supabase
+            .from("product_attribute_values")
+            .select("id, attribute_id, value_name")
+            .in("attribute_id", specificationAttributeIds)
+            .eq("is_active", true),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+
+  if (specificationMappingError || specificationValuesError) {
+    console.error("Load variant specifications failed:", {
+      specificationMappingError,
+      specificationValuesError,
+    });
+    throw new Error("Gagal memuat nilai spesifikasi varian.");
+  }
+
+  const specificationRows = specificationFields
+    .map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      const mapping = specificationMappings?.find(
+        (item) => item.attribute_id === attribute?.id
+      );
+      const value = specificationValues?.find(
+        (item) => item.id === mapping?.attribute_value_id
+      );
+      return { label: field.label, value: value?.value_name ?? "" };
+    })
+    .filter((item) => item.value);
 
   const { data: canUpdate } = await supabase.rpc("has_permission", {
     required_permission: "master.update",
@@ -177,12 +209,14 @@ export default async function ProductVariantDetailPage({ params }: Props) {
                 </p>
               </div>
 
-              <div>
-                <p className="text-sm text-slate-500">Warranty</p>
-                <p className="mt-1 font-medium text-slate-800">
-                  {warrantyName || "-"}
-                </p>
-              </div>
+              {specificationRows.map((item) => (
+                <div key={item.label}>
+                  <p className="text-sm text-slate-500">{item.label}</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
 
               <div>
                 <p className="text-sm text-slate-500">Barcode</p>

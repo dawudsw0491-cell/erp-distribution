@@ -29,7 +29,7 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi produk tidak valid.",
   lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
-  warranty_save_failed: "Warranty gagal disimpan. Varian dibatalkan; silakan coba kembali.",
+  specifications_save_failed: "Varian sudah tersimpan, tetapi spesifikasi belum lengkap tersimpan. Periksa kembali dan simpan ulang spesifikasinya.",
 };
 
 export default async function NewProductVariantPage({
@@ -47,12 +47,7 @@ export default async function NewProductVariantPage({
 
   const auth = await getAuthorizationContext("master.create");
 
- console.log("[VARIANT NEW] AUTH:", {
-  userId: auth.user?.id ?? null,
-  authorized: auth.authorized,
-  hasSupabase: !!auth.supabase,
-}); 
-  
+
   if (!auth.user) {
     redirect("/login");
   }
@@ -67,15 +62,7 @@ export default async function NewProductVariantPage({
     .eq("id", id)
     .maybeSingle();
 
-console.log("[VARIANT NEW] PRODUCT:", {
-  productId: id,
-  found: !!product,
-  error: error?.message ?? null,
-  productType: product?.product_type ?? null,
-  isActive: product?.is_active ?? null,
-});
-
-  if (error || !product) {
+if (error || !product) {
     notFound();
   }
 
@@ -83,29 +70,54 @@ console.log("[VARIANT NEW] PRODUCT:", {
     redirect(`/products/${id}/variants`);
   }
 
-  const { data: warrantyAttribute, error: warrantyAttributeError } = await auth.supabase
-    .from("product_attributes")
-    .select("id")
-    .eq("attribute_code", "WARRANTY")
-    .eq("is_active", true)
-    .maybeSingle();
+  const specificationFields = [
+    { code: "RAM", label: "RAM", placeholder: "Contoh: 8GB" },
+    { code: "ROM", label: "ROM", placeholder: "Contoh: 128GB" },
+    { code: "COLOR", label: "Warna", placeholder: "Contoh: Midnight Black" },
+    { code: "WARRANTY", label: "Warranty", placeholder: "Pilih template atau ketik warranty baru" },
+  ] as const;
 
-  if (warrantyAttributeError) {
-    console.error("Load warranty attribute failed:", warrantyAttributeError);
+  const { data: specificationAttributes, error: specificationAttributeError } =
+    await auth.supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("attribute_code", specificationFields.map((field) => field.code))
+      .eq("is_active", true);
+
+  if (specificationAttributeError) {
+    console.error("Load product specification attributes failed:", specificationAttributeError);
+    throw new Error("Gagal memuat master spesifikasi produk.");
   }
 
-  const { data: warrantyValues, error: warrantyValuesError } = warrantyAttribute
-    ? await auth.supabase
-        .from("product_attribute_values")
-        .select("value_name")
-        .eq("attribute_id", warrantyAttribute.id)
-        .eq("is_active", true)
-        .order("value_name", { ascending: true })
-    : { data: [], error: null };
+  const specificationAttributeIds = (specificationAttributes ?? []).map((item) => item.id);
+  const { data: specificationValues, error: specificationValuesError } =
+    specificationAttributeIds.length
+      ? await auth.supabase
+          .from("product_attribute_values")
+          .select("attribute_id, value_name")
+          .in("attribute_id", specificationAttributeIds)
+          .eq("is_active", true)
+          .order("value_name", { ascending: true })
+      : { data: [], error: null };
 
-  if (warrantyValuesError) {
-    console.error("Load warranty templates failed:", warrantyValuesError);
+  if (specificationValuesError) {
+    console.error("Load product specification templates failed:", specificationValuesError);
+    throw new Error("Gagal memuat template spesifikasi produk.");
   }
+
+  const specificationOptions = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      return [
+        field.code,
+        (specificationValues ?? [])
+          .filter((item) => item.attribute_id === attribute?.id)
+          .map((item) => item.value_name),
+      ];
+    })
+  );
 
   return (
   <div className="min-h-screen bg-slate-50 md:flex md:h-screen md:min-h-0 md:overflow-hidden">
@@ -194,31 +206,40 @@ console.log("[VARIANT NEW] PRODUCT:", {
               />
             </div>
 
-            <div>
-              <label
-                htmlFor="warranty"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Warranty
-              </label>
-              <input
-                id="warranty"
-                name="warranty"
-                type="text"
-                maxLength={100}
-                list="warranty-template-options"
-                placeholder="Pilih template atau ketik warranty baru"
-                className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-              <datalist id="warranty-template-options">
-                {(warrantyValues ?? []).map((item) => (
-                  <option key={item.value_name} value={item.value_name} />
+            <section className="space-y-4 rounded-lg border border-slate-200 p-4">
+              <div>
+                <h2 className="font-semibold text-slate-800">Spesifikasi Varian</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Nilai baru disimpan sebagai template dan dapat digunakan kembali pada varian lain.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {specificationFields.map((field) => (
+                  <div key={field.code}>
+                    <label
+                      htmlFor={`spec-${field.code.toLowerCase()}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
+                      {field.label}
+                    </label>
+                    <input
+                      id={`spec-${field.code.toLowerCase()}`}
+                      name={`spec_${field.code}`}
+                      type="text"
+                      maxLength={100}
+                      list={`spec-options-${field.code.toLowerCase()}`}
+                      placeholder={field.placeholder}
+                      className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <datalist id={`spec-options-${field.code.toLowerCase()}`}>
+                      {(specificationOptions[field.code] ?? []).map((item) => (
+                        <option key={item} value={item} />
+                      ))}
+                    </datalist>
+                  </div>
                 ))}
-              </datalist>
-              <p className="mt-1 text-xs text-slate-500">
-                Teks baru otomatis disimpan sebagai template setelah variant berhasil disimpan.
-              </p>
-            </div>
+              </div>
+            </section>
 
             <div>
               <label

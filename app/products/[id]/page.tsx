@@ -148,6 +148,52 @@ export default async function ProductDetailPage({
     notFound();
   }
 
+  const { data: productVariants, error: productVariantsError } = await supabase
+    .from("product_variants")
+    .select("id, variant_sku, variant_name, barcode, is_active")
+    .eq("product_id", id)
+    .order("created_at", { ascending: true });
+
+  if (productVariantsError) {
+    console.error("Product variants fetch error:", productVariantsError);
+    throw new Error("Gagal mengambil daftar SKU produk.");
+  }
+
+  const variantIds = (productVariants ?? []).map((variant) => variant.id);
+  const { data: variantMappings, error: variantMappingsError } = variantIds.length
+    ? await supabase
+        .from("product_variant_attribute_values")
+        .select("product_variant_id, attribute_id, attribute_value_id")
+        .in("product_variant_id", variantIds)
+    : { data: [], error: null };
+
+  if (variantMappingsError) {
+    console.error("Product variant specifications fetch error:", variantMappingsError);
+    throw new Error("Gagal mengambil spesifikasi SKU.");
+  }
+
+  const attributeIds = [...new Set((variantMappings ?? []).map((item) => item.attribute_id))];
+  const valueIds = [...new Set((variantMappings ?? []).map((item) => item.attribute_value_id))];
+  const [{ data: attributes }, { data: attributeValues }] = await Promise.all([
+    attributeIds.length
+      ? supabase.from("product_attributes").select("id, attribute_code").in("id", attributeIds)
+      : Promise.resolve({ data: [] }),
+    valueIds.length
+      ? supabase.from("product_attribute_values").select("id, value_name").in("id", valueIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const attributeCodeById = new Map((attributes ?? []).map((item) => [item.id, item.attribute_code]));
+  const attributeValueById = new Map((attributeValues ?? []).map((item) => [item.id, item.value_name]));
+  const specificationsByVariant = new Map<string, Record<string, string>>();
+  for (const mapping of variantMappings ?? []) {
+    const code = attributeCodeById.get(mapping.attribute_id);
+    const value = attributeValueById.get(mapping.attribute_value_id);
+    if (!code || !value) continue;
+    const current = specificationsByVariant.get(mapping.product_variant_id) ?? {};
+    current[code] = value;
+    specificationsByVariant.set(mapping.product_variant_id, current);
+  }
+
   // Ambil nama kategori dan subkategori secara terpisah
   // untuk menghindari ambiguitas dua foreign key ke tabel yang sama.
   const categoryIds = [
@@ -245,6 +291,7 @@ export default async function ProductDetailPage({
 
             {canUpdate.data === true && (
               <div className="flex flex-wrap gap-3">
+                <Link href={`/products/${product.id}/variants`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Kelola SKU & Varian</Link>
                 <Link
                   href={`/products/${product.id}/edit`}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -357,6 +404,51 @@ export default async function ProductDetailPage({
                 {product.description || "-"}
               </p>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">Varian, SKU, Spesifikasi & Garansi</h2>
+                <p className="mt-1 text-sm text-slate-500">Seluruh SKU dan spesifikasi yang melekat pada produk ini.</p>
+              </div>
+              <Link href={`/products/${product.id}/variants`} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Lihat & Kelola Varian</Link>
+            </div>
+            {productVariants && productVariants.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {productVariants.map((variant) => {
+                  const specs = specificationsByVariant.get(variant.id) ?? {};
+                  return (
+                    <div key={variant.id} className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-800">{variant.variant_name}</p>
+                          <p className="mt-1 text-sm text-blue-700">{variant.variant_sku}</p>
+                          <p className="mt-1 text-xs text-slate-500">Barcode: {variant.barcode || "-"}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${variant.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}`}>{variant.is_active ? "Aktif" : "Nonaktif"}</span>
+                          <Link href={`/products/${product.id}/variants/${variant.id}`} className="text-sm text-blue-600 hover:underline">Detail SKU</Link>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                        {(["RAM", "ROM", "COLOR", "WARRANTY"] as const).map((code) => (
+                          <div key={code} className="rounded-md bg-slate-50 p-3">
+                            <p className="text-xs text-slate-500">{code === "COLOR" ? "Warna" : code === "WARRANTY" ? "Garansi" : code}</p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">{specs[code] || "-"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                Belum ada SKU varian untuk produk ini.
+                <div className="mt-2"><Link href={`/products/${product.id}/variants`} className="font-medium text-blue-600 hover:underline">Buka pengelolaan SKU</Link></div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-6">

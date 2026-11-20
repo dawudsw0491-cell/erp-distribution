@@ -19,7 +19,7 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 | SEC-004 | P1 | Consolidate overlapping permissive RLS policies | OPEN | Four overlapping policy pairs reported on user_profiles, user_roles, user_warehouse_access |
 | PERF-001 | P2 | Review missing FK covering indexes | OPEN | Supabase performance advisor findings; only add indexes after workload and duplicate-index analysis |
 | PERF-002 | P3 | Review unused indexes | OPEN | 36 unused-index findings; usage window and intended workload must be considered before removal |
-| QA-001 | P1 | Build, lint, and automated test evidence | OPEN | No test script/suite in package manifest; build and lint must run on current branch |
+| QA-001 | P1 | Build, lint, and automated test evidence | IN PROGRESS | Local build passed at commit `3d08b33` (57 routes generated); lint at that commit reported 16 errors / 11 warnings. Source fixes committed after that run; current head still requires one consolidated local build/lint rerun. No test suite identified in package manifest |
 | NAV-001 | P2 | Resolve sidebar links without matching routes | NOT IMPLEMENTED / SCOPE CHECK | /sales, /returns, /accounting, /settings need scope decision or route implementation |
 | INT-001 | P1 | Verify Purchasing → Goods Receipt → Inventory | PARTIAL | RPCs/tables exist; execute controlled end-to-end tests with demo fixtures |
 | DOC-001 | P2 | Replace starter README with operating guide | OPEN | README still create-next-app template |

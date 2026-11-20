@@ -195,7 +195,7 @@ export default function ProductForm({
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [variants, setVariants] = useState<VariantDraft[]>([{
-    variant_name: "Default", barcode: "", ram: "", rom: "", color: "", warranty: "",
+    variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "",
   }]);
 
   function updateVariant(index: number, field: keyof VariantDraft, value: string) {

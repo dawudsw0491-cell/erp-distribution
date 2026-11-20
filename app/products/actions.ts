@@ -725,146 +725,20 @@ async function saveVariantSpecifications(
   variantId: string,
   formData: FormData
 ) {
-  const { data: attributes, error: attributesError } = await supabase
-    .from("product_attributes")
-    .select("id, attribute_code")
-    .in("attribute_code", [...VARIANT_SPECIFICATION_CODES])
-    .eq("is_active", true);
-
-  if (attributesError) throw attributesError;
-
-  const attributeByCode = new Map(
-    (attributes ?? []).map((attribute) => [attribute.attribute_code, attribute])
+  const specifications = Object.fromEntries(
+    VARIANT_SPECIFICATION_CODES.map((code) => [
+      code,
+      String(formData.get(`spec_${code}`) ?? ""),
+    ])
   );
 
-  for (const code of VARIANT_SPECIFICATION_CODES) {
-    const attribute = attributeByCode.get(code);
-    if (!attribute) {
-      throw new Error(`Attribute ${code} belum tersedia atau tidak aktif.`);
-    }
+  const { error } = await supabase.rpc("save_product_variant_specifications", {
+    p_product_id: productId,
+    p_variant_id: variantId,
+    p_specifications: specifications,
+  });
 
-    const valueName = String(formData.get(`spec_${code}`) ?? "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toUpperCase();
-
-    if (valueName.length > 100) {
-      throw new Error(`Nilai spesifikasi ${code} melebihi 100 karakter.`);
-    }
-
-    const { data: existingMapping, error: mappingLookupError } = await supabase
-      .from("product_variant_attribute_values")
-      .select("id, attribute_value_id")
-      .eq("product_variant_id", variantId)
-      .eq("attribute_id", attribute.id)
-      .maybeSingle();
-
-    if (mappingLookupError) throw mappingLookupError;
-
-    if (!valueName) {
-      if (existingMapping) {
-        const { error: deleteMappingError } = await supabase
-          .from("product_variant_attribute_values")
-          .delete()
-          .eq("id", existingMapping.id);
-
-        if (deleteMappingError) throw deleteMappingError;
-      }
-      continue;
-    }
-
-    const { data: values, error: valuesError } = await supabase
-      .from("product_attribute_values")
-      .select("id, value_name")
-      .eq("attribute_id", attribute.id)
-      .eq("is_active", true);
-
-    if (valuesError) throw valuesError;
-
-    let selectedValue = (values ?? []).find(
-      (item) => item.value_name.trim().toUpperCase() === valueName
-    );
-
-    if (!selectedValue) {
-      const codeBase =
-        valueName
-          .normalize("NFKD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^A-Z0-9]+/g, "_")
-          .replace(/^_|_$/g, "")
-          .slice(0, 35) || code;
-
-      const valueCode = `${codeBase}_${randomUUID()
-        .replace(/-/g, "")
-        .slice(0, 8)
-        .toUpperCase()}`;
-
-      const { data: createdValue, error: createValueError } = await supabase
-        .from("product_attribute_values")
-        .insert({
-          attribute_id: attribute.id,
-          value_code: valueCode,
-          value_name: valueName,
-          description: `Reusable ${code} specification template for product variants.`,
-          is_active: true,
-        })
-        .select("id, value_name")
-        .single();
-
-      if (createValueError || !createdValue) {
-        throw createValueError ?? new Error(`Gagal menyimpan template ${code}.`);
-      }
-
-      selectedValue = createdValue;
-    }
-
-    const { data: assignment, error: assignmentLookupError } = await supabase
-      .from("product_attribute_assignments")
-      .select("id")
-      .eq("product_id", productId)
-      .eq("attribute_id", attribute.id)
-      .maybeSingle();
-
-    if (assignmentLookupError) throw assignmentLookupError;
-
-    if (!assignment) {
-      const { error: assignmentInsertError } = await supabase
-        .from("product_attribute_assignments")
-        .insert({
-          product_id: productId,
-          attribute_id: attribute.id,
-          is_required: false,
-          is_active: true,
-        });
-
-      if (assignmentInsertError) throw assignmentInsertError;
-    }
-
-    if (existingMapping) {
-      if (existingMapping.attribute_value_id !== selectedValue.id) {
-        const { error: updateMappingError } = await supabase
-          .from("product_variant_attribute_values")
-          .update({
-            attribute_value_id: selectedValue.id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingMapping.id);
-
-        if (updateMappingError) throw updateMappingError;
-      }
-    } else {
-      const { error: insertMappingError } = await supabase
-        .from("product_variant_attribute_values")
-        .insert({
-          product_id: productId,
-          product_variant_id: variantId,
-          attribute_id: attribute.id,
-          attribute_value_id: selectedValue.id,
-        });
-
-      if (insertMappingError) throw insertMappingError;
-    }
-  }
+  if (error) throw error;
 }
 
 /* =========================================================

@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { createBrand, createProduct } from "../actions";
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 
 type CategoryOption = {
   id: string;
@@ -32,14 +33,7 @@ const inputClass =
 
 const labelClass = "mb-1.5 block text-sm font-medium text-slate-700";
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-];
+
 
 function normalize(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();

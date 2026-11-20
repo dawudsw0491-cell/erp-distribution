@@ -560,7 +560,7 @@ async function StockTransferContent({
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    Produk IMEI/serial wajib menggunakan quantity 1.
+                    Untuk produk IMEI, kosongkan unit untuk transfer agregat SKU atau pilih satu unit ber-IMEI (quantity 1). Produk serial selalu wajib memilih unit individual.
                   </p>
                 </div>
 
@@ -578,7 +578,7 @@ async function StockTransferContent({
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   >
                     <option value="">
-                      Tidak menggunakan unit individual
+                      Transfer agregat SKU (tanpa IMEI)
                     </option>
                     {units.map((unit) => {
                       const identifiers =
@@ -610,8 +610,7 @@ async function StockTransferContent({
                     })}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
-                    Pilih unit yang sesuai dengan produk dan gudang asal.
-                    Validasi akhir dilakukan oleh database.
+                    Pilih unit untuk memindahkan satu unit ber-IMEI/serial. Kosongkan pilihan untuk memindahkan stok agregat SKU (hanya untuk produk IMEI dan quantity).
                   </p>
                 </div>
 

@@ -88,3 +88,16 @@ User ran `npm.cmd run build` successfully at local commit `3d08b33` (Next.js 16.
 - Verified live attributes RAM, ROM, COLOR, WARRANTY are active and the new DELETE policy targets authenticated users with master.update.
 - Runtime UI submission and browser verification are still pending. New dictionary values and assignments still require master.create policies; edit-only users can update existing mappings and clear mappings but cannot create new dictionary values unless they also have master.create.
 - The Product create/edit form still saves the product master independently of variant creation. Full single-submit Product + initial Variant workflow remains open because variant SKU ownership is not yet canonicalized across Purchasing and Inventory.
+
+
+## Dashboard integration audit — 2026-11-20
+
+Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
+
+- Top KPI cards (`Total Produk`, `Total Persediaan`, `Penjualan Hari Ini`, `Total Piutang`) are hardcoded constants with zero values; they are not live database aggregates.
+- Inventory Overview does query live `inventory_balances`, active `warehouses`, active `product_variants`, and posted `inventory_movements`. Its query currently loads all balance rows into application memory; warehouse/user scoping, aggregation semantics, and valuation reconciliation still require review.
+- Business Activity is a hardcoded empty row, not an event feed.
+- System Health labels (server, database, backup, uptime) are static placeholders; they do not perform health checks.
+- The live public schema currently has no Sales, Returns, or Accounting transaction tables. Dashboard sales and receivables must remain unavailable/explicitly not implemented until those modules and their posting/ledger sources exist.
+- Added DASH-001..DASH-005 and INT-002 to the shared backlog. These are dependency-driven requirements: dashboard integrations are activated only after each source module is implemented and verified.
+- No dashboard source code or Supabase schema/data was changed in this audit update.

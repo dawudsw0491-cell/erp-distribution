@@ -70,7 +70,9 @@ Build, lint, browser flows, and transaction-level tests have not yet been run in
 - Master Data Hub now exposes one Product Management workspace for product setup instead of separate Category, Product Model, Product Attribute, and Attribute Value work areas.
 - Sidebar links to those standalone product setup screens have been removed.
 - Existing routes and database structures remain temporarily while the unified workflow and all downstream dependencies are mapped.
-- The unified create/edit workflow for SKU variants and specifications is not yet complete.
+- Variant create/edit now accepts Warranty as free text with datalist suggestions. New text is saved as a reusable `WARRANTY` attribute value and linked to the specific variant through `product_variant_attribute_values`; existing templates are reused case-insensitively after normalization.
+- Seeded reusable warranty templates: SEIN, TAM, B-CELL, DISTRIBUTOR, INTERNASIONAL, GARANSI TOKO, TANPA GARANSI. No duration/year is included.
+- RAM/ROM/color integration and unified product create/edit workflow remain incomplete.
 - No database objects or demo rows were deleted in this navigation change.
 - Product SKU ownership remains unresolved: live schema contains both products.sku and product_variants.variant_sku.
 - Permanent cleanup is blocked on tracing all Purchasing, Goods Receipt, Inventory, serialized-unit, valuation, RPC, trigger, and PostgREST dependencies.

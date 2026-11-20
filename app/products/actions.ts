@@ -725,150 +725,46 @@ async function saveVariantSpecifications(
 
 export async function createProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
-
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
+  if (!UUID_REGEX.test(productId)) redirect("/products?error=invalid_id");
 
-  if (!UUID_REGEX.test(productId)) {
-    redirect("/products?error=invalid_id");
-  }
-
-  const variantSku = String(formData.get("variant_sku") ?? "")
-    .trim()
-    .toUpperCase();
-
-  const skuPattern = variantSku.replace(/[\\%_]/g, "\\$&");
-
-  const variantName = String(formData.get("variant_name") ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-
+  const variantName = String(formData.get("variant_name") ?? "").trim().replace(/\\s+/g, " ");
   const barcode = String(formData.get("barcode") ?? "").trim() || null;
+  if (!variantName) redirect(`/products/${productId}/variants/new?error=required`);
+  if (variantName.length > 200) redirect(`/products/${productId}/variants/new?error=invalid_name`);
+  if (barcode !== null && barcode.length > 100) redirect(`/products/${productId}/variants/new?error=invalid_barcode`);
 
-  if (!variantSku || !variantName) {
-    redirect(`/products/${productId}/variants/new?error=required`);
+  const specifications = {
+    RAM: String(formData.get("spec_RAM") ?? "").trim(),
+    ROM: String(formData.get("spec_ROM") ?? "").trim(),
+    COLOR: String(formData.get("spec_COLOR") ?? "").trim(),
+    WARRANTY: String(formData.get("spec_WARRANTY") ?? "").trim(),
+  };
+  if (Object.values(specifications).some((value) => value.length > 100)) {
+    redirect(`/products/${productId}/variants/new?error=invalid_specification`);
   }
 
-  if (variantSku.length > 50) {
-    redirect(`/products/${productId}/variants/new?error=invalid_sku`);
-  }
+  const { data, error } = await auth.supabase.rpc("create_product_variant_with_specs", {
+    p_product_id: productId,
+    p_variant_name: variantName,
+    p_barcode: barcode,
+    p_specifications: specifications,
+  });
 
-  if (variantName.length > 200) {
-    redirect(`/products/${productId}/variants/new?error=invalid_name`);
-  }
-
-  if (barcode !== null && barcode.length > 100) {
-    redirect(`/products/${productId}/variants/new?error=invalid_barcode`);
-  }
-
-  if (!/^[A-Z0-9._-]+$/.test(variantSku)) {
-    redirect(`/products/${productId}/variants/new?error=invalid_sku_format`);
-  }
-
-  const { data: product, error: productError } = await auth.supabase
-    .from("products")
-    .select("id, sku, is_active, product_type")
-    .eq("id", productId)
-    .maybeSingle();
-
-  if (productError || !product) {
-    redirect("/products?error=not_found");
-  }
-
-  if (!product.is_active) {
-    redirect(`/products/${productId}/variants/new?error=inactive_product`);
-  }
-
-  if (product.product_type !== "goods") {
-    redirect(`/products/${productId}/variants/new?error=invalid_product_type`);
-  }
-
-  if (product.sku.trim().toUpperCase() === variantSku) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: existingVariant, error: variantLookupError } =
-    await auth.supabase
-      .from("product_variants")
-      .select("id")
-      .ilike("variant_sku", skuPattern)
-      .limit(1)
-      .maybeSingle();
-
-  if (variantLookupError) {
-    console.error("Variant SKU lookup failed:", variantLookupError);
-    redirect(`/products/${productId}/variants/new?error=lookup_failed`);
-  }
-
-  if (existingVariant) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: existingProductSku, error: productSkuError } =
-    await auth.supabase
-      .from("products")
-      .select("id")
-      .ilike("sku", skuPattern)
-      .limit(1)
-      .maybeSingle();
-
-  if (productSkuError) {
-    console.error("Product SKU lookup failed:", productSkuError);
-    redirect(`/products/${productId}/variants/new?error=lookup_failed`);
-  }
-
-  if (existingProductSku) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: variant, error } = await auth.supabase
-    .from("product_variants")
-    .insert({
-      product_id: productId,
-      variant_sku: variantSku,
-      variant_name: variantName,
-      barcode,
-      is_active: true,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
+  if (error || !data?.id) {
     console.error("Create product variant failed:", error);
-
-    if (error.code === "23505") {
-      redirect(`/products/${productId}/variants/new?error=duplicate`);
-    }
-
-    if (error.code === "23503") {
-      redirect(`/products/${productId}/variants/new?error=invalid_reference`);
-    }
-
+    if (error?.code === "23505") redirect(`/products/${productId}/variants/new?error=duplicate`);
+    if (error?.message?.toLowerCase().includes("permission")) redirect(`/products/${productId}/variants/new?error=forbidden`);
+    if (error?.message?.toLowerCase().includes("barcode")) redirect(`/products/${productId}/variants/new?error=duplicate`);
     redirect(`/products/${productId}/variants/new?error=save_failed`);
-  }
-
-  try {
-    await saveVariantSpecifications(
-      auth.supabase,
-      productId,
-      variant.id,
-      formData
-    );
-  } catch (specificationError) {
-    console.error("Save variant specifications failed:", specificationError);
-    // Variant insert already succeeded. RLS intentionally has no variant DELETE
-    // policy, so do not claim rollback or attempt a privileged cleanup.
-    redirect(
-      `/products/${productId}/variants/${variant.id}?error=specifications_save_failed`
-    );
   }
 
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/products/${productId}/variants`);
-
-  redirect(`/products/${productId}/variants?created=1&id=${variant.id}`);
+  redirect(`/products/${productId}/variants?created=1&id=${data.id}`);
 }
 
 export async function updateProductVariant(formData: FormData) {

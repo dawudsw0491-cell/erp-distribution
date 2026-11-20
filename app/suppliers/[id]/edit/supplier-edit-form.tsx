@@ -376,7 +376,7 @@ export default function SupplierEditForm({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <RegionField
             label="Provinsi *"
-            key="province--"
+            key="province"
             level="province"
             selected={province}
             parentId=""
@@ -391,7 +391,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Kabupaten/Kota *"
-            key="regency-province-province?.id ?? """
+            key={`regency-${province?.id ?? "none"}-${regency?.id ?? "none"}`}
             level="regency"
             selected={regency}
             parentId={province?.id ?? ""}
@@ -405,7 +405,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Kecamatan *"
-            key="district-regency-regency?.id ?? """
+            key={`district-${regency?.id ?? "none"}-${district?.id ?? "none"}`}
             level="district"
             selected={district}
             parentId={regency?.id ?? ""}
@@ -418,7 +418,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Desa/Kelurahan *"
-            key="village-district-district?.id ?? """
+            key={`village-${district?.id ?? "none"}-${village?.id ?? "none"}`}
             level="village"
             selected={village}
             parentId={district?.id ?? ""}

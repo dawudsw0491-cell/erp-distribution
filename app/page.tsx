@@ -19,33 +19,6 @@ type BalanceRow = {
   inventory_value: number;
 };
 
-const summaryCards = [
-  {
-    title: "Total Produk",
-    value: "0",
-    note: "Produk terdaftar",
-    icon: "▦",
-  },
-  {
-    title: "Total Persediaan",
-    value: "0",
-    note: "Unit tersedia",
-    icon: "▣",
-  },
-  {
-    title: "Penjualan Hari Ini",
-    value: "Rp 0",
-    note: "Belum ada transaksi",
-    icon: "↗",
-  },
-  {
-    title: "Total Piutang",
-    value: "Rp 0",
-    note: "Piutang pelanggan",
-    icon: "◷",
-  },
-];
-
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("id-ID", {
     maximumFractionDigits: 2,
@@ -94,6 +67,28 @@ async function DashboardContent() {
     profile.full_name?.trim() || user.email || "Pengguna";
 
   const initial = displayName.charAt(0).toUpperCase();
+
+  // Product KPI mengikuti permission dan statistik resmi Master Data.
+  const masterAccess = await getAuthorizationContext("master.view");
+  let totalProductCount: number | null = null;
+  let productLoadError = false;
+
+  if (
+    masterAccess.user &&
+    masterAccess.profile &&
+    masterAccess.authorized
+  ) {
+    const productStatisticsResult =
+      await masterAccess.supabase.rpc("get_product_statistics");
+
+    if (productStatisticsResult.error) {
+      productLoadError = true;
+    } else {
+      totalProductCount = Number(
+        productStatisticsResult.data?.[0]?.total_products ?? 0
+      );
+    }
+  }
 
   // INVENTORY OVERVIEW ACCESS
   const inventoryAccess =
@@ -195,6 +190,51 @@ async function DashboardContent() {
   const totalInventorySku = new Set(
     balances.map((row) => row.product_variant_id)
   ).size;
+
+  // KPI penjualan dan piutang tidak menampilkan nol sebelum sumber
+  // transaksi terposting tersedia. Nilai kosong dibedakan dari nol riil.
+  const summaryCards = [
+    {
+      title: "Total Produk",
+      value: !masterAccess.authorized
+        ? "—"
+        : productLoadError
+          ? "Gagal dimuat"
+          : formatNumber(totalProductCount ?? 0),
+      note: !masterAccess.authorized
+        ? "Permission master.view diperlukan"
+        : productLoadError
+          ? "Statistik produk gagal dimuat"
+          : "Produk terdaftar",
+      icon: "▦",
+    },
+    {
+      title: "Total Persediaan",
+      value: !inventoryAccess.authorized
+        ? "—"
+        : inventoryLoadError || !inventoryData
+          ? "Gagal dimuat"
+          : formatNumber(inventorySummary.available),
+      note: !inventoryAccess.authorized
+        ? "Permission inventory.view diperlukan"
+        : inventoryLoadError || !inventoryData
+          ? "Saldo persediaan gagal dimuat"
+          : "Unit dengan status Available",
+      icon: "▣",
+    },
+    {
+      title: "Penjualan Hari Ini",
+      value: "—",
+      note: "Belum ada sumber penjualan terposting",
+      icon: "↗",
+    },
+    {
+      title: "Total Piutang",
+      value: "—",
+      note: "Buku besar piutang pelanggan belum tersedia",
+      icon: "◷",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 text-slate-800 md:flex">

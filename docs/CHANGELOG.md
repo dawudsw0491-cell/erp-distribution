@@ -9,6 +9,14 @@
 - No database, Inventory, authentication, authorization, or RLS code was changed.
 - Work is isolated on branch `work/master-data-baseline-20261119`.
 
+## 2026-11-20 — Unified Product Variant specifications
+
+- Added RAM and ROM to the existing product attribute dictionary; reused existing COLOR and WARRANTY attributes.
+- Added a SECURITY INVOKER RPC to save variant specifications in one database transaction under the caller's RLS permissions.
+- Added an `master.update`-scoped policy to remove a variant-to-value mapping without deleting the reusable value or product assignment.
+- Integrated RAM, ROM, color, and warranty inputs into variant create/edit and displays into variant detail.
+- Full single-submit Product + initial Variant workflow remains open; SKU ownership and downstream transaction consumers are not yet canonicalized.
+
 ## 2026-11-19 — Centralize Brand creation
 
 - Added `lib/master-data/brands.ts` as the shared server-only Brand creation implementation.

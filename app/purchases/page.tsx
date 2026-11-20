@@ -337,6 +337,7 @@ async function PurchasesContent({
           </section>
 
           <RealtimeFilterBar
+            key={[keyword, status].join("|")}
             initialKeyword={keyword}
             searchLabel="Nomor Purchase Order"
             searchPlaceholder="Cari nomor PO..."

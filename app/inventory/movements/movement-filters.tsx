@@ -56,18 +56,22 @@ export default function MovementFilters({
   const [status, setStatus] = useState(initialStatus);
   const [warehouse, setWarehouse] = useState(initialWarehouse);
 
-  const [isSearching, setIsSearching] = useState(false);
+
 
   const currentParams = searchParams.toString();
+  const isSearching = query.trim() !== (searchParams.get("q") ?? "");
 
   // Sinkronisasi filter ketika navigasi browser atau pagination berubah.
   useEffect(() => {
-    const params = new URLSearchParams(currentParams);
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(currentParams);
+      setQuery(params.get("q") ?? "");
+      setType(params.get("type") ?? "");
+      setStatus(params.get("status") ?? "");
+      setWarehouse(params.get("warehouse") ?? "");
+    }, 0);
 
-    setQuery(params.get("q") ?? "");
-    setType(params.get("type") ?? "");
-    setStatus(params.get("status") ?? "");
-    setWarehouse(params.get("warehouse") ?? "");
+    return () => window.clearTimeout(timer);
   }, [currentParams]);
 
   const updateUrl = useCallback(
@@ -123,12 +127,7 @@ export default function MovementFilters({
         });
       }
 
-      setIsSearching(false);
     }, 400);
-
-    if (query !== (new URLSearchParams(currentParams).get("q") ?? "")) {
-      setIsSearching(true);
-    }
 
     return () => window.clearTimeout(timer);
   }, [

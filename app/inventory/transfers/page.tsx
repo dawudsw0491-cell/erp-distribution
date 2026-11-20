@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -21,6 +22,11 @@ type SearchParams = Promise<{
   error?: string;
   created?: string;
   posted?: string;
+  q?: string;
+  transfer_status?: string;
+  inventory_status?: string;
+  source_warehouse?: string;
+  destination_warehouse?: string;
 }>;
 
 type ProductRow = {
@@ -323,6 +329,81 @@ async function StockTransferContent({
           inbound.warehouse_id !== outbound.warehouse_id,
       };
     });
+
+  const keyword = (params.q ?? "").trim().slice(0, 100).toLowerCase();
+  const transferStatusValues = ["draft", "posted", "cancelled"] as const;
+  const transferStatus = transferStatusValues.includes(
+    params.transfer_status as (typeof transferStatusValues)[number]
+  )
+    ? params.transfer_status!
+    : "";
+  const inventoryStatus = Object.keys(STATUS_LABELS).includes(
+    params.inventory_status ?? ""
+  )
+    ? params.inventory_status!
+    : "";
+  const sourceWarehouse = warehouses.some(
+    (warehouse) => warehouse.id === params.source_warehouse
+  )
+    ? params.source_warehouse!
+    : "";
+  const destinationWarehouse = warehouses.some(
+    (warehouse) => warehouse.id === params.destination_warehouse
+  )
+    ? params.destination_warehouse!
+    : "";
+
+  const unitMap = new Map(units.map((unit) => [unit.id, unit]));
+
+  const filteredTransfers = transfers.filter((transfer) => {
+    if (transferStatus && transfer.status !== transferStatus) return false;
+    if (
+      inventoryStatus &&
+      transfer.inventoryStatus !== inventoryStatus
+    ) return false;
+    if (
+      sourceWarehouse &&
+      transfer.sourceWarehouse?.id !== sourceWarehouse
+    ) return false;
+    if (
+      destinationWarehouse &&
+      transfer.destinationWarehouse?.id !== destinationWarehouse
+    ) return false;
+
+    if (!keyword) return true;
+
+    const unit = transfer.id
+      ? movements.find(
+          (movement) =>
+            movement.movement_type === "transfer_out" &&
+            movement.movement_group_id === transfer.id
+        )?.product_unit_id
+      : null;
+    const registeredUnit = unit ? unitMap.get(unit) : undefined;
+    const identifierText = (registeredUnit?.product_unit_identifiers ?? [])
+      .map((identifier) => identifier.identifier_value)
+      .join(" ");
+
+    const searchableText = [
+      transfer.reference,
+      transfer.product?.sku,
+      transfer.product?.product_name,
+      transfer.sourceWarehouse?.warehouse_name,
+      transfer.sourceWarehouse?.warehouse_code,
+      transfer.destinationWarehouse?.warehouse_name,
+      transfer.destinationWarehouse?.warehouse_code,
+      transfer.inventoryStatus,
+      transfer.status,
+      transfer.notes,
+      registeredUnit?.unit_code,
+      identifierText,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(keyword);
+  });
 
   const draftCount = transfers.filter(
     (item) => item.status === "draft"
@@ -649,17 +730,86 @@ async function StockTransferContent({
                 Riwayat Transfer Gudang
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Menampilkan maksimal 2.000 movement transfer terbaru.
+                Menampilkan {filteredTransfers.length.toLocaleString("id-ID")} dari maksimal 2.000 transfer terbaru.
               </p>
             </div>
 
-            {transfers.length === 0 ? (
+            <div className="border-b border-slate-200 p-5">
+              <RealtimeFilterBar
+                key={[
+                  keyword,
+                  transferStatus,
+                  inventoryStatus,
+                  sourceWarehouse,
+                  destinationWarehouse,
+                ].join("|")}
+                initialKeyword={keyword}
+                searchLabel="Cari Riwayat Transfer"
+                searchPlaceholder="Referensi, SKU, produk, gudang, IMEI, serial..."
+                helperText="Pencarian dan seluruh filter diterapkan otomatis tanpa tombol."
+                filters={[
+                  {
+                    param: "transfer_status",
+                    label: "Status Transfer",
+                    initialValue: transferStatus,
+                    options: [
+                      { value: "", label: "Semua Status Transfer" },
+                      { value: "draft", label: "Draft" },
+                      { value: "posted", label: "Posted" },
+                      { value: "cancelled", label: "Cancelled" },
+                    ],
+                  },
+                  {
+                    param: "inventory_status",
+                    label: "Status Persediaan",
+                    initialValue: inventoryStatus,
+                    options: [
+                      { value: "", label: "Semua Status Persediaan" },
+                      ...Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ],
+                  },
+                  {
+                    param: "source_warehouse",
+                    label: "Gudang Asal",
+                    initialValue: sourceWarehouse,
+                    options: [
+                      { value: "", label: "Semua Gudang Asal" },
+                      ...warehouses.map((warehouse) => ({
+                        value: warehouse.id,
+                        label: warehouse.warehouse_name,
+                      })),
+                    ],
+                  },
+                  {
+                    param: "destination_warehouse",
+                    label: "Gudang Tujuan",
+                    initialValue: destinationWarehouse,
+                    options: [
+                      { value: "", label: "Semua Gudang Tujuan" },
+                      ...warehouses.map((warehouse) => ({
+                        value: warehouse.id,
+                        label: warehouse.warehouse_name,
+                      })),
+                    ],
+                  },
+                ]}
+              />
+            </div>
+
+            {filteredTransfers.length === 0 ? (
               <div className="px-5 py-16 text-center">
                 <h3 className="font-semibold text-slate-800">
-                  Belum Ada Transfer
+                  {transfers.length === 0
+                    ? "Belum Ada Transfer"
+                    : "Transfer Tidak Ditemukan"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Draft transfer yang dibuat akan muncul di sini.
+                  {transfers.length === 0
+                    ? "Draft transfer yang dibuat akan muncul di sini."
+                    : "Ubah kata kunci atau pilihan filter untuk melihat hasil lain."}
                 </p>
               </div>
             ) : (
@@ -689,7 +839,7 @@ async function StockTransferContent({
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {transfers.map((transfer) => (
+                    {filteredTransfers.map((transfer) => (
                       <tr
                         key={transfer.id}
                         className="hover:bg-blue-50/40"

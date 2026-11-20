@@ -30,7 +30,6 @@ const errorMessages: Record<string, string> = {
   lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
   warranty_save_failed: "Warranty gagal disimpan. Varian dibatalkan; silakan coba kembali.",
-  warranty_save_failed: "Warranty gagal disimpan. Varian dibatalkan; silakan coba kembali.",
 };
 
 export default async function NewProductVariantPage({

@@ -55,7 +55,7 @@ begin
       raise exception 'Specification attribute % is missing or inactive', v_item.key;
     end if;
 
-    v_value_name := upper(regexp_replace(btrim(coalesce(v_item.value, '')), '\s+', ' ', 'g'));
+    v_value_name := upper(regexp_replace(btrim(coalesce(v_item.value, '')), '[[:space:]]+', ' ', 'g'));
 
     if length(v_value_name) > 100 then
       raise exception 'Specification % exceeds 100 characters', v_item.key;
@@ -73,6 +73,8 @@ begin
         delete from public.product_variant_attribute_values
         where id = v_mapping_id;
       end if;
+      v_mapping_id := null;
+      v_attribute_id := null;
       continue;
     end if;
 

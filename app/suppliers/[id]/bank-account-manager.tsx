@@ -93,7 +93,11 @@ export default function BankAccountManager({ supplierId }: Props) {
   }, [supplierId]);
 
   useEffect(() => {
-    void loadAccounts();
+    const timer = window.setTimeout(() => {
+      void loadAccounts();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadAccounts]);
 
   function updateField<K extends keyof FormState>(

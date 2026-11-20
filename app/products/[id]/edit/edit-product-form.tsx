@@ -52,10 +52,6 @@ const inputClass =
 const labelClass =
   "mb-2 block text-sm font-medium text-slate-700";
 
-function normalize(value: string) {
-  return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
 export default function EditProductForm({
   product,
   categories,

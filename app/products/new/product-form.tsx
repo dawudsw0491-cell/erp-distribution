@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { createBrand, createProduct } from "../actions";
 import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
@@ -174,6 +175,29 @@ function BrandSelector({
         <p className="mt-1.5 text-xs text-red-600">{error}</p>
       )}
     </div>
+  );
+}
+
+
+function SaveProductButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-live="polite"
+      className="inline-flex min-w-36 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
+    >
+      {pending ? (
+        <>
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          Menyimpan produk...
+        </>
+      ) : (
+        "Simpan Produk"
+      )}
+    </button>
   );
 }
 
@@ -528,12 +552,7 @@ export default function ProductForm({
           Batal
         </Link>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Simpan Produk
-        </button>
+        <SaveProductButton />
       </div>
     </form>
   );

@@ -23,6 +23,10 @@ const errorMessages: Record<string, string> = {
   condition_required: "Kondisi produk wajib dipilih untuk produk barang.",
   invalid_subcategory: "Subkategori tidak valid atau tidak sesuai dengan kategori utama.",
   duplicate: "SKU atau barcode sudah digunakan oleh produk lain.",
+  invalid_variants: "Periksa nama varian, barcode, dan panjang spesifikasi. Nama varian dalam satu produk tidak boleh duplikat.",
+  variant_required: "Produk barang wajib memiliki minimal satu varian dan maksimal 100 varian per penyimpanan.",
+  service_variants: "Produk jasa tidak menggunakan varian persediaan.",
+  forbidden: "Anda tidak memiliki izin membuat produk dan varian.",
   save_failed: "Produk gagal disimpan. Silakan coba kembali.",
 };
 

@@ -283,34 +283,36 @@ async function DashboardContent() {
     } else {
       const visibleBalanceRows = (balanceResult.data ?? []) as BalanceRow[];
       const candidateWarehouseIds = masterAccess.authorized
-        ? activeWarehouseIds ?? []
+        ? activeWarehouseIds
         : [...new Set(visibleBalanceRows.map((row) => row.warehouse_id))];
-
-      const warehouseScopeCheck = await filterActivityByWarehouseAccess(
-        inventoryAccess.supabase,
-        candidateWarehouseIds.map((warehouseId) => ({
-          warehouse_id: warehouseId,
-        }))
-      );
 
       let postedMovementCount: number | null = null;
 
-      if (!warehouseScopeCheck.hasError) {
-        const visibleWarehouseIds = warehouseScopeCheck.rows.map(
-          (row) => row.warehouse_id
+      if (candidateWarehouseIds !== null) {
+        const warehouseScopeCheck = await filterActivityByWarehouseAccess(
+          inventoryAccess.supabase,
+          candidateWarehouseIds.map((warehouseId) => ({
+            warehouse_id: warehouseId,
+          }))
         );
 
-        if (visibleWarehouseIds.length === 0) {
-          postedMovementCount = 0;
-        } else {
-          const movementCountResult = await inventoryAccess.supabase
-            .from("inventory_movements")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "posted")
-            .in("warehouse_id", visibleWarehouseIds);
+        if (!warehouseScopeCheck.hasError) {
+          const visibleWarehouseIds = warehouseScopeCheck.rows.map(
+            (row) => row.warehouse_id
+          );
 
-          if (!movementCountResult.error) {
-            postedMovementCount = movementCountResult.count ?? 0;
+          if (visibleWarehouseIds.length === 0) {
+            postedMovementCount = 0;
+          } else {
+            const movementCountResult = await inventoryAccess.supabase
+              .from("inventory_movements")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "posted")
+              .in("warehouse_id", visibleWarehouseIds);
+
+            if (!movementCountResult.error) {
+              postedMovementCount = movementCountResult.count ?? 0;
+            }
           }
         }
       }

@@ -6,10 +6,11 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 |---|---|---|---|---|
 | MD-001 | P1 | Master Data Hub exposes all existing master routes | DONE | Hub links to eight existing master work areas on this branch |
 | MD-002 | P1 | Centralize Brand creation | DONE | Product and Product Model delegate to shared server-only helper |
-| MD-003 | P1 | Canonical Product Model / Product Attribute relationship | PARTIAL | Live tables exist; map all FKs, unique constraints, CRUD paths, and transaction consumers before consolidation |
+| MD-003 | P1 | Canonical Product Model / Product Attribute relationship | PARTIAL | Live composite FKs are validated and enforce variant/product, product/attribute assignment, and attribute/value consistency; 3 simple FKs duplicate those guarantees, but PostgREST relationship dependencies still require source tracing |
 | MD-004 | P1 | Source-controlled DDL for Product Model and attribute relations | PARTIAL | Live DB contains product_models, product_attribute_assignments, product_variant_attribute_values; migration source/history still unresolved |
 | MD-005 | P2 | Dedicated Brand management route | NOT IMPLEMENTED | Decide whether inline shared brand helper is sufficient or standalone CRUD is required |
-| MD-006 | P1 | Product / Variant / Model ownership and lifecycle | PARTIAL | Existing variant references are consumed by Purchasing and Inventory; canonical model grain still open |
+| MD-006 | P1 | Product / Variant / Model ownership and lifecycle | PARTIAL | Existing variant references are consumed by Purchasing and Inventory; product create/edit actions do not persist model_id, leaving model association workflow incomplete |
+| MD-007 | P2 | Centralize canonical top-level product category definitions | DONE — SOURCE UPDATED | Product server validation and client recommendation now import one shared constant from lib/master-data/categories.ts |
 | SEC-001 | P0 | Remove unintended PUBLIC/anon EXECUTE from SECURITY DEFINER functions | DONE — DB VERIFIED | Migration applied 20261120012027; anon=false for seven flagged functions; authenticated access retained where needed |
 | SEC-002 | P0 | Resolve RLS-enabled tables without policies | PARTIAL | Advisor flags import_indonesia_provinces, import_indonesia_regencies, sku_registry, user_deletion_requests; determine intended access and validate grants |
 | SEC-003 | P1 | Review SECURITY DEFINER and privilege surface | PARTIAL | 44 SECURITY DEFINER functions; inventory complete, review authorization/ACLs function-by-function |

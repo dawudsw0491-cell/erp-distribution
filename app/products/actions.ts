@@ -714,6 +714,100 @@ export async function toggleProductStatus(formData: FormData) {
 }
 
 /* =========================================================
+   PRODUCT VARIANT WARRANTY TEMPLATE
+========================================================= */
+
+async function saveVariantWarranty(
+  supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
+  productId: string,
+  variantId: string,
+  warrantyInput: string
+) {
+  const warranty = warrantyInput.trim().replace(/\\s+/g, " ").toUpperCase();
+
+  const { data: attribute, error: attributeError } = await supabase
+    .from("product_attributes")
+    .select("id")
+    .eq("attribute_code", "WARRANTY")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (attributeError || !attribute) {
+    throw new Error("Master attribute WARRANTY belum tersedia.");
+  }
+
+  if (!warranty) {
+    const { error } = await supabase
+      .from("product_variant_attribute_values")
+      .delete()
+      .eq("product_variant_id", variantId)
+      .eq("attribute_id", attribute.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { data: existingValues, error: valuesError } = await supabase
+    .from("product_attribute_values")
+    .select("id, value_name")
+    .eq("attribute_id", attribute.id)
+    .eq("is_active", true);
+
+  if (valuesError) throw valuesError;
+
+  let value = existingValues?.find(
+    (item) => item.value_name.trim().toUpperCase() === warranty
+  );
+
+  if (!value) {
+    const codeBase = warranty
+      .normalize("NFKD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 35) || "WARRANTY";
+    const valueCode = `${codeBase}_${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+
+    const { data: createdValue, error: createValueError } = await supabase
+      .from("product_attribute_values")
+      .insert({
+        attribute_id: attribute.id,
+        value_code: valueCode,
+        value_name: warranty,
+        description: "Warranty template reusable untuk product variant.",
+        is_active: true,
+      })
+      .select("id, value_name")
+      .single();
+
+    if (createValueError || !createdValue) throw createValueError ?? new Error("Gagal menyimpan template warranty.");
+    value = createdValue;
+  }
+
+  const { error: assignmentError } = await supabase
+    .from("product_attribute_assignments")
+    .upsert(
+      { product_id: productId, attribute_id: attribute.id, is_required: false, is_active: true },
+      { onConflict: "product_id,attribute_id" }
+    );
+
+  if (assignmentError) throw assignmentError;
+
+  const { error: mappingError } = await supabase
+    .from("product_variant_attribute_values")
+    .upsert(
+      {
+        product_id: productId,
+        product_variant_id: variantId,
+        attribute_id: attribute.id,
+        attribute_value_id: value.id,
+      },
+      { onConflict: "product_variant_id,attribute_id" }
+    );
+
+  if (mappingError) throw mappingError;
+}
+
+/* =========================================================
    LEGACY PRODUCT VARIANT FUNCTIONS
    Dipertahankan sementara selama proses migrasi.
 ========================================================= */
@@ -842,6 +936,19 @@ export async function createProductVariant(formData: FormData) {
     }
 
     redirect(`/products/${productId}/variants/new?error=save_failed`);
+  }
+
+  try {
+    await saveVariantWarranty(
+      auth.supabase,
+      productId,
+      variant.id,
+      String(formData.get("warranty") ?? "")
+    );
+  } catch (warrantyError) {
+    console.error("Save variant warranty failed:", warrantyError);
+    await auth.supabase.from("product_variants").delete().eq("id", variant.id).eq("product_id", productId);
+    redirect(`/products/${productId}/variants/new?error=warranty_save_failed`);
   }
 
   revalidatePath(`/products/${productId}`);
@@ -996,6 +1103,18 @@ export async function updateProductVariant(formData: FormData) {
     redirect(
       `/products/${productId}/variants/${variantId}/edit?error=save_failed`
     );
+  }
+
+  try {
+    await saveVariantWarranty(
+      auth.supabase,
+      productId,
+      variantId,
+      String(formData.get("warranty") ?? "")
+    );
+  } catch (warrantyError) {
+    console.error("Update variant warranty failed:", warrantyError);
+    redirect(`/products/${productId}/variants/${variantId}/edit?error=warranty_save_failed`);
   }
 
   revalidatePath(`/products/${productId}`);

@@ -57,6 +57,9 @@ BEGIN
     IF v_tracking_type NOT IN ('quantity', 'imei') THEN
         RAISE EXCEPTION 'Aggregate count is allowed for quantity or IMEI products.';
     END IF;
+    IF v_tracking_type = 'imei' AND p_counted_quantity <> trunc(p_counted_quantity) THEN
+        RAISE EXCEPTION 'Aggregate IMEI stock count must be a whole unit quantity.';
+    END IF;
 
     PERFORM public.lock_inventory_warehouse(v_warehouse_id);
 
@@ -165,6 +168,15 @@ BEGIN
                 '^[0-9]{1,15}(\.[0-9]{1,3})?$'
             OR COALESCE(x.value->>'notes', '') IS NULL
             OR length(COALESCE(x.value->>'notes', '')) > 2000
+            OR EXISTS (
+                SELECT 1
+                FROM public.stock_opname_items i
+                JOIN public.products p ON p.id = i.product_id
+                WHERE i.id = (x.value->>'item_id')::uuid
+                  AND p.tracking_type = 'imei'
+                  AND (x.value->>'counted_quantity')::numeric
+                      <> trunc((x.value->>'counted_quantity')::numeric)
+            )
     ) THEN
         RAISE EXCEPTION 'Invalid item data in batch.';
     END IF;

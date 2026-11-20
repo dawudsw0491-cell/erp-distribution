@@ -6,7 +6,7 @@ export type ProductCategoryOption = {
 };
 
 function normalizeCategoryInput(value: string) {
-  return value.trim().replace(/\\s+/g, " ").toUpperCase();
+  return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 export function recommendProductCategory(

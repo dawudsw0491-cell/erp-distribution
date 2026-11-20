@@ -1,7 +1,6 @@
 
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
@@ -81,23 +80,6 @@ const UUID_REGEX =
 
 function normalizeName(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function generateMasterCode(prefix: string, name: string) {
-  const slug =
-    name
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 24) || "ITEM";
-
-  const suffix = randomUUID()
-    .replace(/-/g, "")
-    .slice(0, 8)
-    .toUpperCase();
-
-  return `${prefix}-${slug}-${suffix}`;
 }
 
 function isValidUUID(value: string) {

@@ -65,3 +65,11 @@ These are source-level checks only. Build, lint, and browser/runtime verificatio
 | ESLint after latest changes | NOT RUN | Previous local run reported 25 errors and 11 warnings before these changes; rerun after pulling latest branch |
 
 The two applied specification migrations are recorded as `20261120031233` and `20261120031359`. No product, variant, purchase, inventory, or demo rows were deleted by these migrations.
+
+
+## Latest deployment status — branch head 2f87aed
+
+- GitHub combined commit status reports Vercel = FAILURE for branch head `2f87aed086d4fc23135621d2ca1897d07eaeac31`.
+- No GitHub Actions workflow runs were returned for that commit.
+- The Vercel target URL is present in GitHub status, but deployment logs are not available through the connected GitHub/Supabase tools. Failure cause is therefore UNKNOWN; do not infer it is caused by TypeScript, build, environment variables, or Supabase.
+- Local build and lint must be rerun on the current branch to obtain actionable compiler/linter output.

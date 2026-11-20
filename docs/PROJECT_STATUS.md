@@ -1,44 +1,56 @@
-# Project Status — ERP Distribution
+# Project Status — HEXA CORE ERP Distribution
 
-**Baseline date:** 2026-11-19  
-**Repository:** `dawudsw0491-cell/erp-distribution`  
-**Branch baseline:** `master`  
-**Baseline commit:** `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`
+**Current implementation branch:** `work/hexa-core-implementation-20261120`  
+**Branch base:** `work/master-data-baseline-20261119` at `bb2d212bf375a9941d695486137301712f4ddd40`  
+**Protected baseline:** `master` at `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`  
+**Supabase:** `erp-distribution-dev`, PostgreSQL 17.11, ACTIVE_HEALTHY  
+**Last live inspection:** 2026-11-20
 
-## Executive status
+## Module status (current evidence)
 
-The repository contains an implemented Next.js App Router application backed by Supabase/PostgreSQL. The most developed operational areas visible in source are Product Master, Purchasing/Goods Receipt, Inventory, authentication, and user administration.
-
-This is a source-level status, not a production-readiness certification. Runtime build, database deployment state, live RLS behavior, and end-to-end business transactions were not executed during this baseline.
-
-## SDLC position
-
-| SDLC area | Status | Evidence |
+| Module | Status | Evidence / Notes |
 |---|---|---|
-| Requirements and business analysis | Partial | README is still the create-next-app template; no BRD/SRS found |
-| Architecture and design | Partial | App Router, Supabase clients, SQL scripts and RPC patterns exist |
-| Implementation | In progress / advanced MVP | Multiple CRUD and operational workflows exist |
-| Integration | Partially evidenced | Purchasing and inventory actions call Supabase RPC and share master entities |
-| Verification | Incomplete evidence | Vercel status check successful; no test script or test suite found in package manifest |
-| Deployment | Not fully verified | Vercel check exists; production runtime and environment configuration not inspected |
-| Maintenance/documentation | Partial | SQL scripts are numbered; project-level operational documentation was absent |
+| Authentication / User / RBAC | PARTIAL | Auth, profile, role, permission, warehouse access, audit and deletion tables/actions exist; runtime role matrix and RLS tests not executed |
+| Master Data Hub | DONE on implementation branch | Eight existing work areas linked; Brand creation shared |
+| Product | PARTIAL | Product CRUD and SKU RPC exist; model/attribute relation model needs consolidation |
+| Product Variant | PARTIAL | CRUD and downstream Inventory/GR references exist; lifecycle and uniqueness tests not executed |
+| Category | PARTIAL | CRUD exists; hierarchy/attribute applicability dependencies need tests |
+| Brand | PARTIAL | Shared create helper exists; no dedicated canonical management route |
+| Product Model | PARTIAL | Route/actions and live table exist; deletion and assignment/value ownership needs runtime validation |
+| Product Attributes / Values | PARTIAL | Tables and actions exist; multiple relationship patterns need canonical mapping |
+| Supplier | PARTIAL | Main CRUD plus address/contact/bank/product relations exist; end-to-end validation absent |
+| Customer | PARTIAL | CRUD and live table exist; no Sales consumer route present |
+| Warehouse | PARTIAL | CRUD exists; Inventory/Purchasing dependencies and warehouse access policy need tests |
+| Purchasing / Purchase Orders | PARTIAL | PO CRUD/workflow RPCs and tables exist; runtime workflow not tested |
+| Goods Receipt | PARTIAL | Creation/posting RPCs and tables exist; seven flagged SECURITY DEFINER grants hardened; end-to-end not tested |
+| Inventory Movement | PARTIAL | Draft/post/reversal functions and tables exist; runtime posting tests absent |
+| Inventory Transfer | PARTIAL | Source and live RPCs exist; runtime transfer/rollback tests absent |
+| Inventory Balances / Valuation | PARTIAL | Balance and valuation tables/logs exist; reconciliation and valuation tests absent |
+| Stock Opname | PARTIAL | Session/item/unit count workflows and RPCs exist; approval/posting tests absent |
+| Sales | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
+| Returns | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
+| Accounting | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
+| Settings | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
+| Reporting / Analytics | NOT IMPLEMENTED / SCOPE UNKNOWN | No dedicated module identified in current route tree |
 
-## Completed in this baseline branch
+## Live database snapshot
 
-- Baseline repository audit documentation.
-- Master Data Hub navigation now includes the existing Product Models, Product Attributes, and Product Attribute Values routes.
-- Brand creation logic shared between Product and Product Model workflows.
-- No database schema or Inventory workflow was changed.
+- 47 tables in schema `public`; all reported with RLS enabled.
+- 73 public functions, 44 SECURITY DEFINER functions, 20 non-internal triggers, 102 RLS policies, 189 indexes.
+- Supabase migration ledger initially returned no migrations. After this session it records `20261120012027 hexa_core_harden_public_definer_function_execute`.
+- Live schema confirms `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values` exist. This resolves the previous source-only uncertainty about table existence, but not their full provenance or canonical semantics.
+- Security advisor initially reported seven SECURITY DEFINER functions executable by anon. A migration has been applied and verified: anon execution is false for all seven; authenticated execution remains true for six application/RLS functions. Trigger function `generate_customer_code()` is not directly executable by authenticated.
+- Security advisor reports four RLS-enabled tables without policies and four overlapping permissive policy cases.
+- Performance advisor reports missing covering indexes for foreign keys and 36 unused indexes. No indexes were changed.
 
-## Remaining priorities
+## Work completed in this execution
 
-1. Resolve and document the canonical product/variant/attribute data model.
-2. Establish source-controlled DDL for every table referenced by application code.
-3. Consolidate duplicate Brand creation paths without changing business behavior.
-4. Add automated tests and reproducible build evidence.
-5. Expand project requirements, architecture, and operating documentation.
-6. Validate Purchasing → Goods Receipt → Inventory using a non-production database.
+- Created isolated implementation branch; master remains untouched.
+- Applied Supabase migration `hexa_core_harden_public_definer_function_execute`.
+- Added matching source-controlled migration `database/50_hexa_core_harden_public_definer_function_execute.sql`.
+- Verified grants after migration.
+- Replaced the branch backlog with one module-oriented shared backlog.
 
-## Scope protection
+## Verification limits
 
-Do not make destructive database changes, remove existing tables, rewrite Inventory posting/valuation, or alter authentication/RLS/approval without dependency analysis and explicit approval.
+Build, lint, browser flows, and transaction-level tests have not yet been run in this execution. A Vercel success status from a previous commit is not treated as current build/test proof. No demo data was reset or deleted.

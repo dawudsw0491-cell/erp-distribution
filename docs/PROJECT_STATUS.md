@@ -64,3 +64,13 @@ Build, lint, browser flows, and transaction-level tests have not yet been run in
 - No Supabase schema or data changes were made.
 - The complete assignment workflow between products, attributes, and variant attribute values remains unimplemented/under review.
 - Source-level verification only; build, lint, and runtime tests remain pending.
+
+## Product Management consolidation — current status
+
+- Master Data Hub now exposes one Product Management workspace for product setup instead of separate Category, Product Model, Product Attribute, and Attribute Value work areas.
+- Sidebar links to those standalone product setup screens have been removed.
+- Existing routes and database structures remain temporarily while the unified workflow and all downstream dependencies are mapped.
+- The unified create/edit workflow for SKU variants and specifications is not yet complete.
+- No database objects or demo rows were deleted in this navigation change.
+- Product SKU ownership remains unresolved: live schema contains both products.sku and product_variants.variant_sku.
+- Permanent cleanup is blocked on tracing all Purchasing, Goods Receipt, Inventory, serialized-unit, valuation, RPC, trigger, and PostgREST dependencies.

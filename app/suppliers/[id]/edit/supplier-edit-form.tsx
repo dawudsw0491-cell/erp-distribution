@@ -74,21 +74,7 @@ function RegionField({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setKeyword(selected?.name ?? "");
-  }, [selected?.id, selected?.name]);
-
-  useEffect(() => {
-    if (!isOpen || disabled) {
-      setOptions([]);
-      setIsSearching(false);
-      return;
-    }
-
-    if (level !== "province" && !parentId) {
-      setOptions([]);
-      setIsSearching(false);
-      return;
-    }
+    if (!isOpen || disabled || (level !== "province" && !parentId)) return;
 
     const timeout = setTimeout(async () => {
       setIsSearching(true);
@@ -133,9 +119,14 @@ function RegionField({
         placeholder={`Cari ${label.toLowerCase()}...`}
         disabled={disabled}
         autoComplete="off"
-        onFocus={() => setIsOpen(true)}
+        onFocus={() => {
+          setOptions([]);
+          setError("");
+          setIsOpen(true);
+        }}
         onChange={(event) => {
           setKeyword(event.target.value);
+          setError("");
           setIsOpen(true);
         }}
       />
@@ -385,6 +376,7 @@ export default function SupplierEditForm({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <RegionField
             label="Provinsi *"
+            key="province--"
             level="province"
             selected={province}
             parentId=""
@@ -399,6 +391,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Kabupaten/Kota *"
+            key="regency-province-province?.id ?? """
             level="regency"
             selected={regency}
             parentId={province?.id ?? ""}
@@ -412,6 +405,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Kecamatan *"
+            key="district-regency-regency?.id ?? """
             level="district"
             selected={district}
             parentId={regency?.id ?? ""}
@@ -424,6 +418,7 @@ export default function SupplierEditForm({
 
           <RegionField
             label="Desa/Kelurahan *"
+            key="village-district-district?.id ?? """
             level="village"
             selected={village}
             parentId={district?.id ?? ""}

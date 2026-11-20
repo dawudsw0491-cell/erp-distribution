@@ -16,12 +16,14 @@ type Props = {
     id: string;
     variantId: string;
   }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
-export default async function ProductVariantDetailPage({ params }: Props) {
+export default async function ProductVariantDetailPage({ params, searchParams }: Props) {
   await connection();
 
   const { id, variantId } = await params;
+  const { error: errorCode } = await searchParams;
 
   if (!UUID_REGEX.test(id) || !UUID_REGEX.test(variantId)) {
     notFound();
@@ -149,9 +151,15 @@ export default async function ProductVariantDetailPage({ params }: Props) {
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:h-screen md:p-6">
         <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6">
+          {errorCode === "specifications_save_failed" && (
+            <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Varian sudah tersimpan, tetapi spesifikasinya gagal disimpan. Tidak ada rollback varian yang diklaim. Periksa log server dan izin master.create sebelum mencoba kembali.
+            </div>
+          )}
+
           <div>
             <Link
-              href={`/products/${id}/variants`}
+              href={`/products/${id}/variants`
               className="text-sm font-medium text-blue-600 hover:underline"
             >
               ← Kembali ke Daftar Varian

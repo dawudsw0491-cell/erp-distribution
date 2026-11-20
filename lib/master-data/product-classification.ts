@@ -13,10 +13,10 @@ export function recommendProductCategory(
   productName: string,
   brandName: string,
   condition: string,
-  categories: CategoryOption[]
+  categories: ProductCategoryOption[]
 ) {
-  const name = normalize(productName);
-  const brand = normalize(brandName);
+  const name = normalizeCategoryInput(productName);
+  const brand = normalizeCategoryInput(brandName);
 
   if (!name || !condition) return null;
 
@@ -67,7 +67,8 @@ export function recommendProductCategory(
   const main = categories.find(
     (item) =>
       item.category_name === mainCategory &&
-      item.parent_id === null
+      item.parent_id === null &&
+      item.is_active !== false
   );
 
   if (!main) return null;
@@ -76,7 +77,8 @@ export function recommendProductCategory(
     ? categories.find(
         (item) =>
           item.category_name === subcategory &&
-          item.parent_id === main.id
+          item.parent_id === main.id &&
+          item.is_active !== false
       )
     : undefined;
 

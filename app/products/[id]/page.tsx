@@ -174,16 +174,28 @@ export default async function ProductDetailPage({
 
   const attributeIds = [...new Set((variantMappings ?? []).map((item) => item.attribute_id))];
   const valueIds = [...new Set((variantMappings ?? []).map((item) => item.attribute_value_id))];
-  const [{ data: attributes }, { data: attributeValues }] = await Promise.all([
-    attributeIds.length
-      ? supabase.from("product_attributes").select("id, attribute_code").in("id", attributeIds)
-      : Promise.resolve({ data: [] }),
-    valueIds.length
-      ? supabase.from("product_attribute_values").select("id, value_name").in("id", valueIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-  const attributeCodeById = new Map((attributes ?? []).map((item) => [item.id, item.attribute_code]));
-  const attributeValueById = new Map((attributeValues ?? []).map((item) => [item.id, item.value_name]));
+  let attributes: Array<{ id: string; attribute_code: string }> = [];
+  let attributeValues: Array<{ id: string; value_name: string }> = [];
+
+  if (attributeIds.length > 0) {
+    const { data, error: attributesError } = await supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("id", attributeIds);
+    if (attributesError) throw new Error("Gagal mengambil kamus atribut SKU.");
+    attributes = data ?? [];
+  }
+
+  if (valueIds.length > 0) {
+    const { data, error: valuesError } = await supabase
+      .from("product_attribute_values")
+      .select("id, value_name")
+      .in("id", valueIds);
+    if (valuesError) throw new Error("Gagal mengambil nilai spesifikasi SKU.");
+    attributeValues = data ?? [];
+  }
+  const attributeCodeById = new Map(attributes.map((item) => [item.id, item.attribute_code]));
+  const attributeValueById = new Map(attributeValues.map((item) => [item.id, item.value_name]));
   const specificationsByVariant = new Map<string, Record<string, string>>();
   for (const mapping of variantMappings ?? []) {
     const code = attributeCodeById.get(mapping.attribute_id);

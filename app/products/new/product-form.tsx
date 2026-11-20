@@ -470,12 +470,8 @@ export default function ProductForm({
               name="unit"
               required
               maxLength={50}
-              defaultValue="PCS"
+              defaultValue="Unit"
               className={inputClass}
-              onChange={(event) => {
-                event.target.value =
-                  event.target.value.toUpperCase();
-              }}
             />
           </div>
 

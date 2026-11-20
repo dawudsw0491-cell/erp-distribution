@@ -25,8 +25,17 @@
 - `product_attribute_assignments` links `product_id` to `attribute_id`, with required/active/display-order metadata.
 - `product_attribute_values` is a value dictionary keyed by `attribute_id`, `value_code`, and `value_name`.
 - `product_variant_attribute_values` stores `product_variant_id`, `attribute_id`, `attribute_value_id`, and also `product_id`.
-- The live schema has both legacy composite relationship constraints and additional direct constraints on `product_variant_attribute_values`. These may enforce overlapping integrity, but must not be removed until each composite pair and consumer is tested.
+- The live schema has three validated composite foreign keys on `product_variant_attribute_values`: `(attribute_id, attribute_value_id)` → `(attribute_id, id)` on `product_attribute_values`; `(product_id, attribute_id)` → `(product_id, attribute_id)` on `product_attribute_assignments`; and `(product_variant_id, product_id)` → `(id, product_id)` on `product_variants`. Three additional single-column FKs on `attribute_id`, `attribute_value_id`, and `product_variant_id` overlap these guarantees. Their constraints are structurally redundant, but removal is deferred until all PostgREST relationship embeds and code consumers are checked.
 - Live existence of these tables is now confirmed; their migration provenance is still not found in the tracked numbered SQL inventory.
+
+## Live integrity checks
+
+- Current `product_variant_attribute_values` row count: 2.
+- Product/variant ownership mismatches: 0.
+- Attribute/value mismatches: 0.
+- Variant attribute values missing a matching product-level attribute assignment: 0.
+- Product/model brand mismatches for products with a model: 0.
+- All three composite foreign keys and all three overlapping simple foreign keys are validated.
 
 ## Redundancy candidates — no destructive change made
 
@@ -50,10 +59,12 @@
 
 - Master Data Hub links all eight existing master areas.
 - Product and Product Model brand creation delegate to one server-only helper.
+- Product create/edit server validation and the client-side product categorization recommendation now consume one canonical `MAIN_PRODUCT_CATEGORIES` definition from `lib/master-data/categories.ts`; duplicate arrays were removed.
 - No duplicate Brand generator or second CRUD implementation was introduced.
 
 ## Next concrete Master Data work
 
-- Trace all writes/reads for `brand_id`, `model_id`, `category_id`, `product_subcategory_id`, `product_id`, and variant attribute relations.
+- Trace all writes/reads and PostgREST relationship embeds for `brand_id`, `model_id`, `category_id`, `product_subcategory_id`, `product_id`, and variant attribute relations.
+- Product create/edit currently does not persist `model_id`; implement model assignment only after choosing one canonical brand source (model-inherited vs product override).
 - Decide canonical ownership and derive fields where safe.
 - Produce a migration proposal with constraints, rollback, and application compatibility checks before changing schema.

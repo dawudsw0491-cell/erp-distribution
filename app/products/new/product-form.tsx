@@ -190,7 +190,7 @@ export default function ProductForm({
       categories.filter(
         (item) =>
           item.parent_id === null &&
-          MAIN_PRODUCT_CATEGORIES.includes(item.category_name)
+          MAIN_PRODUCT_CATEGORIES.some((category) => category === item.category_name)
       ),
     [categories]
   );

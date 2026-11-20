@@ -548,9 +548,9 @@ async function StockBalanceContent({
               {
                 param: "status",
                 label: "Status Persediaan",
-                initialValue: statusFilter,
+                initialValue: statusFilter === "all" ? "" : statusFilter,
                 options: [
-                  { value: "all", label: "Semua Status" },
+                  { value: "", label: "Semua Status" },
                   { value: "available", label: "Available" },
                   { value: "reserved", label: "Reserved" },
                   { value: "damaged", label: "Damaged" },

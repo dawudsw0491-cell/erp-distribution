@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 "use client";
 
@@ -543,12 +544,12 @@ export default function SupplierForm() {
       </section>
 
       <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
-        <a
+        <Link
           href="/suppliers"
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

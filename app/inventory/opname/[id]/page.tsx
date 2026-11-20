@@ -69,6 +69,7 @@ type OpnameItemRow = {
   inventory_status: string;
   snapshot_quantity: number;
   counted_quantity: number | null;
+  counted_aggregate_quantity: number | null;
   variance_quantity: number | null;
   snapshot_average_unit_cost: number;
   snapshot_inventory_value: number;
@@ -358,6 +359,7 @@ async function StockOpnameDetailContent({
         inventory_status,
         snapshot_quantity,
         counted_quantity,
+        counted_aggregate_quantity,
         variance_quantity,
         snapshot_average_unit_cost,
         snapshot_inventory_value,
@@ -456,7 +458,7 @@ async function StockOpnameDetailContent({
         ? productMap.get(item.product_id)
         : undefined;
 
-      return product?.tracking_type === "quantity";
+      return product?.tracking_type === "quantity" || product?.tracking_type === "imei";
     })
     .map((item) => {
       const product = item.product_id
@@ -469,9 +471,11 @@ async function StockOpnameDetailContent({
         inventory_status: item.inventory_status,
         snapshot_quantity: Number(item.snapshot_quantity ?? 0),
         counted_quantity:
-          item.counted_quantity === null
-            ? null
-            : Number(item.counted_quantity),
+          product?.tracking_type === "imei"
+            ? Number(item.counted_aggregate_quantity ?? 0)
+            : item.counted_quantity === null
+              ? null
+              : Number(item.counted_quantity),
         variance_quantity:
           item.variance_quantity === null
             ? null

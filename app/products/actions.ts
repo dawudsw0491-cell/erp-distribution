@@ -723,7 +723,7 @@ async function saveVariantWarranty(
   variantId: string,
   warrantyInput: string
 ) {
-  const warranty = warrantyInput.trim().replace(/\\s+/g, " ").toUpperCase();
+  const warranty = warrantyInput.trim().replace(/\s+/g, " ").toUpperCase();
 
   const { data: attribute, error: attributeError } = await supabase
     .from("product_attributes")
@@ -761,7 +761,7 @@ async function saveVariantWarranty(
   if (!value) {
     const codeBase = warranty
       .normalize("NFKD")
-      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^A-Z0-9]+/g, "_")
       .replace(/^_|_$/g, "")
       .slice(0, 35) || "WARRANTY";

@@ -1,6 +1,6 @@
-import Link from "next/link";
-
 "use client";
+
+import Link from "next/link";
 
 import { useActionState, useEffect, useState } from "react";
 import {

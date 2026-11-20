@@ -76,3 +76,15 @@ Build, lint, browser flows, and transaction-level tests have not yet been run in
 - No database objects or demo rows were deleted in this navigation change.
 - Product SKU ownership remains unresolved: live schema contains both products.sku and product_variants.variant_sku.
 - Permanent cleanup is blocked on tracing all Purchasing, Goods Receipt, Inventory, serialized-unit, valuation, RPC, trigger, and PostgREST dependencies.
+
+## Latest implementation update — unified variant specifications
+
+- Added live RAM and ROM product attributes. Existing COLOR and WARRANTY attributes are reused; no duplicate attribute dictionary was created.
+- Variant create, edit, and detail views now expose RAM, ROM, color, and warranty in one specification section.
+- Typed values are saved into the existing product_attribute_values dictionary and reused case-insensitively for subsequent variants.
+- Added save_product_variant_specifications(jsonb) as a SECURITY INVOKER RPC. The function applies all specification changes in one database transaction and leaves RLS/permission checks active.
+- Added a narrowly scoped DELETE policy on product_variant_attribute_values for users with master.update; this deletes only a variant-to-value mapping, not the shared value or product-level assignment.
+- Verified live function ACL: SECURITY DEFINER=false, anon EXECUTE=false, authenticated EXECUTE=true, service_role EXECUTE=true.
+- Verified live attributes RAM, ROM, COLOR, WARRANTY are active and the new DELETE policy targets authenticated users with master.update.
+- Runtime UI submission and browser verification are still pending. New dictionary values and assignments still require master.create policies; edit-only users can update existing mappings and clear mappings but cannot create new dictionary values unless they also have master.create.
+- The Product create/edit form still saves the product master independently of variant creation. Full single-submit Product + initial Variant workflow remains open because variant SKU ownership is not yet canonicalized across Purchasing and Inventory.

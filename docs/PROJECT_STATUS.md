@@ -53,7 +53,7 @@
 
 ## Verification limits
 
-Build, lint, browser flows, and transaction-level tests have not yet been run in this execution. A Vercel success status from a previous commit is not treated as current build/test proof. No demo data was reset or deleted.
+User ran `npm.cmd run build` successfully at local commit `3d08b33` (Next.js 16.4.3; TypeScript passed; 57 routes generated). At the same commit, ESLint reported 16 errors and 11 warnings. Follow-up source fixes are committed through `8828366`; they have not yet been validated by a local build/lint run. Current Vercel status for `8828366` is PENDING. Browser flows, permission-matrix tests, and transaction-level tests remain unrun. No demo data was reset or deleted.
 
 
 ## Latest implementation update — Product Attribute Values

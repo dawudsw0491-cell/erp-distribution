@@ -714,7 +714,7 @@ export async function toggleProductStatus(formData: FormData) {
 }
 
 /* =========================================================
-   PRODUCT VARIANT WARRANTY TEMPLATE
+   PRODUCT VARIANT SPECIFICATIONS
 ========================================================= */
 
 const VARIANT_SPECIFICATION_CODES = ["RAM", "ROM", "COLOR", "WARRANTY"] as const;

@@ -17,7 +17,7 @@
 | Category | PARTIAL | CRUD exists; hierarchy/attribute applicability dependencies need tests |
 | Brand | PARTIAL | Shared create helper exists; no dedicated canonical management route |
 | Product Model | PARTIAL | Route/actions and live table exist; deletion and assignment/value ownership needs runtime validation |
-| Product Attributes / Values | PARTIAL | Tables and actions exist; multiple relationship patterns need canonical mapping |
+| Product Attributes / Values | PARTIAL | Global Attribute and Attribute Value CRUD exist; list counts/search and duplicate-check handling were hardened. Complete product assignment and variant-value maintenance flow is not present in inspected Product/Variant detail routes; legacy SQL 22/23 differs from live schema |
 | Supplier | PARTIAL | Main CRUD plus address/contact/bank/product relations exist; end-to-end validation absent |
 | Customer | PARTIAL | CRUD and live table exist; no Sales consumer route present |
 | Warehouse | PARTIAL | CRUD exists; Inventory/Purchasing dependencies and warehouse access policy need tests |
@@ -54,3 +54,13 @@
 ## Verification limits
 
 Build, lint, browser flows, and transaction-level tests have not yet been run in this execution. A Vercel success status from a previous commit is not treated as current build/test proof. No demo data was reset or deleted.
+
+
+## Latest implementation update — Product Attribute Values
+
+- Replaced application-side full result counting with exact head-only database counts for total, active, and inactive Attribute Values.
+- Bounded and sanitized the Attribute Value list search term before constructing PostgREST OR filters.
+- Changed create/update duplicate checks to fail closed when duplicate lookup queries return errors.
+- No Supabase schema or data changes were made.
+- The complete assignment workflow between products, attributes, and variant attribute values remains unimplemented/under review.
+- Source-level verification only; build, lint, and runtime tests remain pending.

@@ -29,6 +29,7 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi produk tidak valid.",
   lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
+  warranty_save_failed: "Warranty gagal disimpan. Varian dibatalkan; silakan coba kembali.",
 };
 
 export default async function NewProductVariantPage({
@@ -81,7 +82,32 @@ console.log("[VARIANT NEW] PRODUCT:", {
   if (!product.is_active || product.product_type !== "goods") {
     redirect(`/products/${id}/variants`);
   }
-    return (
+
+  const { data: warrantyAttribute, error: warrantyAttributeError } = await auth.supabase
+    .from("product_attributes")
+    .select("id")
+    .eq("attribute_code", "WARRANTY")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (warrantyAttributeError) {
+    console.error("Load warranty attribute failed:", warrantyAttributeError);
+  }
+
+  const { data: warrantyValues, error: warrantyValuesError } = warrantyAttribute
+    ? await auth.supabase
+        .from("product_attribute_values")
+        .select("value_name")
+        .eq("attribute_id", warrantyAttribute.id)
+        .eq("is_active", true)
+        .order("value_name", { ascending: true })
+    : { data: [], error: null };
+
+  if (warrantyValuesError) {
+    console.error("Load warranty templates failed:", warrantyValuesError);
+  }
+
+  return (
   <div className="min-h-screen bg-slate-50 md:flex md:h-screen md:min-h-0 md:overflow-hidden">
     <ErpSidebar activePath="/products" />
 
@@ -166,6 +192,32 @@ console.log("[VARIANT NEW] PRODUCT:", {
                 placeholder="Contoh: Hitam - Ukuran XL"
                 className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="warranty"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Warranty
+              </label>
+              <input
+                id="warranty"
+                name="warranty"
+                type="text"
+                maxLength={100}
+                list="warranty-template-options"
+                placeholder="Pilih template atau ketik warranty baru"
+                className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <datalist id="warranty-template-options">
+                {(warrantyValues ?? []).map((item) => (
+                  <option key={item.value_name} value={item.value_name} />
+                ))}
+              </datalist>
+              <p className="mt-1 text-xs text-slate-500">
+                Teks baru otomatis disimpan sebagai template setelah variant berhasil disimpan.
+              </p>
             </div>
 
             <div>

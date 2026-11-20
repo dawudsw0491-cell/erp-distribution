@@ -736,15 +736,9 @@ async function saveVariantWarranty(
     throw new Error("Master attribute WARRANTY belum tersedia.");
   }
 
-  if (!warranty) {
-    const { error } = await supabase
-      .from("product_variant_attribute_values")
-      .delete()
-      .eq("product_variant_id", variantId)
-      .eq("attribute_id", attribute.id);
-    if (error) throw error;
-    return;
-  }
+  // Empty input means no warranty is assigned; do not invoke DELETE
+  // because variant creation permission does not imply master.delete.
+  if (!warranty) return;
 
   const { data: existingValues, error: valuesError } = await supabase
     .from("product_attribute_values")
@@ -783,14 +777,26 @@ async function saveVariantWarranty(
     value = createdValue;
   }
 
-  const { error: assignmentError } = await supabase
+  const { data: existingAssignment, error: assignmentLookupError } = await supabase
     .from("product_attribute_assignments")
-    .upsert(
-      { product_id: productId, attribute_id: attribute.id, is_required: false, is_active: true },
-      { onConflict: "product_id,attribute_id" }
-    );
+    .select("id")
+    .eq("product_id", productId)
+    .eq("attribute_id", attribute.id)
+    .maybeSingle();
 
-  if (assignmentError) throw assignmentError;
+  if (assignmentLookupError) throw assignmentLookupError;
+
+  if (!existingAssignment) {
+    const { error: assignmentInsertError } = await supabase
+      .from("product_attribute_assignments")
+      .insert({
+        product_id: productId,
+        attribute_id: attribute.id,
+        is_required: false,
+        is_active: true,
+      });
+    if (assignmentInsertError) throw assignmentInsertError;
+  }
 
   const { error: mappingError } = await supabase
     .from("product_variant_attribute_values")

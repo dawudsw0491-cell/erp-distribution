@@ -1,41 +1,51 @@
-# Master Data Mapping
+# Master Data Mapping — HEXA CORE
 
 ## Application route to entity mapping
 
-| Entity | Route | Tables referenced in source | Downstream consumers |
-|---|---|---|---|
-| Product | `/products` | `products`, `product_categories`, `brands` | Purchasing, Inventory, product variants |
-| Product Variant | `/products/[id]/variants` | `product_variants`, `products` | Goods Receipt, Inventory balances/movements/units |
-| Category | `/product-categories` | `product_categories` | Product, attributes |
-| Brand | Inline actions | `brands` | Product, Product Model |
-| Product Model | `/product-models` | `product_models`, `brands`, `products`, attribute-related tables | Product catalog and attribute assignment |
-| Product Attribute | `/product-attributes` | `product_attributes` | Attribute values and product model logic |
-| Product Attribute Value | `/product-attribute-values` | `product_attribute_values`, `product_variant_attribute_values` | Product/variant specification display |
-| Supplier | `/suppliers` | `suppliers`, regional reference tables; detail subfeatures | Purchasing |
-| Customer | `/customers` | `customers`, regional reference tables | Sales (not present as route in current tree) |
-| Warehouse | `/warehouses` | `warehouses` | Inventory, Purchasing/Goods Receipt |
+| Entity | Route | Tables | Downstream consumers | Status |
+|---|---|---|---|---|
+| Product | `/products` | products, product_categories, brands, product_models | Purchasing, Inventory, variants | PARTIAL |
+| Product Variant | `/products/[id]/variants` | product_variants, products | Goods Receipt, Inventory balances/movements/units | PARTIAL |
+| Category | `/product-categories` | product_categories | Product, attributes | PARTIAL |
+| Brand | Shared create helper | brands | Product, Product Model | PARTIAL |
+| Product Model | `/product-models` | product_models, brands, products, product_attribute_assignments | Product catalog | PARTIAL |
+| Product Attribute | `/product-attributes` | product_attributes | Product assignments and variant values | PARTIAL |
+| Product Attribute Value | `/product-attribute-values` | product_attribute_values, product_variant_attribute_values | Product/variant specifications | PARTIAL |
+| Supplier | `/suppliers` | suppliers, supplier_addresses, supplier_contacts, supplier_bank_accounts, product_suppliers | Purchasing | PARTIAL |
+| Customer | `/customers` | customers, regional reference tables | Sales (route absent) | PARTIAL |
+| Warehouse | `/warehouses` | warehouses | Inventory, Purchasing/Goods Receipt | PARTIAL |
 
-## Database relationships evidenced in committed SQL
+## Live relationships confirmed
 
-- `products.category_id` → `product_categories.id`.
-- `products.brand_id` → `brands.id`.
-- `product_variants.product_id` → `products.id`.
-- `product_attribute_values.product_variant_id` → `product_variants.id`.
-- `product_attribute_values.product_attribute_id` → `product_attributes.id`.
-- `product_units.product_variant_id` → `product_variants.id`.
-- `product_units.warehouse_id` → `warehouses.id`.
-- `product_unit_identifiers.product_unit_id` → `product_units.id`.
+- `products.category_id → product_categories.id`
+- `products.product_subcategory_id → product_categories.id`
+- `products.brand_id → brands.id`
+- `products.model_id → product_models.id`
+- `product_models.brand_id → brands.id`
+- `product_variants.product_id → products.id`
+- `product_attribute_assignments.product_id → products.id`
+- `product_attribute_assignments.attribute_id → product_attributes.id`
+- `product_attribute_values.attribute_id → product_attributes.id`
+- `product_variant_attribute_values.product_variant_id → product_variants.id`
+- `product_variant_attribute_values.attribute_id / attribute_value_id` relate to attribute definitions and values
+- `product_variant_attribute_values.product_id` also references the owning product through a composite relationship to variant identity/product.
 
-## Unresolved relationships
+## Redundancy and integrity questions
 
-Application code also references `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values`. Their canonical DDL was not found in the committed SQL files inspected. Do not infer columns, foreign keys, or deletion policy from application usage alone.
+| Candidate | Why it may be redundant | Required decision |
+|---|---|---|
+| products.brand_id + product_models.brand_id | Same brand may be stored at product and model level | Model inheritance vs product-level override |
+| products.category_id + product_subcategory_id | Both point to category table | Parent/child semantics and whether parent is derivable |
+| product_variant_attribute_values.product_id | Derivable from product_variants.product_id | Whether retained composite FK is valuable for consistency/performance |
+| Multiple FK constraints on variant attribute values | Legacy composite and direct FKs overlap in referenced columns | Verify exact pairs, validation, and application reliance before removing any |
+| Product-level attribute assignment + variant-level attribute values | Different data grain, not necessarily duplicate | Define whether assignments are allowed attributes and variant values are actual selections |
 
 ## Integration flow
 
-- Product and Product Variant IDs are used by inventory and purchasing operations.
-- Goods Receipt captures variant and optional serialized unit identifiers.
-- Warehouse IDs are used in purchase orders, receipts, transfers, and balances.
-- Supplier IDs are used in purchase orders.
-- Customer is a master entity; Sales route implementation was not present in the inspected application tree.
+- Product/Variant IDs feed Purchasing and Inventory.
+- Goods Receipt captures variants and optional serialized units.
+- Warehouse IDs are shared across purchase orders, receipts, transfers, and balances.
+- Supplier IDs feed purchase orders.
+- Customer master has no implemented Sales route in current app tree.
 
-This mapping is source-derived and must be reconciled with the live Supabase schema before schema changes.
+This mapping is live-schema plus source-derived. No destructive schema change has been made.

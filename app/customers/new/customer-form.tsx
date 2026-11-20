@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 "use client";
 
@@ -580,12 +581,12 @@ const fullAddress = [
       </section>
 
       <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-        <a
+        <Link
           href="/customers"
           className="rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-100"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

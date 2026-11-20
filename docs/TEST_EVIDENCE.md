@@ -73,3 +73,22 @@ The two applied specification migrations are recorded as `20261120031233` and `2
 - No GitHub Actions workflow runs were returned for that commit.
 - The Vercel target URL is present in GitHub status, but deployment logs are not available through the connected GitHub/Supabase tools. Failure cause is therefore UNKNOWN; do not infer it is caused by TypeScript, build, environment variables, or Supabase.
 - Local build and lint must be rerun on the current branch to obtain actionable compiler/linter output.
+
+
+## 2026-11-20 — Consolidated lint remediation batch
+
+| Check | Result | Evidence |
+|---|---|---|
+| Local production build | PASS at commit `3d08b33` | User terminal: Next.js 16.4.3 compiled successfully, TypeScript passed, and 57 routes generated |
+| ESLint baseline | FAIL at commit `3d08b33` | User terminal: 16 errors and 11 warnings |
+| Client component directive ordering | FIXED — source | Five affected forms now place `"use client"` before imports |
+| Customer/supplier region lookup state | FIXED — source | Parent-dependent options are derived; callback dependencies stabilized; edit fields remount on parent/selection identity |
+| Filter URL synchronization | UPDATED — source | URL synchronization deferred to scheduled callback; search indicator derived from URL comparison |
+| Purchase date initialization | FIXED — source | Local date initialized lazily rather than in an effect |
+| Inventory query typing | UPDATED — source | Paginated query helper uses a typed range-query contract; unused realtime import removed |
+| Purchase order row typing | UPDATED — source | Explicit row type replaces `any` in rendering |
+| Supplier manager initial loading | UPDATED — source | Initial loads are scheduled and cancellable from effect cleanup |
+| Sidebar active-group expansion | FIXED — source | Active route determines default expansion; user toggles remain state overrides |
+| Current-head build/lint | NOT RUN | Changes after `3d08b33` have not yet been run locally; do not infer zero lint errors from source inspection |
+
+Current implementation branch head recorded during this update: `8828366c7634986fc189379795c6f2962329bc33`. GitHub combined status: Vercel PENDING. PR #1 remains draft; `master` remains unchanged.

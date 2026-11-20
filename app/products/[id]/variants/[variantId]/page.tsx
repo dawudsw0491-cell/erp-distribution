@@ -112,8 +112,7 @@ export default async function ProductVariantDetailPage({ params }: Props) {
           supabase
             .from("product_attribute_values")
             .select("id, attribute_id, value_name")
-            .in("attribute_id", specificationAttributeIds)
-            .eq("is_active", true),
+            .in("attribute_id", specificationAttributeIds),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
 

@@ -85,3 +85,9 @@ Navigation consolidation has been implemented in the Master Data Hub and sidebar
 - Product create/edit already exposes `model_id`, filters models by selected Brand, validates that the model belongs to the selected Brand, and persists the relation. Do not rebuild this feature. Remaining issue is duplicated brand state on Product and Product Model; decide whether Product.brand_id is a deliberate denormalized snapshot or should be derived.
 - Decide canonical ownership and derive fields where safe.
 - Produce a migration proposal with constraints, rollback, and application compatibility checks before changing schema.
+
+## Specification workflow implementation update
+
+The existing product_attributes, product_attribute_values, product_attribute_assignments, and product_variant_attribute_values structures are reused. RAM and ROM were added as attribute dictionary entries; COLOR and WARRANTY were already present. The Product Variant create/edit/detail workflow now presents these four specifications together and persists them through one SECURITY INVOKER RPC transaction. A new RLS DELETE policy allows master.update users to remove only the variant-value mapping.
+
+This does not yet satisfy the full single-submit Product + Variant requirement. The product create/edit actions still operate on the Product record; variant creation remains a nested operation. Do not claim full workflow consolidation until variant SKU ownership and transaction consumers are traced and the create flow is implemented without partial product/variant state.

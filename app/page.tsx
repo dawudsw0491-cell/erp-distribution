@@ -1,5 +1,6 @@
 
 import { Suspense } from "react";
+import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
@@ -8,7 +9,8 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 import DashboardClock from "@/components/layout/dashboard-clock";
 
 type BalanceRow = {
-  product_variant_id: string;
+  product_id: string | null;
+  product_variant_id: string | null;
   warehouse_id: string;
   available_quantity: number;
   reserved_quantity: number;
@@ -97,28 +99,25 @@ async function DashboardContent() {
   let inventoryData:
     | {
         balances: BalanceRow[];
-        warehouseCount: number;
-        variantCount: number;
+        warehouseCount: number | null;
+        variantCount: number | null;
         postedMovementCount: number;
       }
     | null = null;
 
   let inventoryLoadError = false;
+  let masterReferenceLoadError = false;
 
   if (
     inventoryAccess.user &&
     inventoryAccess.profile &&
     inventoryAccess.authorized
   ) {
-    const [
-      balanceResult,
-      warehouseResult,
-      variantResult,
-      movementResult,
-    ] = await Promise.all([
+    const [balanceResult, movementResult] = await Promise.all([
       inventoryAccess.supabase
         .from("inventory_balances")
         .select(`
+          product_id,
           product_variant_id,
           warehouse_id,
           available_quantity,
@@ -131,33 +130,45 @@ async function DashboardContent() {
         `),
 
       inventoryAccess.supabase
-        .from("warehouses")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
-
-      inventoryAccess.supabase
-        .from("product_variants")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
-
-      inventoryAccess.supabase
         .from("inventory_movements")
         .select("id", { count: "exact", head: true })
         .eq("status", "posted"),
     ]);
 
-    if (
-      balanceResult.error ||
-      warehouseResult.error ||
-      variantResult.error ||
-      movementResult.error
-    ) {
+    let warehouseCount: number | null = null;
+    let variantCount: number | null = null;
+
+    // Warehouse dan Product Variant memakai policy master.view di live DB.
+    // Jangan menjalankannya melalui context inventory.view karena RLS dapat
+    // mengembalikan hitungan nol yang sebenarnya hanya tidak terlihat.
+    if (masterAccess.authorized) {
+      const [warehouseResult, variantResult] = await Promise.all([
+        masterAccess.supabase
+          .from("warehouses")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true),
+
+        masterAccess.supabase
+          .from("product_variants")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true),
+      ]);
+
+      if (warehouseResult.error || variantResult.error) {
+        masterReferenceLoadError = true;
+      } else {
+        warehouseCount = warehouseResult.count ?? 0;
+        variantCount = variantResult.count ?? 0;
+      }
+    }
+
+    if (balanceResult.error || movementResult.error) {
       inventoryLoadError = true;
     } else {
       inventoryData = {
         balances: (balanceResult.data ?? []) as BalanceRow[],
-        warehouseCount: warehouseResult.count ?? 0,
-        variantCount: variantResult.count ?? 0,
+        warehouseCount,
+        variantCount,
         postedMovementCount: movementResult.count ?? 0,
       };
     }
@@ -187,8 +198,12 @@ async function DashboardContent() {
     }
   );
 
+  // Live inventory_balances menyimpan identitas produk pada product_id.
+  // product_variant_id tetap dibaca sebagai fallback untuk baris historis.
   const totalInventorySku = new Set(
-    balances.map((row) => row.product_variant_id)
+    balances
+      .map((row) => row.product_id ?? row.product_variant_id)
+      .filter((id): id is string => Boolean(id))
   ).size;
 
   // KPI penjualan dan piutang tidak menampilkan nol sebelum sumber
@@ -339,27 +354,42 @@ async function DashboardContent() {
                     {
                       label: "Total SKU",
                       value: formatNumber(totalInventorySku),
-                      note: "Varian produk yang memiliki saldo",
+                      note: "Produk unik yang memiliki saldo",
+                      href: "/inventory/balances",
                     },
                     {
                       label: "Total On Hand",
                       value: formatNumber(inventorySummary.onHand),
-                      note: "Kuantitas seluruh status persediaan",
+                      note: "Jumlah seluruh bucket status persediaan",
+                      href: "/inventory/balances",
                     },
                     {
                       label: "Gudang Aktif",
-                      value: formatNumber(inventoryData.warehouseCount),
-                      note: "Gudang berstatus aktif",
+                      value: !masterAccess.authorized
+                        ? "—"
+                        : masterReferenceLoadError
+                          ? "Gagal dimuat"
+                          : formatNumber(inventoryData.warehouseCount ?? 0),
+                      note: !masterAccess.authorized
+                        ? "Permission master.view diperlukan"
+                        : masterReferenceLoadError
+                          ? "Data gudang gagal dimuat"
+                          : "Gudang berstatus aktif",
+                      href: masterAccess.authorized
+                        ? "/warehouses"
+                        : "/inventory/balances",
                     },
                     {
                       label: "Nilai Persediaan",
                       value: formatCurrency(inventorySummary.value),
-                      note: "Berdasarkan valuasi inventory",
+                      note: "Total inventory value pada gudang yang dapat diakses",
+                      href: "/inventory/balances",
                     },
                   ].map((item) => (
-                    <div
+                    <Link
                       key={item.label}
-                      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                      href={item.href}
+                      className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <p className="text-sm font-medium text-slate-500">
                         {item.label}
@@ -370,7 +400,7 @@ async function DashboardContent() {
                       <p className="mt-2 text-xs text-slate-500">
                         {item.note}
                       </p>
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
@@ -435,7 +465,11 @@ async function DashboardContent() {
                     </p>
                   </div>
                   <p className="text-xs text-slate-500">
-                    {formatNumber(inventoryData.variantCount)} varian produk aktif
+                    {inventoryData.variantCount === null
+                        ? masterReferenceLoadError
+                          ? "Jumlah varian gagal dimuat."
+                          : "Permission master.view diperlukan untuk jumlah varian."
+                        : `${formatNumber(inventoryData.variantCount)} varian produk aktif`}
                   </p>
                 </div>
               </>

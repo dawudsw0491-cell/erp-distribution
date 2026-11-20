@@ -38,3 +38,18 @@ Application source references more than one attribute-value relation pattern, wh
 **Status:** Accepted
 
 Changes are made on `work/master-data-baseline-20261119`, based on the verified master HEAD. The `master` branch is not updated by this implementation.
+
+
+## ADR-006 — One user-facing Product Management workspace
+
+**Date:** 2026-11-20  
+**Status:** Accepted and implemented on branch `fix/engineering-governance-masterdata-consolidation-20261120`
+
+Product, category, product model, product attributes, and attribute values are one user-facing Product Management workspace. Legacy list/new/detail/edit route entry points for Product Models, Product Attributes, Product Attribute Values, and Product Categories redirect to `/products`. Existing server actions, tables, RPCs, and relationships are retained until a dependency-safe retirement migration is proven. No duplicate CRUD workspace is permitted.
+
+## ADR-007 — Evidence-based completion and no repetitive audit loops
+
+**Date:** 2026-11-20  
+**Status:** Accepted
+
+A task is executed against one backlog ID and one active implementation branch. Re-audit only changed scope or failed evidence. DONE requires source commit, relevant automated checks, applicable database verification, Preview READY, and an affected-flow smoke test. Infrastructure-blocked checks are reported as BLOCKED and are not retried repeatedly without a changed condition.

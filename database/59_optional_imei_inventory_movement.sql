@@ -106,6 +106,9 @@ BEGIN
             IF NOT FOUND THEN
                 RAISE EXCEPTION 'Unit tidak ditemukan untuk produk dan gudang tersebut';
             END IF;
+        ELSIF p_quantity_delta <> TRUNC(p_quantity_delta) THEN
+            RAISE EXCEPTION
+                'Aggregate IMEI movement quantity must be a whole unit quantity.';
         END IF;
     ELSIF v_tracking_type = 'serial' THEN
         IF p_product_unit_id IS NULL THEN
@@ -301,10 +304,15 @@ BEGIN
                 'Produk quantity tidak boleh menggunakan product_unit_id.';
         END IF;
 
-        IF v_tracking_type = 'imei'
-           AND v_movement.product_unit_id IS NOT NULL
-           AND ABS(v_movement.quantity_delta) <> 1 THEN
-            RAISE EXCEPTION 'Satu unit IMEI hanya boleh diproses dengan quantity 1.';
+        IF v_tracking_type = 'imei' THEN
+            IF v_movement.product_unit_id IS NOT NULL
+               AND ABS(v_movement.quantity_delta) <> 1 THEN
+                RAISE EXCEPTION 'Satu unit IMEI hanya boleh diproses dengan quantity 1.';
+            ELSIF v_movement.product_unit_id IS NULL
+               AND v_movement.quantity_delta <> TRUNC(v_movement.quantity_delta) THEN
+                RAISE EXCEPTION
+                    'Aggregate IMEI movement quantity must be a whole unit quantity.';
+            END IF;
         END IF;
 
         IF v_tracking_type = 'serial' THEN

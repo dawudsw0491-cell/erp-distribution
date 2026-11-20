@@ -1,4 +1,3 @@
-``
 import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";

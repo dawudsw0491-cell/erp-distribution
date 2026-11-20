@@ -810,3 +810,248 @@ BEGIN
 END;
 $function$
 ;
+
+
+-- Allow aggregate SKU transfers for untagged IMEI-tracked stock.
+CREATE OR REPLACE FUNCTION public.create_inventory_transfer_by_product(p_product_id uuid, p_source_warehouse_id uuid, p_destination_warehouse_id uuid, p_quantity numeric, p_inventory_status character varying, p_product_unit_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_group_id UUID;
+    v_tracking_type VARCHAR(30);
+    v_source_quantity NUMERIC(18,3);
+    v_unit_status VARCHAR(30);
+    v_reference_number VARCHAR(50);
+    v_warehouse_id UUID;
+BEGIN
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required.';
+    END IF;
+
+    IF NOT public.has_permission('inventory.transfer') THEN
+        RAISE EXCEPTION
+            'User tidak memiliki permission inventory.transfer.';
+    END IF;
+
+    IF p_product_id IS NULL
+       OR p_source_warehouse_id IS NULL
+       OR p_destination_warehouse_id IS NULL THEN
+        RAISE EXCEPTION 'Produk dan kedua gudang wajib diisi.';
+    END IF;
+
+    IF p_source_warehouse_id = p_destination_warehouse_id THEN
+        RAISE EXCEPTION
+            'Gudang asal dan tujuan tidak boleh sama.';
+    END IF;
+
+    IF p_quantity IS NULL
+       OR p_quantity <= 0
+       OR p_quantity <> ROUND(p_quantity, 3) THEN
+        RAISE EXCEPTION 'Quantity transfer tidak valid.';
+    END IF;
+
+    IF p_inventory_status IS NULL
+       OR p_inventory_status NOT IN (
+           'available', 'reserved', 'damaged', 'repair'
+       ) THEN
+        RAISE EXCEPTION 'Inventory status tidak valid.';
+    END IF;
+
+    IF (
+        SELECT COUNT(*)
+        FROM public.warehouses
+        WHERE id IN (
+            p_source_warehouse_id,
+            p_destination_warehouse_id
+        )
+        AND is_active = TRUE
+    ) <> 2 THEN
+        RAISE EXCEPTION
+            'Gudang asal dan tujuan harus aktif.';
+    END IF;
+
+    -- Lock kedua warehouse secara deterministik.
+    FOR v_warehouse_id IN
+        SELECT x.id
+        FROM (
+            VALUES
+                (p_source_warehouse_id),
+                (p_destination_warehouse_id)
+        ) AS x(id)
+        ORDER BY x.id
+    LOOP
+        PERFORM public.lock_inventory_warehouse(v_warehouse_id);
+    END LOOP;
+
+    SELECT tracking_type
+    INTO v_tracking_type
+    FROM public.products
+    WHERE id = p_product_id
+      AND is_active = TRUE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Produk tidak ditemukan atau tidak aktif.';
+    END IF;
+
+    SELECT
+        CASE p_inventory_status
+            WHEN 'available' THEN available_quantity
+            WHEN 'reserved' THEN reserved_quantity
+            WHEN 'damaged' THEN damaged_quantity
+            WHEN 'repair' THEN repair_quantity
+        END
+    INTO v_source_quantity
+    FROM public.inventory_balances
+    WHERE product_id = p_product_id
+      AND warehouse_id = p_source_warehouse_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Saldo inventory gudang asal tidak ditemukan.';
+    END IF;
+
+    IF v_source_quantity < p_quantity THEN
+        RAISE EXCEPTION
+            'Stok pada status yang dipilih tidak mencukupi.';
+    END IF;
+
+    IF v_tracking_type = 'quantity' THEN
+        IF p_product_unit_id IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Produk quantity tidak boleh menggunakan product_unit_id.';
+        END IF;
+
+    ELSIF v_tracking_type = 'imei' THEN
+        IF p_product_unit_id IS NOT NULL THEN
+            IF p_quantity <> 1 THEN
+                RAISE EXCEPTION 'Unit IMEI individual harus ditransfer satu unit.';
+            END IF;
+            SELECT unit_status INTO v_unit_status
+            FROM public.product_units
+            WHERE id = p_product_unit_id
+              AND product_id = p_product_id
+              AND warehouse_id = p_source_warehouse_id
+            FOR UPDATE;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Unit tidak ditemukan di gudang asal.';
+            END IF;
+            IF v_unit_status <> p_inventory_status THEN
+                RAISE EXCEPTION 'Status unit tidak sesuai dengan status transfer.';
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM public.product_unit_identifiers
+                WHERE product_unit_id = p_product_unit_id
+                  AND identifier_type = 'IMEI_1'
+            ) THEN
+                RAISE EXCEPTION 'IMEI_1 wajib tersedia untuk unit terdaftar.';
+            END IF;
+        END IF;
+
+    ELSIF v_tracking_type = 'serial' THEN
+        IF p_product_unit_id IS NULL OR p_quantity <> 1 THEN
+            RAISE EXCEPTION 'Produk serial harus ditransfer satu unit.';
+        END IF;
+        SELECT unit_status INTO v_unit_status
+        FROM public.product_units
+        WHERE id = p_product_unit_id
+          AND product_id = p_product_id
+          AND warehouse_id = p_source_warehouse_id
+        FOR UPDATE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Unit tidak ditemukan di gudang asal.';
+        END IF;
+        IF v_unit_status <> p_inventory_status THEN
+            RAISE EXCEPTION 'Status unit tidak sesuai dengan status transfer.';
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM public.product_unit_identifiers
+            WHERE product_unit_id = p_product_unit_id
+              AND identifier_type = 'SERIAL_NUMBER'
+        ) THEN
+            RAISE EXCEPTION 'SERIAL_NUMBER wajib tersedia.';
+        END IF;
+
+    ELSE
+        RAISE EXCEPTION 'Tracking type produk tidak dikenal.';
+    END IF;
+
+    v_group_id := pg_catalog.gen_random_uuid();
+
+    v_reference_number :=
+        'TRF-' ||
+        UPPER(LEFT(REPLACE(v_group_id::TEXT, '-', ''), 12));
+
+    INSERT INTO public.inventory_movements (
+        movement_group_id,
+        product_id,
+        warehouse_id,
+        product_unit_id,
+        movement_type,
+        status,
+        quantity_delta,
+        inventory_status,
+        source_reference_type,
+        source_reference_id,
+        source_reference_number,
+        notes,
+        created_by
+    )
+    VALUES (
+        v_group_id,
+        p_product_id,
+        p_source_warehouse_id,
+        p_product_unit_id,
+        'transfer_out',
+        'draft',
+        -p_quantity,
+        p_inventory_status,
+        'stock_transfer',
+        v_group_id,
+        v_reference_number,
+        p_notes,
+        v_user_id
+    );
+
+    INSERT INTO public.inventory_movements (
+        movement_group_id,
+        product_id,
+        warehouse_id,
+        product_unit_id,
+        movement_type,
+        status,
+        quantity_delta,
+        inventory_status,
+        source_reference_type,
+        source_reference_id,
+        source_reference_number,
+        notes,
+        created_by
+    )
+    VALUES (
+        v_group_id,
+        p_product_id,
+        p_destination_warehouse_id,
+        p_product_unit_id,
+        'transfer_in',
+        'draft',
+        p_quantity,
+        p_inventory_status,
+        'stock_transfer',
+        v_group_id,
+        v_reference_number,
+        p_notes,
+        v_user_id
+    );
+
+    RETURN v_group_id;
+END;
+$function$
+;

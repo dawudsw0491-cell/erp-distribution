@@ -11,8 +11,8 @@ type EditVariantFormProps = {
   variantSku: string;
   initialVariantName: string;
   initialBarcode: string;
-  initialWarranty: string;
-  warrantyTemplates: string[];
+  initialSpecifications: Record<string, string>;
+  specificationOptions: Record<string, string[]>;
 };
 
 export default function EditVariantForm({
@@ -21,12 +21,19 @@ export default function EditVariantForm({
   variantSku,
   initialVariantName,
   initialBarcode,
-  initialWarranty,
-  warrantyTemplates,
+  initialSpecifications,
+  specificationOptions,
 }: EditVariantFormProps) {
   const [variantName, setVariantName] = useState(initialVariantName);
   const [barcode, setBarcode] = useState(initialBarcode);
-  const [warranty, setWarranty] = useState(initialWarranty);
+  const [specifications, setSpecifications] = useState(initialSpecifications);
+
+  const specificationFields = [
+    { code: "RAM", label: "RAM", placeholder: "Contoh: 8GB" },
+    { code: "ROM", label: "ROM", placeholder: "Contoh: 128GB" },
+    { code: "COLOR", label: "Warna", placeholder: "Contoh: Midnight Black" },
+    { code: "WARRANTY", label: "Warranty", placeholder: "Pilih template atau ketik warranty baru" },
+  ] as const;
 
   return (
     <form
@@ -82,33 +89,47 @@ export default function EditVariantForm({
         </p>
       </div>
 
-      <div>
-        <label
-          htmlFor="warranty"
-          className="mb-2 block text-sm font-medium text-slate-700"
-        >
-          Warranty
-        </label>
-        <input
-          id="warranty"
-          name="warranty"
-          type="text"
-          maxLength={100}
-          list="warranty-template-options"
-          value={warranty}
-          onChange={(event) => setWarranty(event.target.value)}
-          placeholder="Pilih template atau ketik warranty baru"
-          className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
-        <datalist id="warranty-template-options">
-          {warrantyTemplates.map((item) => (
-            <option key={item} value={item} />
+      <section className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div>
+          <h2 className="font-semibold text-slate-800">Spesifikasi Varian</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Nilai baru disimpan sebagai template reusable. Menghapus isi field akan menghapus relasi spesifikasi pada varian ini, bukan template global.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {specificationFields.map((field) => (
+            <div key={field.code}>
+              <label
+                htmlFor={`spec-${field.code.toLowerCase()}`}
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                {field.label}
+              </label>
+              <input
+                id={`spec-${field.code.toLowerCase()}`}
+                name={`spec_${field.code}`}
+                type="text"
+                maxLength={100}
+                list={`spec-options-${field.code.toLowerCase()}`}
+                value={specifications[field.code] ?? ""}
+                onChange={(event) =>
+                  setSpecifications((previous) => ({
+                    ...previous,
+                    [field.code]: event.target.value,
+                  }))
+                }
+                placeholder={field.placeholder}
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <datalist id={`spec-options-${field.code.toLowerCase()}`}>
+                {(specificationOptions[field.code] ?? []).map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </div>
           ))}
-        </datalist>
-        <p className="mt-1 text-xs text-slate-500">
-          Teks baru otomatis disimpan sebagai template setelah perubahan variant disimpan.
-        </p>
-      </div>
+        </div>
+      </section>
 
       <div>
         <label

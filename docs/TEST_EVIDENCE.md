@@ -49,3 +49,19 @@ A successful migration and grant read-back prove the ACL change, not all functio
 | Legacy attribute DDL provenance | OPEN | Repository SQL files 22/23 describe a different attribute schema from the live database tables; no schema migration was changed |
 
 These are source-level checks only. Build, lint, and browser/runtime verification remain pending.
+
+
+## 2026-11-20 — Variant specification workflow
+
+| Check | Result | Evidence |
+|---|---|---|
+| RAM and ROM attribute masters | PASS — live DB | Both rows exist and are active; existing COLOR and WARRANTY rows were reused |
+| Variant specification RPC | PASS — live catalog | `save_product_variant_specifications(uuid, uuid, jsonb)` exists; `prosecdef=false`; `anon_execute=false`; `authenticated_execute=true`; `service_role_execute=true` |
+| Variant mapping removal policy | PASS — live catalog | DELETE policy exists for authenticated and checks `has_permission('master.update')` |
+| Specification transaction design | PASS — source inspection | One RPC call handles all four attributes in a PostgreSQL transaction; no service-role client or SECURITY DEFINER path is introduced |
+| Variant create/edit/detail UI | PASS — source inspection | Four fields are loaded/rendered from the shared attribute dictionary; create/edit calls the RPC |
+| Browser submission / RLS role matrix | NOT RUN | Requires authenticated UI session with permission combinations; not inferred from catalog inspection |
+| Production build after latest changes | NOT RUN | Previous local build was before these changes; rerun after pulling latest branch |
+| ESLint after latest changes | NOT RUN | Previous local run reported 25 errors and 11 warnings before these changes; rerun after pulling latest branch |
+
+The two applied specification migrations are recorded as `20261120031233` and `20261120031359`. No product, variant, purchase, inventory, or demo rows were deleted by these migrations.

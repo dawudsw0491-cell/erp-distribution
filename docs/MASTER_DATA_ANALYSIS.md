@@ -45,6 +45,22 @@
 4. Attribute assignment is product-grain, while attribute values are variant-grain. Preserve this distinction until requirements confirm whether all assigned attributes are required on every variant.
 5. Duplicate-looking FK constraints on variant attribute values must be evaluated by their exact column pairs; no FK has been dropped.
 
+## Requirement decision — single Product Management workspace
+
+The authoritative requirement is one Product Management workspace. Category, Brand, model information, SKU type, variants, and specifications are product details in the same workflow, not independent user work areas. Product creation and editing must not require navigation across standalone Product Model, Product Attribute, Attribute Value, or Category screens.
+
+Navigation consolidation has been implemented in the Master Data Hub and sidebar: only Product Management is exposed for product setup. The standalone route source is retained temporarily while its actions, forms, API consumers, foreign keys, triggers, and inventory/purchasing dependencies are traced. This is a retirement state, not a decision to preserve those modules.
+
+### Destructive cleanup gate
+
+- Demo rows are not a reason to retain redundant schema.
+- Do not drop Product Variant identity while purchasing, receipt, stock movement, serialized-unit, or valuation consumers still depend on it.
+- Product and Product Variant both store SKU (`products.sku`, `product_variants.variant_sku`). Select canonical SKU ownership only after tracing transaction foreign keys and RPCs.
+- Product and Product Model both store Brand ownership. Treat Product Model as a candidate descriptive property, not an independently managed entity.
+- Product Attribute, Attribute Value, product assignments, and variant values should be managed in the same Product Management workflow, not separate CRUD screens.
+- Category hierarchy remains a classification dimension but must be captured inline in Product Management.
+- No permanent database drop until the consumer inventory and replacement migration are complete and verified.
+
 ## Design principles
 
 1. Product `id` remains the stable product identity.

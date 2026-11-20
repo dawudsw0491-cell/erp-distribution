@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   createCustomerAction,
   searchCustomerRegionsAction,
@@ -57,12 +57,12 @@ export default function CustomerForm() {
 
   const [postalCode, setPostalCode] = useState("");
 
-  function getParentId(level: RegionLevel): string {
+  const getParentId = useCallback((level: RegionLevel): string => {
     if (level === "province") return "";
     if (level === "regency") return province?.id ?? "";
     if (level === "district") return regency?.id ?? "";
     return district?.id ?? "";
-  }
+  }, [province?.id, regency?.id, district?.id]);
 
   function getSelectedRegion(
     level: RegionLevel
@@ -157,10 +157,7 @@ export default function CustomerForm() {
     const keyword = searchQuery;
     const parentId = getParentId(level);
 
-    if (level !== "province" && !parentId) {
-      setOptions([]);
-      return;
-    }
+    if (level !== "province" && !parentId) return;
 
     let cancelled = false;
 
@@ -199,6 +196,7 @@ export default function CustomerForm() {
     province?.id,
     regency?.id,
     district?.id,
+    getParentId,
   ]);
 
   function renderRegionField(level: RegionLevel) {
@@ -217,6 +215,7 @@ export default function CustomerForm() {
       village: "Ketik nama desa / kelurahan...",
     }[level];
 
+    const visibleOptions = parentMissing ? [] : options;
     const inputId = `${level}_search`;
     const optionsId = `${level}_options`;
 
@@ -274,8 +273,8 @@ export default function CustomerForm() {
               <p className="px-3 py-3 text-sm text-red-600">
                 {searchError}
               </p>
-            ) : options.length > 0 ? (
-              options.map((item) => (
+            ) : visibleOptions.length > 0 ? (
+              visibleOptions.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -342,15 +341,6 @@ const fullAddress = [
   .filter((value) => Boolean(value && value.trim()))
   .join(", ");
 
-
-  const regionSummary = [
-    village?.name,
-    district?.name,
-    regency?.name,
-    province?.name,
-  ]
-    .filter(Boolean)
-    .join(", ");
 
   return (
     <form action={createCustomerAction} className="space-y-6">

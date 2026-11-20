@@ -60,6 +60,7 @@
 - Master Data Hub links all eight existing master areas.
 - Product and Product Model brand creation delegate to one server-only helper.
 - Product create/edit server validation and the client-side product categorization recommendation now consume one canonical `MAIN_PRODUCT_CATEGORIES` definition from `lib/master-data/categories.ts`; duplicate arrays were removed.
+- Product create/edit forms now share `recommendProductCategory` from `lib/master-data/product-classification.ts`; duplicated rule engines were consolidated, including Apple/iPhone matching and active-category filtering.
 - No duplicate Brand generator or second CRUD implementation was introduced.
 
 ## Next concrete Master Data work

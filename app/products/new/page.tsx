@@ -18,6 +18,7 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi kategori atau brand tidak valid.",
   invalid_category: "Kategori tidak ditemukan atau sudah tidak aktif.",
   invalid_brand: "Brand tidak ditemukan atau sudah tidak aktif.",
+  invalid_model: "Product Model tidak ditemukan, tidak aktif, atau tidak sesuai dengan Brand.",
   invalid_condition: "Kondisi produk tidak valid.",
   condition_required: "Kondisi produk wajib dipilih untuk produk barang.",
   invalid_subcategory: "Subkategori tidak valid atau tidak sesuai dengan kategori utama.",
@@ -58,6 +59,7 @@ export default async function NewProductPage({
   const [
     { data: categories, error: categoryError },
     { data: brands, error: brandError },
+    { data: models, error: modelError },
   ] = await Promise.all([
     auth.supabase
       .from("product_categories")
@@ -70,6 +72,12 @@ export default async function NewProductPage({
       .select("id, brand_name")
       .eq("is_active", true)
       .order("brand_name", { ascending: true }),
+
+    auth.supabase
+      .from("product_models")
+      .select("id, brand_id, model_name, model_code")
+      .eq("is_active", true)
+      .order("model_name", { ascending: true }),
   ]);
 
   if (categoryError) {
@@ -78,6 +86,10 @@ export default async function NewProductPage({
 
   if (brandError) {
     console.error("Load brands failed:", brandError);
+  }
+
+  if (modelError) {
+    console.error("Load product models failed:", modelError);
   }
 
   return (
@@ -116,6 +128,7 @@ export default async function NewProductPage({
             <ProductForm
               categories={categories ?? []}
               brands={brands ?? []}
+              models={models ?? []}
             />
           </div>
         </div>

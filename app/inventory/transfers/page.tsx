@@ -316,6 +316,7 @@ async function StockTransferContent({
         destinationWarehouse,
         quantity: Math.abs(Number(outbound.quantity_delta)),
         inventoryStatus: outbound.inventory_status ?? "-",
+        productUnitId: outbound.product_unit_id,
         status: outbound.status,
         notes: outbound.notes,
         createdAt: outbound.created_at,
@@ -372,14 +373,9 @@ async function StockTransferContent({
 
     if (!keyword) return true;
 
-    const unit = transfer.id
-      ? movements.find(
-          (movement) =>
-            movement.movement_type === "transfer_out" &&
-            movement.movement_group_id === transfer.id
-        )?.product_unit_id
-      : null;
-    const registeredUnit = unit ? unitMap.get(unit) : undefined;
+    const registeredUnit = transfer.productUnitId
+      ? unitMap.get(transfer.productUnitId)
+      : undefined;
     const identifierText = (registeredUnit?.product_unit_identifiers ?? [])
       .map((identifier) => identifier.identifier_value)
       .join(" ");

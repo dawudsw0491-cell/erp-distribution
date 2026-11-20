@@ -247,6 +247,7 @@ export default function ErpSidebar({
                           <Link
                             key={child.href}
                             href={child.href}
+                            prefetch={true}
                             className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 ease-in-out ${
                               childActive
                                 ? "translate-x-1 bg-blue-50 font-semibold text-blue-700"
@@ -284,6 +285,7 @@ export default function ErpSidebar({
             <Link
               key={group.label}
               href={group.href || "#"}
+              prefetch={true}
               className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 groupActive
                   ? "bg-blue-50 text-blue-700"

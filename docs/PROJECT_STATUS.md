@@ -113,3 +113,6 @@ Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
 - Live row counts before/after implementation verification remained products=14, product_variants=5, product_variant_attribute_values=2; no product demo/operational rows were created or modified during migration.
 - Customer and Supplier schemas/routes were not changed.
 - Not yet verified: local TypeScript/build/lint, real authenticated browser submit, multi-variant save, uniqueness failure rollback, permission matrix, and detail-page runtime rendering. These remain required before MD-010 can be marked DONE.
+
+
+- Follow-up migration `validate_atomic_product_variant_payload` hardened direct RPC validation: missing condition is rejected for goods, and variant barcode is checked against existing product-level barcodes before insert.

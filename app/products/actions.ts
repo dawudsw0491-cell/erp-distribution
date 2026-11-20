@@ -144,8 +144,8 @@ export async function createCategory(
   const categoryName = normalizeMasterName(input);
 
   if (
-    !MAIN_CATEGORIES.includes(
-      categoryName as (typeof MAIN_CATEGORIES)[number]
+    !MAIN_PRODUCT_CATEGORIES.includes(
+      categoryName as (typeof MAIN_PRODUCT_CATEGORIES)[number]
     )
   ) {
     return {
@@ -347,8 +347,8 @@ export async function createProduct(formData: FormData) {
     if (
       error ||
       !category ||
-      !MAIN_CATEGORIES.includes(
-        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      !MAIN_PRODUCT_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]
       )
     ) {
       redirect("/products/new?error=invalid_category");
@@ -547,8 +547,8 @@ export async function updateProduct(formData: FormData) {
     if (
       error ||
       !category ||
-      !MAIN_CATEGORIES.includes(
-        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      !MAIN_PRODUCT_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]
       )
     ) {
       redirect(`${editPath}?error=invalid_category`);

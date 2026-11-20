@@ -884,7 +884,7 @@ export async function createProductVariant(formData: FormData) {
     // Variant insert already succeeded. RLS intentionally has no variant DELETE
     // policy, so do not claim rollback or attempt a privileged cleanup.
     redirect(
-      `/products/${productId}/variants/${variant.id}/edit?error=specifications_save_failed`
+      `/products/${productId}/variants/${variant.id}?error=specifications_save_failed`
     );
   }
 

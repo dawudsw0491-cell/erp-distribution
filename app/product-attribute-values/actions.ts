@@ -77,12 +77,17 @@ export async function createProductAttributeValue(
     };
   }
 
-  const { data: duplicateCode } = await supabase
+  const { data: duplicateCode, error: duplicateCodeError } = await supabase
     .from("product_attribute_values")
     .select("id")
     .eq("attribute_id", attributeId)
     .ilike("value_code", valueCode)
     .maybeSingle();
+
+  if (duplicateCodeError) {
+    console.error("Attribute value code check failed:", duplicateCodeError);
+    return { error: "Gagal memeriksa duplikasi Value Code. Silakan coba lagi." };
+  }
 
   if (duplicateCode) {
     return {
@@ -90,12 +95,17 @@ export async function createProductAttributeValue(
     };
   }
 
-  const { data: duplicateName } = await supabase
+  const { data: duplicateName, error: duplicateNameError } = await supabase
     .from("product_attribute_values")
     .select("id")
     .eq("attribute_id", attributeId)
     .ilike("value_name", valueName)
     .maybeSingle();
+
+  if (duplicateNameError) {
+    console.error("Attribute value name check failed:", duplicateNameError);
+    return { error: "Gagal memeriksa duplikasi Value Name. Silakan coba lagi." };
+  }
 
   if (duplicateName) {
     return {
@@ -228,7 +238,7 @@ export async function updateProductAttributeValue(
     }
   }
 
-  const { data: duplicateCode } = await supabase
+  const { data: duplicateCode, error: duplicateCodeError } = await supabase
     .from("product_attribute_values")
     .select("id")
     .eq("attribute_id", attributeId)
@@ -236,17 +246,27 @@ export async function updateProductAttributeValue(
     .neq("id", id)
     .maybeSingle();
 
+  if (duplicateCodeError) {
+    console.error("Attribute value code check failed:", duplicateCodeError);
+    return fail("Gagal memeriksa duplikasi Value Code.");
+  }
+
   if (duplicateCode) {
     return fail("Value Code sudah digunakan pada Parent Attribute tersebut.");
   }
 
-  const { data: duplicateName } = await supabase
+  const { data: duplicateName, error: duplicateNameError } = await supabase
     .from("product_attribute_values")
     .select("id")
     .eq("attribute_id", attributeId)
     .ilike("value_name", valueName)
     .neq("id", id)
     .maybeSingle();
+
+  if (duplicateNameError) {
+    console.error("Attribute value name check failed:", duplicateNameError);
+    return fail("Gagal memeriksa duplikasi Value Name.");
+  }
 
   if (duplicateName) {
     return fail("Value Name sudah digunakan pada Parent Attribute tersebut.");

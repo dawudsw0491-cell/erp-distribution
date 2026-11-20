@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
@@ -309,12 +310,12 @@ export default async function PurchaseOrderDetailPage({
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <a
+              <Link
                 href="/purchases"
                 className="text-sm font-medium text-blue-600 hover:text-blue-800"
               >
                 ← Kembali ke Pembelian
-              </a>
+              </Link>
 
               <h1 className="mt-3 text-2xl font-bold text-slate-900">
                 Detail Purchase Order

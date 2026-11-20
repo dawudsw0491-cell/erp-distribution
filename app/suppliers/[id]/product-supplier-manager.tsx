@@ -106,6 +106,8 @@ export default function ProductSupplierManager({
   const [searchError, setSearchError] = useState("");
 
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const shouldSearchProducts =
+    modalOpen && !editing && searchKeyword.trim().length >= 2;
 
   const loadRelations = useCallback(async () => {
     setLoading(true);
@@ -129,16 +131,15 @@ export default function ProductSupplierManager({
   }, [supplierId]);
 
   useEffect(() => {
-    void loadRelations();
+    const timer = window.setTimeout(() => {
+      void loadRelations();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadRelations]);
 
   useEffect(() => {
-    if (!modalOpen || editing || searchKeyword.trim().length < 2) {
-      setSearchResults([]);
-      setSearchError("");
-      setSearching(false);
-      return;
-    }
+    if (!shouldSearchProducts) return;
 
     let cancelled = false;
 
@@ -175,7 +176,7 @@ export default function ProductSupplierManager({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [modalOpen, editing, searchKeyword]);
+  }, [shouldSearchProducts, searchKeyword]);
 
   function openCreateForm() {
     setEditing(null);
@@ -613,13 +614,13 @@ export default function ProductSupplierManager({
                         className={INPUT_CLASS}
                       />
 
-                      {searching && (
+                      {shouldSearchProducts && searching && (
                         <p className="mt-2 text-xs text-slate-500">
                           Mencari produk...
                         </p>
                       )}
 
-                      {searchError && (
+                      {shouldSearchProducts && searchError && (
                         <p
                           role="alert"
                           className="mt-2 text-xs text-red-600"
@@ -637,7 +638,7 @@ export default function ProductSupplierManager({
                           </p>
                         )}
 
-                      {searchResults.length > 0 && (
+                      {shouldSearchProducts && searchResults.length > 0 && (
                         <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200">
                           {searchResults.map((product) => (
                             <button

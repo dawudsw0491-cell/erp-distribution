@@ -17,17 +17,15 @@ type PageProps = {
 };
 
 const errorMessages: Record<string, string> = {
-  required: "SKU dan nama varian wajib diisi.",
-  invalid_sku: "Format atau panjang SKU varian tidak valid.",
-  invalid_sku_format: "SKU hanya boleh menggunakan huruf, angka, titik, garis bawah, dan tanda hubung.",
+  required: "Nama varian wajib diisi.",
   invalid_name: "Nama varian melebihi batas 200 karakter.",
   invalid_barcode: "Barcode melebihi batas 100 karakter.",
   inactive_product: "Produk sudah nonaktif. Varian tidak dapat ditambahkan.",
   invalid_product_type: "Varian hanya dapat ditambahkan pada produk barang (goods).",
-  duplicate_sku: "SKU sudah digunakan oleh produk atau varian lain.",
   duplicate: "SKU atau barcode sudah terdaftar.",
   invalid_reference: "Referensi produk tidak valid.",
-  lookup_failed: "Gagal memeriksa duplikasi SKU. Silakan coba kembali.",
+  invalid_specification: "Spesifikasi maksimal 100 karakter.",
+  forbidden: "Anda tidak memiliki izin membuat varian.",
   save_failed: "Varian gagal disimpan. Silakan coba kembali.",
 };
 
@@ -46,12 +44,7 @@ export default async function NewProductVariantPage({
 
   const auth = await getAuthorizationContext("master.create");
 
- console.log("[VARIANT NEW] AUTH:", {
-  userId: auth.user?.id ?? null,
-  authorized: auth.authorized,
-  hasSupabase: !!auth.supabase,
-}); 
-  
+
   if (!auth.user) {
     redirect("/login");
   }
@@ -66,22 +59,64 @@ export default async function NewProductVariantPage({
     .eq("id", id)
     .maybeSingle();
 
-console.log("[VARIANT NEW] PRODUCT:", {
-  productId: id,
-  found: !!product,
-  error: error?.message ?? null,
-  productType: product?.product_type ?? null,
-  isActive: product?.is_active ?? null,
-});
-
-  if (error || !product) {
+if (error || !product) {
     notFound();
   }
 
   if (!product.is_active || product.product_type !== "goods") {
     redirect(`/products/${id}/variants`);
   }
-    return (
+
+  const specificationFields = [
+    { code: "RAM", label: "RAM", placeholder: "Contoh: 8GB" },
+    { code: "ROM", label: "ROM", placeholder: "Contoh: 128GB" },
+    { code: "COLOR", label: "Warna", placeholder: "Contoh: Midnight Black" },
+    { code: "WARRANTY", label: "Warranty", placeholder: "Pilih template atau ketik warranty baru" },
+  ] as const;
+
+  const { data: specificationAttributes, error: specificationAttributeError } =
+    await auth.supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("attribute_code", specificationFields.map((field) => field.code))
+      .eq("is_active", true);
+
+  if (specificationAttributeError) {
+    console.error("Load product specification attributes failed:", specificationAttributeError);
+    throw new Error("Gagal memuat master spesifikasi produk.");
+  }
+
+  const specificationAttributeIds = (specificationAttributes ?? []).map((item) => item.id);
+  const { data: specificationValues, error: specificationValuesError } =
+    specificationAttributeIds.length
+      ? await auth.supabase
+          .from("product_attribute_values")
+          .select("attribute_id, value_name")
+          .in("attribute_id", specificationAttributeIds)
+          .eq("is_active", true)
+          .order("value_name", { ascending: true })
+      : { data: [], error: null };
+
+  if (specificationValuesError) {
+    console.error("Load product specification templates failed:", specificationValuesError);
+    throw new Error("Gagal memuat template spesifikasi produk.");
+  }
+
+  const specificationOptions = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      return [
+        field.code,
+        (specificationValues ?? [])
+          .filter((item) => item.attribute_id === attribute?.id)
+          .map((item) => item.value_name),
+      ];
+    })
+  );
+
+  return (
   <div className="min-h-screen bg-slate-50 md:flex md:h-screen md:min-h-0 md:overflow-hidden">
     <ErpSidebar activePath="/products" />
 
@@ -128,26 +163,9 @@ console.log("[VARIANT NEW] PRODUCT:", {
           >
             <input type="hidden" name="product_id" value={product.id} />
 
-            <div>
-              <label
-                htmlFor="variant_sku"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                SKU Varian <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="variant_sku"
-                name="variant_sku"
-                type="text"
-                required
-                maxLength={50}
-                placeholder="Contoh: PROD001-BLK"
-                className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Maksimal 50 karakter. Gunakan huruf kapital, angka, titik,
-                garis bawah, atau tanda hubung.
-              </p>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-semibold text-blue-900">SKU Varian Otomatis</p>
+              <p className="mt-1 text-sm text-blue-800">Sistem membuat SKU berdasarkan SKU produk utama dan nomor urut berikutnya. SKU tidak perlu diinput dan tidak berubah saat varian diedit.</p>
             </div>
 
             <div>
@@ -167,6 +185,41 @@ console.log("[VARIANT NEW] PRODUCT:", {
                 className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
+
+            <section className="space-y-4 rounded-lg border border-slate-200 p-4">
+              <div>
+                <h2 className="font-semibold text-slate-800">Spesifikasi Varian</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Nilai baru disimpan sebagai template dan dapat digunakan kembali pada varian lain.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {specificationFields.map((field) => (
+                  <div key={field.code}>
+                    <label
+                      htmlFor={`spec-${field.code.toLowerCase()}`}
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
+                      {field.label}
+                    </label>
+                    <input
+                      id={`spec-${field.code.toLowerCase()}`}
+                      name={`spec_${field.code}`}
+                      type="text"
+                      maxLength={100}
+                      list={`spec-options-${field.code.toLowerCase()}`}
+                      placeholder={field.placeholder}
+                      className="box-border w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <datalist id={`spec-options-${field.code.toLowerCase()}`}>
+                      {(specificationOptions[field.code] ?? []).map((item) => (
+                        <option key={item} value={item} />
+                      ))}
+                    </datalist>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <div>
               <label

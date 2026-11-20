@@ -12,6 +12,17 @@ export const metadata = {
   description: "Pengelolaan pesanan pembelian",
 };
 
+type PurchaseOrderRow = {
+  id: string;
+  po_number: string;
+  order_date: string;
+  expected_date: string | null;
+  status: string;
+  grand_total: number | string | null;
+  supplier: { supplier_name: string | null; supplier_code: string | null }[] | null;
+  warehouse: { warehouse_name: string | null; warehouse_code: string | null }[] | null;
+};
+
 type PurchasesPageProps = {
   searchParams: Promise<{
     q?: string;
@@ -440,7 +451,7 @@ async function PurchasesContent({
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {orders?.map((order: any) => (
+                      {orders?.map((order: PurchaseOrderRow) => (
                         <tr key={order.id} className="hover:bg-blue-50/40">
                           <td className="whitespace-nowrap px-5 py-4 font-semibold">
                             <Link
@@ -452,11 +463,11 @@ async function PurchasesContent({
                           </td>
 
                           <td className="px-5 py-4 text-slate-700">
-                            {order.supplier?.supplier_name ?? "-"}
+                            {order.supplier?.[0]?.supplier_name ?? "-"}
                           </td>
 
                           <td className="px-5 py-4 text-slate-700">
-                            {order.warehouse?.warehouse_name ?? "-"}
+                            {order.warehouse?.[0]?.warehouse_name ?? "-"}
                           </td>
 
                           <td className="whitespace-nowrap px-5 py-4 text-slate-700">

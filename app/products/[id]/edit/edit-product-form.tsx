@@ -4,17 +4,20 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { updateProduct } from "../../actions";
+import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
-type CategoryOption = {
-  id: string;
-  category_name: string;
-  parent_id: string | null;
-  is_active?: boolean;
-};
+type CategoryOption = ProductCategoryOption;
 
 type BrandOption = {
   id: string;
   brand_name: string;
+};
+
+type ModelOption = {
+  id: string;
+  brand_id: string;
+  model_name: string;
+  model_code: string;
 };
 
 type ProductData = {
@@ -26,6 +29,7 @@ type ProductData = {
   product_subcategory_id: string | null;
   product_condition: string | null;
   brand_id: string | null;
+  model_id: string | null;
   product_type: string;
   tracking_type: string;
   unit: string;
@@ -37,16 +41,10 @@ type EditProductFormProps = {
   product: ProductData;
   categories: CategoryOption[];
   brands: BrandOption[];
+  models: ModelOption[];
 };
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-];
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 
 const inputClass =
   "box-border w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -54,104 +52,11 @@ const inputClass =
 const labelClass =
   "mb-2 block text-sm font-medium text-slate-700";
 
-function normalize(value: string) {
-  return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function getRecommendation(
-  productName: string,
-  brandName: string,
-  condition: string,
-  categories: CategoryOption[]
-) {
-  const name = normalize(productName);
-  const brand = normalize(brandName);
-
-  if (!name || !condition) return null;
-
-  let mainCategory = "";
-  let subcategory = "";
-
-  if (
-    /\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)
-  ) {
-    mainCategory = "TABLET";
-  } else if (
-    /\b(MACBOOK|LAPTOP|NOTEBOOK|CHROMEBOOK|THINKPAD|VIVOBOOK|ZENBOOK)\b/.test(name)
-  ) {
-    mainCategory = "KOMPUTER DAN LAPTOP";
-  } else if (
-    /\b(ROUTER|SWITCH|ACCESS POINT|ACCESS-POINT|MODEM|ONT|OLT|REPEATER|MESH WIFI)\b/.test(name)
-  ) {
-    mainCategory = "NETWORKING";
-  } else if (
-    /\b(IC|MIKROKONTROLER|RESISTOR|KAPASITOR|TRANSISTOR|DIODE|PCB|ARDUINO|SENSOR|MOSFET)\b/.test(name)
-  ) {
-    mainCategory = "KOMPONEN ELEKTRONIK";
-  } else if (
-    /\b(AIRPODS|EARBUDS|HEADSET|HEADPHONE|EARPHONE|CHARGER|ADAPTER|CABLE|KABEL|CASE|COVER|POWERBANK|TEMPERED GLASS|SCREEN PROTECTOR|MOUSE|KEYBOARD|USB HUB|DOCKING)\b/.test(name)
-  ) {
-    mainCategory = "AKSESORIS";
-  } else if (/\b(IPHONE)\b/.test(name)) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE IOS";
-  } else if (
-    /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
-    (
-      [
-        "SAMSUNG",
-        "XIAOMI",
-        "OPPO",
-        "VIVO",
-        "REALME",
-        "INFINIX",
-        "TECNO",
-        "POCO",
-      ].includes(brand) &&
-      /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name)
-    )
-  ) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE ANDROID";
-  }
-
-  if (!mainCategory) return null;
-
-  if (condition === "SECOND") {
-    subcategory = `${mainCategory} SECONDHAND`;
-  }
-
-  const main = categories.find(
-    (item) =>
-      item.category_name === mainCategory &&
-      item.parent_id === null &&
-      item.is_active !== false
-  );
-
-  if (!main) return null;
-
-  const child = subcategory
-    ? categories.find(
-        (item) =>
-          item.category_name === subcategory &&
-          item.parent_id === main.id &&
-          item.is_active !== false
-      )
-    : undefined;
-
-  return {
-    categoryId: main.id,
-    categoryName: main.category_name,
-    subcategoryId: child?.id ?? "",
-    subcategoryName: child?.category_name ?? "",
-    missingSubcategory: Boolean(subcategory && !child),
-  };
-}
-
 export default function EditProductForm({
   product,
   categories,
   brands,
+  models,
 }: EditProductFormProps) {
   const initialCategory = categories.find(
     (item) => item.id === product.category_id
@@ -159,6 +64,7 @@ export default function EditProductForm({
 
   const [productName, setProductName] = useState(product.product_name);
   const [brandId, setBrandId] = useState(product.brand_id ?? "");
+  const [modelId, setModelId] = useState(product.model_id ?? "");
   const [condition, setCondition] = useState(
     product.product_condition ?? ""
   );
@@ -178,7 +84,7 @@ export default function EditProductForm({
       categories.filter(
         (item) =>
           item.parent_id === null &&
-          MAIN_CATEGORIES.includes(item.category_name) &&
+          MAIN_PRODUCT_CATEGORIES.includes(item.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]) &&
           item.is_active !== false
       ),
     [categories]
@@ -198,7 +104,7 @@ export default function EditProductForm({
   const recommendation = useMemo(
     () =>
       productType === "goods"
-        ? getRecommendation(
+        ? recommendProductCategory(
             productName,
             selectedBrandName,
             condition,
@@ -283,7 +189,10 @@ export default function EditProductForm({
             id="brand_id"
             name="brand_id"
             value={brandId}
-            onChange={(event) => setBrandId(event.target.value)}
+            onChange={(event) => {
+              setBrandId(event.target.value);
+              setModelId("");
+            }}
             className={inputClass}
           >
             <option value="">Tanpa Brand</option>
@@ -293,6 +202,31 @@ export default function EditProductForm({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Product Model */}
+        <div className="min-w-0">
+          <label htmlFor="model_id" className={labelClass}>
+            Product Model
+          </label>
+          <select
+            id="model_id"
+            name="model_id"
+            value={modelId}
+            onChange={(event) => setModelId(event.target.value)}
+            disabled={!brandId || productType === "service"}
+            className={inputClass}
+          >
+            <option value="">Tanpa Model</option>
+            {models.filter((item) => item.brand_id === brandId).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.model_name} ({item.model_code})
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Model harus berasal dari Brand yang dipilih.
+          </p>
         </div>
 
         {/* Product Type */}
@@ -519,7 +453,7 @@ export default function EditProductForm({
             name="unit"
             required
             maxLength={50}
-            defaultValue={product.unit}
+            defaultValue={["PCS", "pcs", "PC", "PIECE", "PIECES"].includes(product.unit.trim().toUpperCase()) ? "Unit" : product.unit}
             className={inputClass}
           />
         </div>

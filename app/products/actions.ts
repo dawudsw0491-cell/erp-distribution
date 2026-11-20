@@ -5,18 +5,13 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { createBrandRecord } from "@/lib/master-data/brands";
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-] as const;
+
 
 type ProductCondition = "BARU" | "SECOND";
 
@@ -62,29 +57,6 @@ function generateMasterCode(prefix: string, name: string) {
   return `${prefix}-${slug}-${suffix}`;
 }
 
-/**
- * Menghasilkan SKU pendek melalui database sequence.
- * Format: HXA-000001
- */
-async function generateProductSku(
-  supabase: Awaited<
-    ReturnType<typeof getAuthorizationContext>
-  >["supabase"]
-): Promise<string> {
-  const { data, error } = await supabase.rpc(
-    "generate_product_sku"
-  );
-
-  if (error || !data) {
-    throw new Error(
-      `Gagal membuat SKU produk: ${
-        error?.message ?? "SKU kosong"
-      }`
-    );
-  }
-
-  return data;
-}
 
 function getProductCondition(
   value: FormDataEntryValue | null
@@ -149,8 +121,8 @@ export async function createCategory(
   const categoryName = normalizeMasterName(input);
 
   if (
-    !MAIN_CATEGORIES.includes(
-      categoryName as (typeof MAIN_CATEGORIES)[number]
+    !MAIN_PRODUCT_CATEGORIES.includes(
+      categoryName as (typeof MAIN_PRODUCT_CATEGORIES)[number]
     )
   ) {
     return {
@@ -230,97 +202,12 @@ export async function createCategory(
 export async function createBrand(
   input: string
 ): Promise<CreateMasterResult> {
-  const auth = await getAuthorizationContext("master.create");
-
-  if (!auth.user) {
-    return {
-      success: false,
-      error: "Sesi login telah berakhir. Silakan login kembali.",
-    };
-  }
-
-  if (!auth.authorized) {
-    return {
-      success: false,
-      error: "Anda tidak memiliki izin membuat brand.",
-    };
-  }
-
-  const brandName = normalizeMasterName(input);
-
-  if (!brandName) {
-    return {
-      success: false,
-      error: "Nama brand wajib diisi.",
-    };
-  }
-
-  if (brandName.length > 255) {
-    return {
-      success: false,
-      error: "Nama brand maksimal 255 karakter.",
-    };
-  }
-
-  const { data: existing, error: lookupError } = await auth.supabase
-    .from("brands")
-    .select("id, brand_name, is_active")
-    .ilike("brand_name", brandName)
-    .limit(1)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("Brand lookup failed:", lookupError);
-
-    return {
-      success: false,
-      error: "Gagal memeriksa brand yang sudah tersedia.",
-    };
-  }
-
-  if (existing) {
-    if (!existing.is_active) {
-      return {
-        success: false,
-        error: "Brand sudah ada tetapi tidak aktif.",
-      };
-    }
-
-    return {
-      success: true,
-      id: existing.id,
-      name: existing.brand_name,
-      existing: true,
-    };
-  }
-
-  const { data, error } = await auth.supabase
-    .from("brands")
-    .insert({
-      brand_code: generateMasterCode("BRD", brandName),
-      brand_name: brandName,
-      is_active: true,
-    })
-    .select("id, brand_name")
-    .single();
-
-  if (error) {
-    console.error("Create brand failed:", error);
-
-    return {
-      success: false,
-      error: "Gagal menyimpan brand baru ke database.",
-    };
-  }
-
-  revalidatePath("/products/new");
-  revalidatePath("/products");
-
-  return {
-    success: true,
-    id: data.id,
-    name: data.brand_name,
-  };
+  return createBrandRecord(input, [
+    "/products/new",
+    "/products",
+    "/product-models",
+    "/product-models/new",
+  ]);
 }
 
 /* =========================================================
@@ -332,10 +219,6 @@ export async function createProduct(formData: FormData) {
 
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
-
-  // SKU tidak lagi diterima dari form.
-  // Sistem menjadi satu-satunya pihak yang membuat SKU.
-  const sku = await generateProductSku(auth.supabase);
 
   const productName = normalizeProductName(
     formData.get("product_name")
@@ -352,7 +235,7 @@ export async function createProduct(formData: FormData) {
     formData.get("tracking_type") ?? "quantity"
   );
 
-  const unit = String(formData.get("unit") ?? "pcs").trim();
+  const unit = String(formData.get("unit") ?? "Unit").trim();
   const description =
     String(formData.get("description") ?? "").trim() || null;
 
@@ -367,6 +250,7 @@ export async function createProduct(formData: FormData) {
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
+  const modelId = getOptionalUuid(formData.get("model_id"));
 
   let minimumStock = getMinimumStock(
     formData.get("minimum_stock")
@@ -399,7 +283,8 @@ export async function createProduct(formData: FormData) {
   if (
     categoryId === undefined ||
     subcategoryId === undefined ||
-    brandId === undefined
+    brandId === undefined ||
+    modelId === undefined
   ) {
     redirect("/products/new?error=invalid_reference");
   }
@@ -437,8 +322,8 @@ export async function createProduct(formData: FormData) {
     if (
       error ||
       !category ||
-      !MAIN_CATEGORIES.includes(
-        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      !MAIN_PRODUCT_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]
       )
     ) {
       redirect("/products/new?error=invalid_category");
@@ -471,43 +356,61 @@ export async function createProduct(formData: FormData) {
     }
   }
 
-  const { data, error } = await auth.supabase
-    .from("products")
-    .insert({
-      sku,
-      barcode,
-      product_name: productName,
-      category_id: categoryId,
-      product_subcategory_id: subcategoryId,
-      product_condition: productCondition,
-      brand_id: brandId,
-      product_type: productType,
-      tracking_type: trackingType,
-      unit,
-      description,
-      minimum_stock: minimumStock,
-      is_active: true,
-    })
-    .select("id")
-    .single();
+  if (modelId) {
+    const { data: model, error } = await auth.supabase
+      .from("product_models")
+      .select("id, brand_id")
+      .eq("id", modelId)
+      .eq("is_active", true)
+      .maybeSingle();
 
-  if (error) {
-    console.error("Create product failed:", error);
-
-    if (error.code === "23505") {
-      redirect("/products/new?error=duplicate");
+    if (error || !model || model.brand_id !== brandId) {
+      redirect("/products/new?error=invalid_model");
     }
-
-    if (error.code === "23503") {
-      redirect("/products/new?error=invalid_reference");
-    }
-
-    redirect("/products/new?error=save_failed");
   }
 
+  let variants: Array<{
+    variant_name: string; barcode: string | null; ram: string; rom: string; color: string; warranty: string;
+  }>;
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("variants_json") ?? "[]"));
+    if (!Array.isArray(parsed)) throw new Error("Invalid variants payload");
+    variants = parsed.map((item: unknown) => {
+      if (!item || typeof item !== "object") throw new Error("Invalid variant");
+      const row = item as Record<string, unknown>;
+      return {
+        variant_name: String(row.variant_name ?? "").trim().replace(/\s+/g, " "),
+        barcode: String(row.barcode ?? "").trim() || null,
+        ram: String(row.ram ?? "").trim(), rom: String(row.rom ?? "").trim(),
+        color: String(row.color ?? "").trim(), warranty: String(row.warranty ?? "").trim(),
+      };
+    });
+  } catch { redirect("/products/new?error=invalid_variants"); }
+  if (productType === "goods" && (variants.length < 1 || variants.length > 100)) redirect("/products/new?error=variant_required");
+  if (productType === "service" && variants.length > 0) redirect("/products/new?error=service_variants");
+  const variantNames = new Set<string>();
+  const variantBarcodes = new Set<string>();
+  for (const variant of variants) {
+    const normalizedName = variant.variant_name.toLocaleLowerCase("id-ID");
+    if (!variant.variant_name || variant.variant_name.length > 200 || variantNames.has(normalizedName)) redirect("/products/new?error=invalid_variants");
+    variantNames.add(normalizedName);
+    if (variant.barcode && (variant.barcode.length > 100 || variantBarcodes.has(variant.barcode))) redirect("/products/new?error=invalid_variants");
+    if (variant.barcode) variantBarcodes.add(variant.barcode);
+    if ([variant.ram, variant.rom, variant.color, variant.warranty].some((value) => value.length > 100)) redirect("/products/new?error=invalid_variants");
+  }
+  const productPayload = { barcode, product_name: productName, category_id: categoryId, product_subcategory_id: subcategoryId, product_condition: productCondition, brand_id: brandId, model_id: productType === "goods" ? modelId : null, product_type: productType, tracking_type: trackingType, unit, description, minimum_stock: minimumStock };
+  const { data, error } = await auth.supabase.rpc("create_product_with_variants", { p_product: productPayload, p_variants: variants });
+  if (error || !data?.product_id) {
+    console.error("Create product with variants failed:", error);
+    if (error?.code === "23505") redirect("/products/new?error=duplicate");
+    if (error?.code === "23503") redirect("/products/new?error=invalid_reference");
+    if (error?.message?.toLowerCase().includes("permission")) redirect("/products/new?error=forbidden");
+    redirect("/products/new?error=save_failed");
+  }
   revalidatePath("/products");
-
-  redirect(`/products?created=1&id=${data.id}`);
+  revalidatePath("/products/" + data.product_id);
+  revalidatePath("/products/" + data.product_id + "/variants");
+  redirect("/products/" + data.product_id + "?created=1");
 }
 
 /* =========================================================
@@ -528,7 +431,7 @@ export async function updateProduct(formData: FormData) {
 
   const { data: existingProduct, error: lookupError } = await auth.supabase
     .from("products")
-    .select("id")
+    .select("id, model_id")
     .eq("id", productId)
     .maybeSingle();
 
@@ -567,6 +470,7 @@ export async function updateProduct(formData: FormData) {
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
+  const modelId = getOptionalUuid(formData.get("model_id"));
 
   let minimumStock = getMinimumStock(
     formData.get("minimum_stock")
@@ -599,7 +503,8 @@ export async function updateProduct(formData: FormData) {
   if (
     categoryId === undefined ||
     subcategoryId === undefined ||
-    brandId === undefined
+    brandId === undefined ||
+    modelId === undefined
   ) {
     redirect(`${editPath}?error=invalid_reference`);
   }
@@ -637,8 +542,8 @@ export async function updateProduct(formData: FormData) {
     if (
       error ||
       !category ||
-      !MAIN_CATEGORIES.includes(
-        category.category_name as (typeof MAIN_CATEGORIES)[number]
+      !MAIN_PRODUCT_CATEGORIES.includes(
+        category.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]
       )
     ) {
       redirect(`${editPath}?error=invalid_category`);
@@ -671,6 +576,19 @@ export async function updateProduct(formData: FormData) {
     }
   }
 
+  if (modelId) {
+    const { data: model, error } = await auth.supabase
+      .from("product_models")
+      .select("id, brand_id")
+      .eq("id", modelId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !model || model.brand_id !== brandId) {
+      redirect(`${editPath}?error=invalid_model`);
+    }
+  }
+
   const { error } = await auth.supabase
     .from("products")
     .update({
@@ -682,6 +600,7 @@ export async function updateProduct(formData: FormData) {
       product_subcategory_id: subcategoryId,
       product_condition: productCondition,
       brand_id: brandId,
+      model_id: productType === "goods" ? modelId : null,
       product_type: productType,
       tracking_type: trackingType,
       unit,
@@ -772,140 +691,80 @@ export async function toggleProductStatus(formData: FormData) {
 }
 
 /* =========================================================
+   PRODUCT VARIANT SPECIFICATIONS
+========================================================= */
+
+const VARIANT_SPECIFICATION_CODES = ["RAM", "ROM", "COLOR", "WARRANTY"] as const;
+
+async function saveVariantSpecifications(
+  supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
+  productId: string,
+  variantId: string,
+  formData: FormData
+) {
+  const specifications = Object.fromEntries(
+    VARIANT_SPECIFICATION_CODES.map((code) => [
+      code,
+      String(formData.get(`spec_${code}`) ?? ""),
+    ])
+  );
+
+  const { error } = await supabase.rpc("save_product_variant_specifications", {
+    p_product_id: productId,
+    p_variant_id: variantId,
+    p_specifications: specifications,
+  });
+
+  if (error) throw error;
+}
+
+/* =========================================================
    LEGACY PRODUCT VARIANT FUNCTIONS
    Dipertahankan sementara selama proses migrasi.
 ========================================================= */
 
 export async function createProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.create");
-
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
+  if (!UUID_REGEX.test(productId)) redirect("/products?error=invalid_id");
 
-  if (!UUID_REGEX.test(productId)) {
-    redirect("/products?error=invalid_id");
-  }
-
-  const variantSku = String(formData.get("variant_sku") ?? "")
-    .trim()
-    .toUpperCase();
-
-  const skuPattern = variantSku.replace(/[\\%_]/g, "\\$&");
-
-  const variantName = String(formData.get("variant_name") ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-
+  const variantName = String(formData.get("variant_name") ?? "").trim().replace(/\\s+/g, " ");
   const barcode = String(formData.get("barcode") ?? "").trim() || null;
+  if (!variantName) redirect(`/products/${productId}/variants/new?error=required`);
+  if (variantName.length > 200) redirect(`/products/${productId}/variants/new?error=invalid_name`);
+  if (barcode !== null && barcode.length > 100) redirect(`/products/${productId}/variants/new?error=invalid_barcode`);
 
-  if (!variantSku || !variantName) {
-    redirect(`/products/${productId}/variants/new?error=required`);
+  const specifications = {
+    RAM: String(formData.get("spec_RAM") ?? "").trim(),
+    ROM: String(formData.get("spec_ROM") ?? "").trim(),
+    COLOR: String(formData.get("spec_COLOR") ?? "").trim(),
+    WARRANTY: String(formData.get("spec_WARRANTY") ?? "").trim(),
+  };
+  if (Object.values(specifications).some((value) => value.length > 100)) {
+    redirect(`/products/${productId}/variants/new?error=invalid_specification`);
   }
 
-  if (variantSku.length > 50) {
-    redirect(`/products/${productId}/variants/new?error=invalid_sku`);
-  }
+  const { data, error } = await auth.supabase.rpc("create_product_variant_with_specs", {
+    p_product_id: productId,
+    p_variant_name: variantName,
+    p_barcode: barcode,
+    p_specifications: specifications,
+  });
 
-  if (variantName.length > 200) {
-    redirect(`/products/${productId}/variants/new?error=invalid_name`);
-  }
-
-  if (barcode !== null && barcode.length > 100) {
-    redirect(`/products/${productId}/variants/new?error=invalid_barcode`);
-  }
-
-  if (!/^[A-Z0-9._-]+$/.test(variantSku)) {
-    redirect(`/products/${productId}/variants/new?error=invalid_sku_format`);
-  }
-
-  const { data: product, error: productError } = await auth.supabase
-    .from("products")
-    .select("id, sku, is_active, product_type")
-    .eq("id", productId)
-    .maybeSingle();
-
-  if (productError || !product) {
-    redirect("/products?error=not_found");
-  }
-
-  if (!product.is_active) {
-    redirect(`/products/${productId}/variants/new?error=inactive_product`);
-  }
-
-  if (product.product_type !== "goods") {
-    redirect(`/products/${productId}/variants/new?error=invalid_product_type`);
-  }
-
-  if (product.sku.trim().toUpperCase() === variantSku) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: existingVariant, error: variantLookupError } =
-    await auth.supabase
-      .from("product_variants")
-      .select("id")
-      .ilike("variant_sku", skuPattern)
-      .limit(1)
-      .maybeSingle();
-
-  if (variantLookupError) {
-    console.error("Variant SKU lookup failed:", variantLookupError);
-    redirect(`/products/${productId}/variants/new?error=lookup_failed`);
-  }
-
-  if (existingVariant) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: existingProductSku, error: productSkuError } =
-    await auth.supabase
-      .from("products")
-      .select("id")
-      .ilike("sku", skuPattern)
-      .limit(1)
-      .maybeSingle();
-
-  if (productSkuError) {
-    console.error("Product SKU lookup failed:", productSkuError);
-    redirect(`/products/${productId}/variants/new?error=lookup_failed`);
-  }
-
-  if (existingProductSku) {
-    redirect(`/products/${productId}/variants/new?error=duplicate_sku`);
-  }
-
-  const { data: variant, error } = await auth.supabase
-    .from("product_variants")
-    .insert({
-      product_id: productId,
-      variant_sku: variantSku,
-      variant_name: variantName,
-      barcode,
-      is_active: true,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
+  if (error || !data?.id) {
     console.error("Create product variant failed:", error);
-
-    if (error.code === "23505") {
-      redirect(`/products/${productId}/variants/new?error=duplicate`);
-    }
-
-    if (error.code === "23503") {
-      redirect(`/products/${productId}/variants/new?error=invalid_reference`);
-    }
-
+    if (error?.code === "23505") redirect(`/products/${productId}/variants/new?error=duplicate`);
+    if (error?.message?.toLowerCase().includes("permission")) redirect(`/products/${productId}/variants/new?error=forbidden`);
+    if (error?.message?.toLowerCase().includes("barcode")) redirect(`/products/${productId}/variants/new?error=duplicate`);
     redirect(`/products/${productId}/variants/new?error=save_failed`);
   }
 
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/products/${productId}/variants`);
-
-  redirect(`/products/${productId}/variants?created=1&id=${variant.id}`);
+  redirect(`/products/${productId}/variants?created=1&id=${data.id}`);
 }
 
 export async function updateProductVariant(formData: FormData) {
@@ -1053,6 +912,20 @@ export async function updateProductVariant(formData: FormData) {
 
     redirect(
       `/products/${productId}/variants/${variantId}/edit?error=save_failed`
+    );
+  }
+
+  try {
+    await saveVariantSpecifications(
+      auth.supabase,
+      productId,
+      variantId,
+      formData
+    );
+  } catch (specificationError) {
+    console.error("Update variant specifications failed:", specificationError);
+    redirect(
+      `/products/${productId}/variants/${variantId}/edit?error=specifications_save_failed`
     );
   }
 

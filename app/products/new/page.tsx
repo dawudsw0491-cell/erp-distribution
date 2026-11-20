@@ -9,7 +9,7 @@ import ProductForm from "./product-form";
 export const instant = false;
 
 const errorMessages: Record<string, string> = {
-  required: "SKU, nama produk, dan satuan wajib diisi.",
+  required: "Nama produk dan satuan wajib diisi.",
   invalid_length: "Panjang karakter salah satu field melebihi batas.",
   invalid_barcode: "Barcode tidak memenuhi ketentuan.",
   invalid_type: "Jenis produk tidak valid.",
@@ -18,10 +18,15 @@ const errorMessages: Record<string, string> = {
   invalid_reference: "Referensi kategori atau brand tidak valid.",
   invalid_category: "Kategori tidak ditemukan atau sudah tidak aktif.",
   invalid_brand: "Brand tidak ditemukan atau sudah tidak aktif.",
+  invalid_model: "Product Model tidak ditemukan, tidak aktif, atau tidak sesuai dengan Brand.",
   invalid_condition: "Kondisi produk tidak valid.",
   condition_required: "Kondisi produk wajib dipilih untuk produk barang.",
   invalid_subcategory: "Subkategori tidak valid atau tidak sesuai dengan kategori utama.",
   duplicate: "SKU atau barcode sudah digunakan oleh produk lain.",
+  invalid_variants: "Periksa nama varian, barcode, dan panjang spesifikasi. Nama varian dalam satu produk tidak boleh duplikat.",
+  variant_required: "Produk barang wajib memiliki minimal satu varian dan maksimal 100 varian per penyimpanan.",
+  service_variants: "Produk jasa tidak menggunakan varian persediaan.",
+  forbidden: "Anda tidak memiliki izin membuat produk dan varian.",
   save_failed: "Produk gagal disimpan. Silakan coba kembali.",
 };
 
@@ -58,6 +63,7 @@ export default async function NewProductPage({
   const [
     { data: categories, error: categoryError },
     { data: brands, error: brandError },
+    { data: models, error: modelError },
   ] = await Promise.all([
     auth.supabase
       .from("product_categories")
@@ -70,6 +76,12 @@ export default async function NewProductPage({
       .select("id, brand_name")
       .eq("is_active", true)
       .order("brand_name", { ascending: true }),
+
+    auth.supabase
+      .from("product_models")
+      .select("id, brand_id, model_name, model_code")
+      .eq("is_active", true)
+      .order("model_name", { ascending: true }),
   ]);
 
   if (categoryError) {
@@ -78,6 +90,10 @@ export default async function NewProductPage({
 
   if (brandError) {
     console.error("Load brands failed:", brandError);
+  }
+
+  if (modelError) {
+    console.error("Load product models failed:", modelError);
   }
 
   return (
@@ -99,7 +115,7 @@ export default async function NewProductPage({
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Masukkan informasi master produk ke dalam sistem ERP.
+              Kelola identitas produk, kategori, seluruh SKU varian, spesifikasi, dan garansi dalam satu proses.
             </p>
           </div>
 
@@ -116,6 +132,7 @@ export default async function NewProductPage({
             <ProductForm
               categories={categories ?? []}
               brands={brands ?? []}
+              models={models ?? []}
             />
           </div>
         </div>

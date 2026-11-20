@@ -1,22 +1,14 @@
 
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import {
+  createBrandRecord,
+  type CreateBrandResult,
+} from "@/lib/master-data/brands";
 
-type CreateBrandResult =
-  | {
-      success: true;
-      id: string;
-      name: string;
-      existing?: boolean;
-    }
-  | {
-      success: false;
-      error: string;
-    };
 
 type ActionResult =
   | {
@@ -88,23 +80,6 @@ const UUID_REGEX =
 
 function normalizeName(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function generateMasterCode(prefix: string, name: string) {
-  const slug =
-    name
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 24) || "ITEM";
-
-  const suffix = randomUUID()
-    .replace(/-/g, "")
-    .slice(0, 8)
-    .toUpperCase();
-
-  return `${prefix}-${slug}-${suffix}`;
 }
 
 function isValidUUID(value: string) {
@@ -380,104 +355,12 @@ export async function updateProductModel(formData: FormData) {
 export async function createBrandForProductModel(
   nameInput: string
 ): Promise<CreateBrandResult> {
-  const name = normalizeName(nameInput);
-
-  if (!name) {
-    return {
-      success: false,
-      error: "Nama Brand wajib diisi.",
-    };
-  }
-
-  if (name.length > 255) {
-    return {
-      success: false,
-      error: "Nama Brand maksimal 255 karakter.",
-    };
-  }
-
-  const auth = await getAuthorizationContext("master.create");
-
-  if (!auth.user) {
-    return {
-      success: false,
-      error: "Sesi login berakhir. Silakan login kembali.",
-    };
-  }
-
-  if (!auth.authorized) {
-    return {
-      success: false,
-      error: "Anda tidak memiliki permission untuk menambah Brand.",
-    };
-  }
-
-  const { data: existing, error: lookupError } = await auth.supabase
-    .from("brands")
-    .select("id, brand_name, is_active")
-    .ilike("brand_name", name)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("Brand lookup failed:", lookupError);
-
-    return {
-      success: false,
-      error: "Gagal memeriksa data Brand.",
-    };
-  }
-
-  if (existing) {
-    if (!existing.is_active) {
-      return {
-        success: false,
-        error: "Brand sudah terdaftar tetapi tidak aktif.",
-      };
-    }
-
-    return {
-      success: true,
-      id: existing.id,
-      name: existing.brand_name,
-      existing: true,
-    };
-  }
-
-  const { data, error } = await auth.supabase
-    .from("brands")
-    .insert({
-      brand_code: generateMasterCode("BRD", name),
-      brand_name: name,
-      is_active: true,
-    })
-    .select("id, brand_name")
-    .single();
-
-  if (error || !data) {
-    console.error("Create Brand failed:", error);
-
-    if (error?.code === "23505") {
-      return {
-        success: false,
-        error: "Brand sudah terdaftar atau kode Brand sudah digunakan.",
-      };
-    }
-
-    return {
-      success: false,
-      error: "Gagal menyimpan Brand.",
-    };
-  }
-
-  revalidatePath("/brands");
-  revalidatePath("/product-models");
-  revalidatePath("/product-models/new");
-
-  return {
-    success: true,
-    id: data.id,
-    name: data.brand_name,
-  };
+  return createBrandRecord(nameInput, [
+    "/products/new",
+    "/products",
+    "/product-models",
+    "/product-models/new",
+  ]);
 }
 
 /**

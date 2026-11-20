@@ -79,8 +79,9 @@ export async function createWarehouseAction(
 export async function updateWarehouseStatusAction(
   warehouseId: string,
   isActive: boolean,
-  _formData: FormData
+  formData: FormData
 ): Promise<void> {
+  void formData;
   const auth = await getAuthorizationContext("master.update");
 
   if (!auth.user || !auth.authorized) {

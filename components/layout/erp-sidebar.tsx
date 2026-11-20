@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   LayoutDashboard,
   Database,
@@ -14,14 +14,13 @@ import {
   ShoppingCart,
   Boxes,
   ArrowLeftRight,
+  ChevronDown,
   ClipboardList,
   Smartphone,
-  ChevronDown,
   ShoppingBag,
   RotateCcw,
   Wallet,
   Settings,
-  Tags,
 } from "lucide-react";
 
 import LogoutButton from "@/components/layout/logout-button";
@@ -60,11 +59,6 @@ const menuGroups: MenuGroup[] = [
         icon: <Package size={16} />,
       },
       {
-        label: "Kategori Produk",
-        href: "/product-categories",
-        icon: <Tags size={16} />,
-      },
-      {
         label: "Pelanggan",
         href: "/customers",
         icon: <Users size={16} />,
@@ -78,21 +72,6 @@ const menuGroups: MenuGroup[] = [
         label: "Warehouse",
         href: "/warehouses",
         icon: <Warehouse size={16} />,
-      },
-      {
-        label: "Product Models",
-        href: "/product-models",
-        icon: <Boxes size={16} />,
-      },
-      {
-        label: "Product Attributes",
-        href: "/product-attributes",
-        icon: <Settings size={16} />,
-      },
-      {
-        label: "Product Attribute Values",
-        href: "/product-attribute-values",
-        icon: <ClipboardList size={16} />,
       },
     ],
   },
@@ -169,35 +148,12 @@ export default function ErpSidebar({
   const pathname = usePathname();
   const currentPath = pathname || activePath;
 
-  const [expandedGroups, setExpandedGroups] = useState<
-    Record<string, boolean>
-  >({
-    "Master Data": false,
-    Inventory: false,
-  });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    setExpandedGroups((previous) => {
-      const next = { ...previous };
-
-      menuGroups.forEach((group) => {
-        if (
-          group.children?.some((child) =>
-            isRouteActive(currentPath, child.href)
-          )
-        ) {
-          next[group.label] = true;
-        }
-      });
-
-      return next;
-    });
-  }, [currentPath]);
-
-  function toggleGroup(label: string) {
+  function toggleGroup(label: string, currentlyExpanded: boolean) {
     setExpandedGroups((previous) => ({
       ...previous,
-      [label]: !previous[label],
+      [label]: !currentlyExpanded,
     }));
   }
 
@@ -236,14 +192,14 @@ export default function ErpSidebar({
               ? isRouteActive(currentPath, group.href)
               : false;
 
-          const isExpanded = Boolean(expandedGroups[group.label]);
+          const isExpanded = expandedGroups[group.label] ?? groupActive;
 
           if (hasChildren) {
             return (
               <div key={group.label} className="space-y-1">
                 <button
                   type="button"
-                  onClick={() => toggleGroup(group.label)}
+                  onClick={() => toggleGroup(group.label, isExpanded)}
                   aria-expanded={isExpanded}
                   className={`group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                     groupActive

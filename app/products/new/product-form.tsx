@@ -1,18 +1,33 @@
-
 "use client";
+
+import Link from "next/link";
 
 import { useMemo, useState } from "react";
 import { createBrand, createProduct } from "../actions";
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
+import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
-type CategoryOption = {
-  id: string;
-  category_name: string;
-  parent_id: string | null;
-};
+type CategoryOption = ProductCategoryOption;
 
 type BrandOption = {
   id: string;
   brand_name: string;
+};
+
+type ModelOption = {
+  id: string;
+  brand_id: string;
+  model_name: string;
+  model_code: string;
+};
+
+type VariantDraft = {
+  variant_name: string;
+  barcode: string;
+  ram: string;
+  rom: string;
+  color: string;
+  warranty: string;
 };
 
 type CreateMasterResult =
@@ -32,97 +47,10 @@ const inputClass =
 
 const labelClass = "mb-1.5 block text-sm font-medium text-slate-700";
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-];
+
 
 function normalize(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function getRecommendation(
-  productName: string,
-  brandName: string,
-  condition: string,
-  categories: CategoryOption[]
-) {
-  const name = normalize(productName);
-  const brand = normalize(brandName);
-
-  if (!name || !condition) return null;
-
-  let mainCategory = "";
-  let subcategory = "";
-
-  if (/\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)) {
-    mainCategory = "TABLET";
-  } else if (
-    /\b(MACBOOK|LAPTOP|NOTEBOOK|CHROMEBOOK|THINKPAD|VIVOBOOK|ZENBOOK)\b/.test(name)
-  ) {
-    mainCategory = "KOMPUTER DAN LAPTOP";
-  } else if (
-    /\b(ROUTER|SWITCH|ACCESS POINT|ACCESS-POINT|MODEM|ONT|OLT|REPEATER|MESH WIFI)\b/.test(name)
-  ) {
-    mainCategory = "NETWORKING";
-  } else if (
-    /\b(IC|MIKROKONTROLER|RESISTOR|KAPASITOR|TRANSISTOR|DIODE|PCB|ARDUINO|SENSOR|MOSFET)\b/.test(name)
-  ) {
-    mainCategory = "KOMPONEN ELEKTRONIK";
-  } else if (
-    /\b(AIRPODS|EARBUDS|HEADSET|HEADPHONE|EARPHONE|CHARGER|ADAPTER|CABLE|KABEL|CASE|COVER|POWERBANK|TEMPERED GLASS|SCREEN PROTECTOR|MOUSE|KEYBOARD|USB HUB|DOCKING)\b/.test(name)
-  ) {
-    mainCategory = "AKSESORIS";
-  } else if (
-    /\b(IPHONE)\b/.test(name) ||
-    (brand === "APPLE" && /\b(15|16|17|14|13|12|11)\b/.test(name))
-  ) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE IOS";
-  } else if (
-    /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
-    (
-      ["SAMSUNG", "XIAOMI", "OPPO", "VIVO", "REALME", "INFINIX", "TECNO", "POCO"].includes(brand) &&
-      /\b(A\d{1,2}|S\d{1,2}|NOTE|PRO|ULTRA|F\d{1,2}|C\d{1,2}|X\d{1,2})\b/.test(name)
-    )
-  ) {
-    mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE ANDROID";
-  }
-
-  if (!mainCategory) return null;
-
-  if (condition === "SECOND") {
-    subcategory = `${mainCategory} SECONDHAND`;
-  }
-
-  const main = categories.find(
-    (item) =>
-      item.category_name === mainCategory &&
-      item.parent_id === null
-  );
-
-  if (!main) return null;
-
-  const child = subcategory
-    ? categories.find(
-        (item) =>
-          item.category_name === subcategory &&
-          item.parent_id === main.id
-      )
-    : undefined;
-
-  return {
-    categoryId: main.id,
-    categoryName: main.category_name,
-    subcategoryId: child?.id ?? "",
-    subcategoryName: child?.category_name ?? "",
-    missingSubcategory: Boolean(subcategory && !child),
-  };
 }
 
 function BrandSelector({
@@ -252,24 +180,36 @@ function BrandSelector({
 export default function ProductForm({
   categories,
   brands,
+  models,
 }: {
   categories: CategoryOption[];
   brands: BrandOption[];
+  models: ModelOption[];
 }) {
   const [productName, setProductName] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brandName, setBrandName] = useState("");
+  const [modelId, setModelId] = useState("");
   const [condition, setCondition] = useState("BARU");
   const [productType, setProductType] = useState("goods");
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
+  const [variants, setVariants] = useState<VariantDraft[]>([{
+    variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "",
+  }]);
+
+  function updateVariant(index: number, field: keyof VariantDraft, value: string) {
+    setVariants((current) => current.map((variant, rowIndex) =>
+      rowIndex === index ? { ...variant, [field]: value } : variant
+    ));
+  }
 
   const mainCategories = useMemo(
     () =>
       categories.filter(
         (item) =>
           item.parent_id === null &&
-          MAIN_CATEGORIES.includes(item.category_name)
+          MAIN_PRODUCT_CATEGORIES.some((category) => category === item.category_name)
       ),
     [categories]
   );
@@ -285,7 +225,7 @@ export default function ProductForm({
   const recommendation = useMemo(
     () =>
       productType === "goods"
-        ? getRecommendation(
+        ? recommendProductCategory(
             productName,
             brandName,
             condition,
@@ -304,6 +244,7 @@ export default function ProductForm({
 
   return (
     <form action={createProduct} className="space-y-6">
+      <input type="hidden" name="variants_json" value={JSON.stringify(productType === "goods" ? variants : [])} />
       <section className="space-y-4">
         <h2 className="border-b border-slate-200 pb-2 font-semibold text-slate-800">
           Informasi Produk
@@ -344,8 +285,30 @@ export default function ProductForm({
             onChange={(id, name) => {
               setBrandId(id);
               setBrandName(name);
+              setModelId("");
             }}
           />
+
+          <div>
+            <label className={labelClass}>Product Model</label>
+            <select
+              name="model_id"
+              value={modelId}
+              onChange={(event) => setModelId(event.target.value)}
+              disabled={!brandId || productType === "service"}
+              className={inputClass}
+            >
+              <option value="">Tanpa Model</option>
+              {models.filter((item) => item.brand_id === brandId).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.model_name} ({item.model_code})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Model hanya menampilkan pilihan dari Brand yang dipilih.
+            </p>
+          </div>
 
           <div>
             <label className={labelClass}>Jenis Produk</label>
@@ -507,12 +470,8 @@ export default function ProductForm({
               name="unit"
               required
               maxLength={50}
-              defaultValue="PCS"
+              defaultValue="Unit"
               className={inputClass}
-              onChange={(event) => {
-                event.target.value =
-                  event.target.value.toUpperCase();
-              }}
             />
           </div>
 
@@ -532,13 +491,42 @@ export default function ProductForm({
         </div>
       </section>
 
+      {productType === "goods" && (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+            <div><h2 className="font-semibold text-slate-800">Varian, SKU, Spesifikasi & Garansi</h2>
+            <p className="mt-1 text-xs text-slate-500">Semua varian dibuat bersama produk. SKU varian dibuat otomatis setelah penyimpanan.</p></div>
+            <button type="button" onClick={() => setVariants((current) => [...current, { variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "" }])} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">+ Tambah Varian</button>
+          </div>
+          <div className="space-y-4">
+            {variants.map((variant, index) => (
+              <div key={index} className="rounded-xl border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between"><h3 className="font-medium text-slate-800">Varian {index + 1}</h3>
+                  {variants.length > 1 && <button type="button" onClick={() => setVariants((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="text-xs text-red-600 hover:underline">Hapus varian</button>}</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div><label className={labelClass}>Nama Varian <span className="text-red-600">*</span></label><input required maxLength={200} value={variant.variant_name} onChange={(event) => updateVariant(index, "variant_name", event.target.value)} className={inputClass} placeholder="Contoh: 8GB / 256GB - Black" /></div>
+                  <div><label className={labelClass}>Barcode</label><input maxLength={100} value={variant.barcode} onChange={(event) => updateVariant(index, "barcode", event.target.value)} className={inputClass} placeholder="Barcode (opsional)" /></div>
+                  <div><label className={labelClass}>RAM</label><input maxLength={100} list="variant-ram-options" value={variant.ram} onChange={(event) => updateVariant(index, "ram", event.target.value)} className={inputClass} placeholder="Contoh: 8 GB" /></div>
+                  <div><label className={labelClass}>ROM / Penyimpanan</label><input maxLength={100} list="variant-rom-options" value={variant.rom} onChange={(event) => updateVariant(index, "rom", event.target.value)} className={inputClass} placeholder="Contoh: 256 GB" /></div>
+                  <div><label className={labelClass}>Warna</label><input maxLength={100} list="variant-color-options" value={variant.color} onChange={(event) => updateVariant(index, "color", event.target.value)} className={inputClass} placeholder="Contoh: Graphite" /></div>
+                  <div><label className={labelClass}>Jenis Garansi</label><input maxLength={100} list="variant-warranty-options" value={variant.warranty} onChange={(event) => updateVariant(index, "warranty", event.target.value)} className={inputClass} placeholder="Pilih atau ketik garansi" /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <datalist id="variant-ram-options"><option value="2 GB"/><option value="3 GB"/><option value="4 GB"/><option value="6 GB"/><option value="8 GB"/><option value="12 GB"/><option value="16 GB"/></datalist>
+          <datalist id="variant-rom-options"><option value="32 GB"/><option value="64 GB"/><option value="128 GB"/><option value="256 GB"/><option value="512 GB"/><option value="1 TB"/></datalist>
+          <datalist id="variant-color-options"><option value="Black"/><option value="White"/><option value="Blue"/><option value="Silver"/><option value="Graphite"/></datalist>
+          <datalist id="variant-warranty-options"><option value="SEIN"/><option value="TAM"/><option value="B-CELL"/><option value="DISTRIBUTOR"/><option value="INTERNASIONAL"/><option value="GARANSI TOKO"/><option value="TANPA GARANSI"/></datalist>
+        </section>
+      )}
       <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
-        <a
+        <Link
           href="/products"
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

@@ -6,7 +6,6 @@ import { connection } from "next/server";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import StockBalanceRealtime from "@/app/inventory/stock-balance-realtime";
 
 export const metadata = {
   title: "Stock Balance | HEXACORE ERP",
@@ -86,9 +85,19 @@ const STATUS_COLUMNS: Record<
   repair: "repair",
 };
 
-async function fetchAllRows<T>(query: any): Promise<{
+type RangeQuery<T> = {
+  range: (
+    from: number,
+    to: number
+  ) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>;
+};
+
+async function fetchAllRows<T>(query: RangeQuery<T>): Promise<{
   data: T[];
-  error: any;
+  error: { message: string } | null;
 }> {
   const allRows: T[] = [];
 

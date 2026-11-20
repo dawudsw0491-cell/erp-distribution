@@ -90,7 +90,11 @@ export default function ContactManager({ supplierId }: Props) {
   }, [supplierId]);
 
   useEffect(() => {
-    void loadContacts();
+    const timer = window.setTimeout(() => {
+      void loadContacts();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadContacts]);
 
   function updateField<K extends keyof FormState>(

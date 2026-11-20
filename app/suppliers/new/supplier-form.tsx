@@ -1,7 +1,8 @@
-
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
+
+import { useActionState, useCallback, useEffect, useState } from "react";
 import {
   createSupplierAction,
   searchSupplierRegionsAction,
@@ -48,12 +49,12 @@ export default function SupplierForm() {
   const [searchError, setSearchError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  function getParentId(level: RegionLevel): string {
+  const getParentId = useCallback((level: RegionLevel): string => {
     if (level === "province") return "";
     if (level === "regency") return province?.id ?? "";
     if (level === "district") return regency?.id ?? "";
     return district?.id ?? "";
-  }
+  }, [province?.id, regency?.id, district?.id]);
 
   function getSelectedRegion(level: RegionLevel): SelectedRegion | null {
     if (level === "province") return province;
@@ -143,10 +144,7 @@ export default function SupplierForm() {
     const level = activeLevel;
     const keyword = searchQuery;
 
-    if (level !== "province" && !parentId) {
-      setOptions([]);
-      return;
-    }
+    if (level !== "province" && !parentId) return;
 
     let cancelled = false;
 
@@ -177,6 +175,7 @@ export default function SupplierForm() {
     province?.id,
     regency?.id,
     district?.id,
+    getParentId,
   ]);
 
   function renderRegionField(level: RegionLevel) {
@@ -189,6 +188,7 @@ export default function SupplierForm() {
 
     const isOpen = activeLevel === level;
 
+    const visibleOptions = parentMissing ? [] : options;
     const placeholder = {
       province: "Ketik nama provinsi...",
       regency: "Ketik nama kabupaten / kota...",
@@ -252,8 +252,8 @@ export default function SupplierForm() {
               <p className="px-3 py-3 text-sm text-red-600">
                 {searchError}
               </p>
-            ) : options.length > 0 ? (
-              options.map((item) => (
+            ) : visibleOptions.length > 0 ? (
+              visibleOptions.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -543,12 +543,12 @@ export default function SupplierForm() {
       </section>
 
       <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
-        <a
+        <Link
           href="/suppliers"
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

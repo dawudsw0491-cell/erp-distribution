@@ -1,7 +1,8 @@
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
+import { useMemo, useState } from "react";
 
 import { createPurchaseOrderAction } from "../actions";
 
@@ -74,19 +75,14 @@ export default function PurchaseOrderForm({
     suppliers[0]?.id ?? ""
   );
 
-  const [orderDate, setOrderDate] = useState("");
-
-  useEffect(() => {
+  const [orderDate, setOrderDate] = useState(() => {
     const today = new Date();
-
-    const localDate = [
+    return [
       today.getFullYear(),
       String(today.getMonth() + 1).padStart(2, "0"),
       String(today.getDate()).padStart(2, "0"),
     ].join("-");
-
-    setOrderDate(localDate);
-  }, []);
+  });
 
   const [items, setItems] = useState<PurchaseItem[]>([
     createEmptyItem(products[0]?.id ?? ""),
@@ -612,12 +608,12 @@ export default function PurchaseOrderForm({
 
       {/* Tombol aksi */}
       <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-        <a
+        <Link
           href="/purchases"
           className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

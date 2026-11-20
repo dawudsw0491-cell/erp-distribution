@@ -33,7 +33,8 @@ export default async function ProductAttributeValuesPage({
 
   const params = await searchParams;
 
-  const query = params.q?.trim() ?? "";
+  const query = (params.q?.trim() ?? "").slice(0, 100);
+  const safeQuery = query.replace(/[\\%_(),]/g, "").trim();
   const attributeFilter = params.attribute ?? "";
 
   const statusFilter = ["all", "active", "inactive"].includes(
@@ -93,51 +94,42 @@ export default async function ProductAttributeValuesPage({
     .select("id, attribute_code, attribute_name")
     .order("attribute_name");
 
-  let valuesQuery = supabase
-    .from("product_attribute_values")
-    .select(
-      `
-        id,
-        attribute_id,
-        value_code,
-        value_name,
-        description,
-        is_active,
-        created_at,
-        updated_at,
-        product_attributes (
-          id,
-          attribute_code,
-          attribute_name
-        )
-      `,
-      { count: "exact" }
-    );
+  const buildFilteredCountQuery = () => {
+    let countQuery = supabase
+      .from("product_attribute_values")
+      .select("id", { count: "exact", head: true });
 
-  if (query) {
-    valuesQuery = valuesQuery.or(
-      `value_code.ilike.%${query}%,value_name.ilike.%${query}%`
-    );
-  }
+    if (safeQuery) {
+      countQuery = countQuery.or(
+        `value_code.ilike.%${safeQuery}%,value_name.ilike.%${safeQuery}%`
+      );
+    }
 
-  if (attributeFilter) {
-    valuesQuery = valuesQuery.eq("attribute_id", attributeFilter);
-  }
+    if (attributeFilter) {
+      countQuery = countQuery.eq("attribute_id", attributeFilter);
+    }
 
-  if (statusFilter === "active") {
-    valuesQuery = valuesQuery.eq("is_active", true);
-  } else if (statusFilter === "inactive") {
-    valuesQuery = valuesQuery.eq("is_active", false);
-  }
+    return countQuery;
+  };
 
-  const { data: countData, error: countError } = await valuesQuery.select(
-    "is_active"
-  );
+  const [totalCountResult, activeCountResult, inactiveCountResult] =
+    await Promise.all([
+      buildFilteredCountQuery(),
+      buildFilteredCountQuery().eq("is_active", true),
+      buildFilteredCountQuery().eq("is_active", false),
+    ]);
 
-  if (attributeError || countError) {
+  if (
+    attributeError ||
+    totalCountResult.error ||
+    activeCountResult.error ||
+    inactiveCountResult.error
+  ) {
     console.error("Product Attribute Values count error:", {
       attributeError,
-      countError,
+      totalCountError: totalCountResult.error,
+      activeCountError: activeCountResult.error,
+      inactiveCountError: inactiveCountResult.error,
     });
 
     return (
@@ -155,13 +147,9 @@ export default async function ProductAttributeValuesPage({
     );
   }
 
-  const totalRecords = countData?.length ?? 0;
-
-  const activeCount =
-    countData?.filter((item) => item.is_active).length ?? 0;
-
-  const inactiveCount =
-    countData?.filter((item) => !item.is_active).length ?? 0;
+  const totalRecords = totalCountResult.count ?? 0;
+  const activeCount = activeCountResult.count ?? 0;
+  const inactiveCount = inactiveCountResult.count ?? 0;
 
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
 
@@ -187,9 +175,9 @@ export default async function ProductAttributeValuesPage({
       `
     );
 
-  if (query) {
+  if (safeQuery) {
     listQuery = listQuery.or(
-      `value_code.ilike.%${query}%,value_name.ilike.%${query}%`
+      `value_code.ilike.%${safeQuery}%,value_name.ilike.%${safeQuery}%`
     );
   }
 

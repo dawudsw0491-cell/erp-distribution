@@ -16,14 +16,17 @@ type PageProps = {
     id: string;
     variantId: string;
   }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 export default async function EditProductVariantPage({
   params,
+  searchParams,
 }: PageProps) {
   await connection();
 
   const { id, variantId } = await params;
+  const { error: errorCode } = await searchParams;
 
   if (!UUID_REGEX.test(id) || !UUID_REGEX.test(variantId)) {
     notFound();
@@ -72,6 +75,79 @@ export default async function EditProductVariantPage({
     notFound();
   }
 
+  const specificationFields = [
+    { code: "RAM", label: "RAM" },
+    { code: "ROM", label: "ROM" },
+    { code: "COLOR", label: "Warna" },
+    { code: "WARRANTY", label: "Warranty" },
+  ] as const;
+
+  const { data: specificationAttributes, error: specificationAttributeError } =
+    await auth.supabase
+      .from("product_attributes")
+      .select("id, attribute_code")
+      .in("attribute_code", specificationFields.map((field) => field.code))
+      .eq("is_active", true);
+
+  if (specificationAttributeError) {
+    console.error("Load variant specification attributes failed:", specificationAttributeError);
+    throw new Error("Gagal memuat atribut spesifikasi.");
+  }
+
+  const specificationAttributeIds = (specificationAttributes ?? []).map((item) => item.id);
+  const [{ data: specificationMappings, error: specificationMappingError }, { data: specificationValues, error: specificationValuesError }] =
+    specificationAttributeIds.length
+      ? await Promise.all([
+          auth.supabase
+            .from("product_variant_attribute_values")
+            .select("attribute_id, attribute_value_id")
+            .eq("product_variant_id", variantId)
+            .in("attribute_id", specificationAttributeIds),
+          auth.supabase
+            .from("product_attribute_values")
+            .select("id, attribute_id, value_name, is_active")
+            .in("attribute_id", specificationAttributeIds)
+            .order("value_name", { ascending: true }),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+
+  if (specificationMappingError || specificationValuesError) {
+    console.error("Load variant specifications failed:", {
+      specificationMappingError,
+      specificationValuesError,
+    });
+    throw new Error("Gagal memuat nilai spesifikasi varian.");
+  }
+
+  const initialSpecifications = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      const mapping = specificationMappings?.find(
+        (item) => item.attribute_id === attribute?.id
+      );
+      const value = specificationValues?.find(
+        (item) => item.id === mapping?.attribute_value_id
+      );
+      return [field.code, value?.value_name ?? ""];
+    })
+  );
+
+  const specificationOptions = Object.fromEntries(
+    specificationFields.map((field) => {
+      const attribute = specificationAttributes?.find(
+        (item) => item.attribute_code === field.code
+      );
+      return [
+        field.code,
+        (specificationValues ?? [])
+          .filter((item) => item.attribute_id === attribute?.id && item.is_active)
+          .map((item) => item.value_name),
+      ];
+    })
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
       <ErpSidebar activePath="/products" />
@@ -99,12 +175,19 @@ export default async function EditProductVariantPage({
             </p>
           </div>
 
+          {errorCode === "specifications_save_failed" && (
+            <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Data dasar varian sudah tersimpan, tetapi sebagian spesifikasi gagal disimpan. Periksa izin master.create dan simpan kembali spesifikasi.
+            </div>
+          )}
           <EditVariantForm
             productId={id}
             variantId={variantId}
             variantSku={variant.variant_sku}
             initialVariantName={variant.variant_name}
             initialBarcode={variant.barcode ?? ""}
+            initialSpecifications={initialSpecifications}
+            specificationOptions={specificationOptions}
           />
         </div>
       </main>

@@ -116,3 +116,19 @@ Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
 
 
 - Follow-up migration `validate_atomic_product_variant_payload` hardened direct RPC validation: missing condition is rejected for goods, and variant barcode is checked against existing product-level barcodes before insert.
+
+
+## Product Variant SKU and unit-label update — 2026-11-20
+
+- Applied live migration `20261120081908 canonical_variant_sku_and_unit_label`.
+- Added SECURITY INVOKER helper `next_product_variant_sku(uuid)`: locks the parent Product row, finds the highest existing numeric suffix, and generates the next available child SKU. It is shared by initial variant creation and subsequent variant creation; it does not rewrite or recycle existing SKUs.
+- Added `create_product_variant_with_specs(uuid,text,text,jsonb)`, which creates a variant and persists RAM/ROM/COLOR/WARRANTY mappings in one database transaction.
+- Updated the add-variant action to call the RPC. The manual SKU input was removed; the edit form continues to show the existing SKU read-only.
+- Product unit default is now `Unit`; legacy `PCS/PC/PIECE/PIECES` values were normalized to `Unit` in the products master. No product, variant, or serialized-unit records were deleted.
+- Live migration ledger confirms the new migration. Function grants and current row counts still require a focused read-back; no authenticated browser or local build/lint validation has been performed.
+
+## Optional IMEI requirement — dependency finding
+
+- Live schema already has `product_units`, `goods_receipt_units`, `goods_receipt_unit_identifiers`, and `product_unit_identifiers`.
+- Current Goods Receipt logic requires a full set of serialized units and mandatory IMEI_1 when `products.tracking_type='imei'`; quantity-tracked products reject individual unit rows.
+- Therefore optional IMEI with SKU/quantity fallback is a cross-module inventory behavior change, not a nullable UI field. It must cover receipt draft/posting, unit identity uniqueness, inventory movements, transfer, stock opname, and search before being enabled. This is not yet implemented.

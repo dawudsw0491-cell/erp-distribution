@@ -159,7 +159,7 @@ export default async function ProductVariantDetailPage({ params, searchParams }:
 
           <div>
             <Link
-              href={`/products/${id}/variants`
+              href={`/products/${id}/variants`}
               className="text-sm font-medium text-blue-600 hover:underline"
             >
               ← Kembali ke Daftar Varian

@@ -4,7 +4,7 @@
 
 | Entity | Route | Tables | Downstream consumers | Status |
 |---|---|---|---|---|
-| Product | `/products` | products, product_categories, brands, product_models | Purchasing, Inventory, variants | PARTIAL |
+| Product | `/products` | products, product_categories, brands, product_models | Purchasing, Inventory, variants | PARTIAL — model_id not yet persisted by create/edit actions |
 | Product Variant | `/products/[id]/variants` | product_variants, products | Goods Receipt, Inventory balances/movements/units | PARTIAL |
 | Category | `/product-categories` | product_categories | Product, attributes | PARTIAL |
 | Brand | Shared create helper | brands | Product, Product Model | PARTIAL |
@@ -29,6 +29,8 @@
 - `product_variant_attribute_values.product_variant_id → product_variants.id`
 - `product_variant_attribute_values.attribute_id / attribute_value_id` relate to attribute definitions and values
 - `product_variant_attribute_values.product_id` also references the owning product through a composite relationship to variant identity/product.
+- The live DB has three validated composite FKs on `product_variant_attribute_values` plus three validated single-column FKs that overlap them. The simple FKs are structurally redundant, but must be checked against PostgREST embed usage before removal.
+- Live integrity counts: 2 variant-attribute rows; 0 product/variant mismatches; 0 attribute/value mismatches; 0 missing product-attribute assignments; 0 product/model brand mismatches.
 
 ## Redundancy and integrity questions
 
@@ -48,4 +50,4 @@
 - Supplier IDs feed purchase orders.
 - Customer master has no implemented Sales route in current app tree.
 
-This mapping is live-schema plus source-derived. No destructive schema change has been made.
+This mapping is live-schema plus source-derived. No destructive schema change has been made. Product server validation and client-side categorization recommendations now share the canonical top-level category list in `lib/master-data/categories.ts`.

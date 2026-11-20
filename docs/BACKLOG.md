@@ -28,7 +28,7 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 
 | MD-010 | P0 | Consolidate all product setup into one Product Management workspace | IN PROGRESS | New Product form now captures product master, category, multiple initial variants, barcode, RAM, ROM, color, and warranty in one submission. Added SECURITY INVOKER RPC `create_product_with_variants` to persist product + all variants + specification mappings in one database transaction; product detail now displays the variant/SKU/specification summary. Live migrations `20261120075428 create_product_with_variants_atomic`, `20261120075733 validate_atomic_product_variant_payload`, and `20261120081908 canonical_variant_sku_and_unit_label` applied. SKU generation now shares a parent-locked sequence for initial and later variants; new-variant form no longer accepts manual SKU. Product unit defaults/display normalize PCS variants to `Unit`. Pending build/lint, authenticated browser submission/rollback tests, and remaining IMEI optional/mixed tracking design and transaction integration |
 | MD-011 | P0 | Canonicalize Product + Variant SKU generation | PARTIAL — IMPLEMENTED SOURCE/DB | Product SKU remains the parent identity; each variant has its own immutable SKU. New variant creation now uses a database-side, parent-row-locked sequence shared by initial and later variants; existing SKU values are preserved. Downstream transaction references and search/list grouping still require validation |
-| MD-012 | P0 | Remove redundant Product Model / Attribute maintenance surfaces and schema | OPEN | Retire UI only after inline Product Management replacement; drop DB objects only after complete code/RPC/constraint dependency map and replacement migration |
+| MD-012 | P0 | Consolidate Product Model / Category / Attribute / Attribute Value user workflows | UI CONSOLIDATED — ROUTES REDIRECTED | All 16 list/new/detail/edit page entry points now redirect to `/products`; server actions and database objects are retained because downstream dependencies have not been proven removable. No separate maintenance workflow is exposed. Physical schema cleanup is deferred until dependency proof exists |
 | MD-013 | P0 | Optional IMEI tracking with SKU quantity fallback | OPEN — DESIGN/INTEGRATION REQUIRED | Existing Goods Receipt supports mandatory serialized-unit IMEI when products.tracking_type='imei' and quantity-only stock when tracking_type='quantity'. User requirement allows mixed units with optional IMEI. Must extend Goods Receipt unit capture/posting, product_unit_identifiers, inventory movements, transfers, opname, search, and permissions consistently; do not implement as a detached input column |
 
 | DASH-001 | P0 | Dashboard KPI cards use live domain data | OPEN | Screenshot + app/page.tsx confirm Total Produk, Total Persediaan, Penjualan Hari Ini, and Total Piutang are hardcoded zero placeholders. Bind product count to products, inventory to inventory_balances, sales to posted sales documents, and receivables to posted customer AR ledger once the corresponding schema/module exists; show permission and query failure states distinctly |
@@ -46,3 +46,17 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 - Demo records are test data. Their presence is not a reason to preserve defective schema or duplicated modules. No bulk deletion/reset without a separate approved migration.
 - Every database change must have a matching SQL migration in this repository and a verified live result.
 - A work item is DONE only after implementation, tests, and dependent-module checks are recorded.
+
+
+## Mandatory execution control — effective immediately
+
+1. One active implementation branch and one shared backlog per workstream. No parallel independent audits or duplicate remediation branches.
+2. Every task starts from an existing backlog ID. If no ID exists, add one before coding. Update the same row; do not create duplicate tasks for the same root cause.
+3. Fix root cause once. Do not re-open files or repeat audits unless a changed commit, new runtime evidence, or failed test justifies it.
+4. Scope control: no unrelated refactor, schema redesign, UI redesign, or feature expansion inside a bug fix.
+5. Definition of DONE: code committed; build/type-check/lint results recorded; affected DB migration applied and verified if applicable; affected business flow tested; Preview deployment READY; runtime smoke test passed; backlog evidence updated.
+6. A deployment marked READY is not proof of business correctness. A source commit is not proof of deployment. Report these states separately.
+7. If a gate is blocked by infrastructure/quota/access, mark BLOCKED with exact evidence and continue with work that does not depend on that gate. Do not repeatedly retry the same blocked action.
+8. For every change, record only changed paths, exact commit, test command/result, deployment URL/status, and remaining blocker. Do not repeat a full repository audit.
+9. GitHub owns source code and migration files. Supabase is the live database state. Any cross-boundary change must be represented by a source migration and verified against the live database.
+10. Production is immutable during Preview remediation. Never rotate credentials, reset demo data, drop tables, or merge to Production without explicit authorization.

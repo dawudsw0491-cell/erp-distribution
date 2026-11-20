@@ -95,7 +95,7 @@ function formatActivityDateTime(value: string) {
 async function filterActivityByWarehouseAccess<T extends { warehouse_id: string }>(
   supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
   rows: T[]
-): Promise<T[]> {
+): Promise<{ rows: T[]; hasError: boolean }> {
   const warehouseIds = [...new Set(rows.map((row) => row.warehouse_id))];
 
   const accessChecks = await Promise.all(
@@ -107,6 +107,7 @@ async function filterActivityByWarehouseAccess<T extends { warehouse_id: string 
       return {
         warehouseId,
         allowed: !error && data === true,
+        hasError: Boolean(error),
       };
     })
   );
@@ -117,7 +118,10 @@ async function filterActivityByWarehouseAccess<T extends { warehouse_id: string 
       .map((check) => check.warehouseId)
   );
 
-  return rows.filter((row) => allowedWarehouseIds.has(row.warehouse_id));
+  return {
+    rows: rows.filter((row) => allowedWarehouseIds.has(row.warehouse_id)),
+    hasError: accessChecks.some((check) => check.hasError),
+  };
 }
 
 function getPurchaseOrderActivityStatus(status: string) {
@@ -444,10 +448,17 @@ async function DashboardContent() {
 
   // RPC per warehouse dijalankan dengan identitas pengguna yang sedang login.
   // Jika pemeriksaan gagal, baris ditolak (fail closed), tidak ditampilkan.
-  const visibleActivityRows = await filterActivityByWarehouseAccess(
+  const {
+    rows: visibleActivityRows,
+    hasError: warehouseAccessCheckFailed,
+  } = await filterActivityByWarehouseAccess(
     inventoryAccess.supabase,
     candidateActivityRows
   );
+
+  if (warehouseAccessCheckFailed) {
+    activityLoadErrors.push("Pemeriksaan Akses Gudang");
+  }
 
   const activityItems: ActivityRecord[] = visibleActivityRows.map((row) => {
     if (row.kind === "purchase_order") {
@@ -488,7 +499,7 @@ async function DashboardContent() {
         row.source_reference_type ??
         `MOV-${row.id.slice(0, 8)}`,
       status: "Posted",
-      href: `/inventory/movements?q=${encodeURIComponent(row.source_reference_number ?? row.movement_type)}&status=posted`,
+      href: "/inventory/movements",
     };
   }).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
     .slice(0, 10);

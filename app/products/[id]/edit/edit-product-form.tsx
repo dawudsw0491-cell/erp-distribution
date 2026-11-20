@@ -453,7 +453,7 @@ export default function EditProductForm({
             name="unit"
             required
             maxLength={50}
-            defaultValue={product.unit}
+            defaultValue={["PCS", "pcs", "PC", "PIECE", "PIECES"].includes(product.unit.trim().toUpperCase()) ? "Unit" : product.unit}
             className={inputClass}
           />
         </div>

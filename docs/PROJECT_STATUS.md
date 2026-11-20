@@ -11,13 +11,13 @@
 | Module | Status | Evidence / Notes |
 |---|---|---|
 | Authentication / User / RBAC | PARTIAL | Auth, profile, role, permission, warehouse access, audit and deletion tables/actions exist; runtime role matrix and RLS tests not executed |
-| Master Data Hub | DONE on implementation branch | Eight existing work areas linked; Brand creation shared |
+| Master Data Hub | DONE on implementation branch | One Product Management workspace plus Customers, Suppliers, and Warehouses; shared Brand creation helper retained |
 | Product | PARTIAL | Product CRUD and SKU RPC exist; model/attribute relation model needs consolidation |
-| Product Variant | PARTIAL | CRUD and downstream Inventory/GR references exist; lifecycle and uniqueness tests not executed |
+| Product Variant | PARTIAL | CRUD plus RAM/ROM/COLOR/WARRANTY specification create/edit/detail; specifications persist through RLS-aware SECURITY INVOKER RPC. Browser submission and permission-matrix tests remain open |
 | Category | PARTIAL | CRUD exists; hierarchy/attribute applicability dependencies need tests |
 | Brand | PARTIAL | Shared create helper exists; no dedicated canonical management route |
 | Product Model | PARTIAL | Route/actions and live table exist; deletion and assignment/value ownership needs runtime validation |
-| Product Attributes / Values | PARTIAL | Global Attribute and Attribute Value CRUD exist; list counts/search and duplicate-check handling were hardened. Complete product assignment and variant-value maintenance flow is not present in inspected Product/Variant detail routes; legacy SQL 22/23 differs from live schema |
+| Product Attributes / Values | PARTIAL | Variant specification assignment/value maintenance is integrated into Product Variant create/edit/detail for RAM, ROM, COLOR, WARRANTY. Standalone CRUD routes remain off Hub/sidebar; legacy SQL 22/23 provenance and PostgREST consumers still require reconciliation |
 | Supplier | PARTIAL | Main CRUD plus address/contact/bank/product relations exist; end-to-end validation absent |
 | Customer | PARTIAL | CRUD and live table exist; no Sales consumer route present |
 | Warehouse | PARTIAL | CRUD exists; Inventory/Purchasing dependencies and warehouse access policy need tests |
@@ -37,7 +37,7 @@
 
 - 47 tables in schema `public`; all reported with RLS enabled.
 - 73 public functions, 44 SECURITY DEFINER functions, 20 non-internal triggers, 102 RLS policies, 189 indexes.
-- Supabase migration ledger initially returned no migrations. After this session it records `20261120012027 hexa_core_harden_public_definer_function_execute`.
+- Supabase migration ledger contains four applied migrations: `20261120012027 hexa_core_harden_public_definer_function_execute`, `20261120023844 seed_product_warranty_templates`, `20261120031233 seed_ram_rom_variant_specifications_and_delete_policy`, and `20261120031359 save_product_variant_specifications_rpc`.
 - Live schema confirms `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values` exist. This resolves the previous source-only uncertainty about table existence, but not their full provenance or canonical semantics.
 - Security advisor initially reported seven SECURITY DEFINER functions executable by anon. A migration has been applied and verified: anon execution is false for all seven; authenticated execution remains true for six application/RLS functions. Trigger function `generate_customer_code()` is not directly executable by authenticated.
 - Security advisor reports four RLS-enabled tables without policies and four overlapping permissive policy cases.
@@ -72,7 +72,7 @@ Build, lint, browser flows, and transaction-level tests have not yet been run in
 - Existing routes and database structures remain temporarily while the unified workflow and all downstream dependencies are mapped.
 - Variant create/edit now accepts Warranty as free text with datalist suggestions. New text is saved as a reusable `WARRANTY` attribute value and linked to the specific variant through `product_variant_attribute_values`; existing templates are reused case-insensitively after normalization.
 - Seeded reusable warranty templates: SEIN, TAM, B-CELL, DISTRIBUTOR, INTERNASIONAL, GARANSI TOKO, TANPA GARANSI. No duration/year is included.
-- RAM/ROM/color integration and unified product create/edit workflow remain incomplete.
+- RAM/ROM/COLOR/WARRANTY are now integrated into Product Variant create/edit/detail. The single-submit Product + initial Variant create/edit workflow remains incomplete.
 - No database objects or demo rows were deleted in this navigation change.
 - Product SKU ownership remains unresolved: live schema contains both products.sku and product_variants.variant_sku.
 - Permanent cleanup is blocked on tracing all Purchasing, Goods Receipt, Inventory, serialized-unit, valuation, RPC, trigger, and PostgREST dependencies.

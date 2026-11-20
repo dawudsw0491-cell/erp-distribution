@@ -9,7 +9,7 @@ import ProductForm from "./product-form";
 export const instant = false;
 
 const errorMessages: Record<string, string> = {
-  required: "SKU, nama produk, dan satuan wajib diisi.",
+  required: "Nama produk dan satuan wajib diisi.",
   invalid_length: "Panjang karakter salah satu field melebihi batas.",
   invalid_barcode: "Barcode tidak memenuhi ketentuan.",
   invalid_type: "Jenis produk tidak valid.",
@@ -115,7 +115,7 @@ export default async function NewProductPage({
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Masukkan informasi master produk ke dalam sistem ERP.
+              Kelola identitas produk, kategori, seluruh SKU varian, spesifikasi, dan garansi dalam satu proses.
             </p>
           </div>
 

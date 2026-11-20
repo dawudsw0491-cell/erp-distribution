@@ -21,6 +21,9 @@
 | Repository tree | PASS | 258 entries on master; implementation branch retains earlier Master Data changes |
 | Master Data Hub | PASS — source | Eight work areas linked |
 | Shared Brand create helper | PASS — source | Product and Product Model use shared helper |
+| Product Model assignment | PASS — source inspection | Product create/edit forms submit model_id; server actions validate active model and matching brand_id before persisting |
+| Shared category recommendation | PASS — source inspection | Create/edit forms import one shared classifier; duplicate recommendation implementations removed |
+| Product/model brand consistency | PASS — live data check | 0 mismatches among products with model_id at time of inspection |
 | Live schema table inventory | PASS | 47 public tables |
 | Product Model/attribute tables existence | PASS | Live schema lists all three relation tables |
 | Security grants migration | PASS | Applied and ACLs re-queried |

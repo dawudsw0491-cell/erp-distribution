@@ -49,26 +49,8 @@ export default function RealtimeFilterBar({
       )
   );
 
-  // Keep the controls synchronized with browser Back/Forward navigation.
-  useEffect(() => {
-    const filterParams = filterParamsKey ? filterParamsKey.split("|") : [];
-    const nextKeyword = searchParams.get("q") ?? "";
-    const nextFilterValues = Object.fromEntries(
-      filterParams.map((param) => [param, searchParams.get(param) ?? ""])
-    );
-
-    setKeyword((current) =>
-      current === nextKeyword ? current : nextKeyword
-    );
-
-    setFilterValues((current) => {
-      const unchanged = filterParams.every(
-        (param) => (current[param] ?? "") === nextFilterValues[param]
-      );
-
-      return unchanged ? current : nextFilterValues;
-    });
-  }, [searchParams, filterParamsKey]);
+  // The parent keys this component from the URL-backed filter state.
+  // This avoids effect-driven state updates while keeping Back/Forward in sync.
 
   // Update the query after a short debounce; no submit or reset button is needed.
   useEffect(() => {

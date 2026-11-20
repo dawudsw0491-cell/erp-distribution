@@ -26,7 +26,7 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 | GOV-001 | P1 | Reconcile Git migration files with Supabase migration ledger | OPEN | Repository has 48 numbered SQL files; live migration list initially empty, now records HEXA migration only |
 | GOV-002 | P1 | Maintain single shared backlog and decision log | IN PROGRESS | This file is the canonical backlog on implementation branch |
 
-| MD-010 | P0 | Consolidate all product setup into one Product Management workspace | IN PROGRESS | Master Data Hub and sidebar no longer expose Category, Product Model, Product Attributes, or Attribute Values as separate work areas. Integrated create/edit of SKU variants and specifications, route retirement, and schema cleanup remain open |
+| MD-010 | P0 | Consolidate all product setup into one Product Management workspace | IN PROGRESS | Master Data Hub and sidebar no longer expose Category, Product Model, Product Attributes, or Attribute Values as separate work areas. Variant create/edit now stores reusable Warranty attribute values and exposes them as a datalist; RAM/ROM/color integration, unified product create/edit flow, route retirement, and schema cleanup remain open |
 | MD-011 | P0 | Canonicalize SKU identity across Product, Variant, Purchasing, and Inventory | OPEN | Live schema stores both products.sku and product_variants.variant_sku; trace all transaction FKs/RPCs before choosing canonical owner |
 | MD-012 | P0 | Remove redundant Product Model / Attribute maintenance surfaces and schema | OPEN | Retire UI only after inline Product Management replacement; drop DB objects only after complete code/RPC/constraint dependency map and replacement migration |
 

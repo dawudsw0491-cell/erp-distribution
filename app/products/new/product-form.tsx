@@ -1,6 +1,6 @@
-import Link from "next/link";
-
 "use client";
+
+import Link from "next/link";
 
 import { useMemo, useState } from "react";
 import { createBrand, createProduct } from "../actions";

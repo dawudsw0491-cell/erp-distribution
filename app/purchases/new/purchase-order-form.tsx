@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 "use client";
 
@@ -612,12 +613,12 @@ export default function PurchaseOrderForm({
 
       {/* Tombol aksi */}
       <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-        <a
+        <Link
           href="/purchases"
           className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Batal
-        </a>
+        </Link>
 
         <button
           type="submit"

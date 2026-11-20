@@ -144,41 +144,44 @@ export default function GoodsReceiptForm({
         const units =
           item.tracking_type === "quantity"
             ? []
-            : state.units.map((unit) => {
-                const identifiers: ReceiptIdentifier[] = [];
+            : state.units
+                .filter((unit) =>
+                  item.tracking_type === "imei"
+                    ? Boolean(unit.imei1.trim())
+                    : Boolean(unit.serialNumber.trim())
+                )
+                .map((unit) => {
+                  const identifiers: ReceiptIdentifier[] = [];
 
-                if (item.tracking_type === "imei") {
-                  identifiers.push({
-                    identifier_type: "IMEI_1",
-                    identifier_value: unit.imei1.trim(),
-                  });
-
-                  if (unit.imei2.trim()) {
+                  if (item.tracking_type === "imei") {
                     identifiers.push({
-                      identifier_type: "IMEI_2",
-                      identifier_value: unit.imei2.trim(),
+                      identifier_type: "IMEI_1",
+                      identifier_value: unit.imei1.trim(),
+                    });
+
+                    if (unit.imei2.trim()) {
+                      identifiers.push({
+                        identifier_type: "IMEI_2",
+                        identifier_value: unit.imei2.trim(),
+                      });
+                    }
+                  }
+
+                  if (item.tracking_type === "serial") {
+                    identifiers.push({
+                      identifier_type: "SERIAL_NUMBER",
+                      identifier_value: unit.serialNumber.trim(),
                     });
                   }
-                }
 
-                if (item.tracking_type === "serial") {
-                  identifiers.push({
-                    identifier_type: "SERIAL_NUMBER",
-                    identifier_value: unit.serialNumber.trim(),
-                  });
-                }
+                  const unitCode =
+                    unit.unit_code.trim() ||
+                    (item.tracking_type === "imei"
+                      ? unit.imei1.trim()
+                      : unit.serialNumber.trim());
 
-                const unitCode =
-                  unit.unit_code.trim() ||
-                  (item.tracking_type === "imei"
-                    ? unit.imei1.trim()
-                    : unit.serialNumber.trim());
-
-                return {
-                  unit_code: unitCode,
-                  identifiers,
-                };
-              });
+                  return { unit_code: unitCode, identifiers };
+                });
 
         return {
           purchase_order_item_id: item.id,
@@ -317,7 +320,10 @@ export default function GoodsReceiptForm({
 
       if (product.tracking_type === "quantity") continue;
 
-      if (state.units.length !== quantity) {
+      if (
+        product.tracking_type === "serial" &&
+        state.units.length !== quantity
+      ) {
         return `Jumlah unit ${product.product_name} tidak sesuai kuantitas.`;
       }
 
@@ -331,6 +337,13 @@ export default function GoodsReceiptForm({
         const unit = state.units[unitIndex];
 
         if (product.tracking_type === "imei") {
+          if (!unit.imei1.trim()) {
+            if (unit.imei2.trim()) {
+              return `IMEI 2 unit ${unitIndex + 1} harus disertai IMEI 1.`;
+            }
+            continue;
+          }
+
           if (!isValidImei(unit.imei1.trim())) {
             return `IMEI 1 unit ${unitIndex + 1} pada ${product.product_name} harus 15 digit dan valid.`;
           }
@@ -363,8 +376,15 @@ export default function GoodsReceiptForm({
             ? unit.imei1.trim()
             : unit.serialNumber.trim());
 
-        if (!unitCode || unitCode.length > 100) {
+        if (
+          product.tracking_type === "serial" &&
+          (!unitCode || unitCode.length > 100)
+        ) {
           return `Unit Code unit ${unitIndex + 1} pada ${product.product_name} wajib diisi dan maksimal 100 karakter.`;
+        }
+
+        if (product.tracking_type === "imei" && unitCode.length > 100) {
+          return `Unit Code unit ${unitIndex + 1} maksimal 100 karakter.`;
         }
 
         const normalizedCode = unitCode.toUpperCase();
@@ -617,7 +637,7 @@ export default function GoodsReceiptForm({
                 <div className="space-y-4 border-t border-slate-200 pt-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-slate-900">
-                      Unit Identifiers
+                      Identitas Unit (Opsional untuk IMEI)
                     </h4>
 
                     <span className="text-xs text-slate-500">
@@ -639,7 +659,7 @@ export default function GoodsReceiptForm({
                           htmlFor={`unit-code-${product.id}-${unitIndex}`}
                           className="mb-1 block text-xs font-medium text-slate-600"
                         >
-                          Unit Code (optional)
+                          Unit Code (opsional, untuk unit ber-IMEI)
                         </label>
 
                         <input
@@ -651,7 +671,7 @@ export default function GoodsReceiptForm({
                               unit_code: event.target.value,
                             })
                           }
-                          placeholder="Kosongkan untuk menggunakan identifier utama"
+                          placeholder="Kosongkan untuk menggunakan IMEI 1"
                           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
                         />
                       </div>
@@ -663,7 +683,7 @@ export default function GoodsReceiptForm({
                               htmlFor={`imei1-${product.id}-${unitIndex}`}
                               className="mb-1 block text-xs font-medium text-slate-600"
                             >
-                              IMEI 1 *
+                              IMEI 1 (opsional)
                             </label>
 
                             <input

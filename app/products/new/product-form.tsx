@@ -16,6 +16,13 @@ type BrandOption = {
   brand_name: string;
 };
 
+type ModelOption = {
+  id: string;
+  brand_id: string;
+  model_name: string;
+  model_code: string;
+};
+
 type CreateMasterResult =
   | {
       success: true;
@@ -246,13 +253,16 @@ function BrandSelector({
 export default function ProductForm({
   categories,
   brands,
+  models,
 }: {
   categories: CategoryOption[];
   brands: BrandOption[];
+  models: ModelOption[];
 }) {
   const [productName, setProductName] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brandName, setBrandName] = useState("");
+  const [modelId, setModelId] = useState("");
   const [condition, setCondition] = useState("BARU");
   const [productType, setProductType] = useState("goods");
   const [categoryId, setCategoryId] = useState("");
@@ -338,8 +348,30 @@ export default function ProductForm({
             onChange={(id, name) => {
               setBrandId(id);
               setBrandName(name);
+              setModelId("");
             }}
           />
+
+          <div>
+            <label className={labelClass}>Product Model</label>
+            <select
+              name="model_id"
+              value={modelId}
+              onChange={(event) => setModelId(event.target.value)}
+              disabled={!brandId || productType === "service"}
+              className={inputClass}
+            >
+              <option value="">Tanpa Model</option>
+              {models.filter((item) => item.brand_id === brandId).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.model_name} ({item.model_code})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Model hanya menampilkan pilihan dari Brand yang dipilih.
+            </p>
+          </div>
 
           <div>
             <label className={labelClass}>Jenis Produk</label>

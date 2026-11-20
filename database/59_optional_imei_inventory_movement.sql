@@ -445,7 +445,8 @@ BEGIN
     END IF;
 
     -- 10. Serialized unit validation
-    IF v_tracking_type IN ('imei', 'serial') THEN
+    IF v_tracking_type = 'serial'
+       OR (v_tracking_type = 'imei' AND v_movement.product_unit_id IS NOT NULL) THEN
         SELECT unit_status
         INTO v_unit_status
         FROM public.product_units

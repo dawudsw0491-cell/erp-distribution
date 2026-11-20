@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { createGoodsReceiptAction } from "../../actions";
+import UniversalScanner from "@/components/scanner/universal-scanner";
 
 type TrackingType = "quantity" | "imei" | "serial";
 
@@ -644,6 +645,28 @@ export default function GoodsReceiptForm({
                       {state.units.length} unit
                     </span>
                   </div>
+
+                  {product.tracking_type === "imei" && (
+                    <UniversalScanner
+                      label="Scanner IMEI Unit"
+                      placeholder="Scan IMEI 1 atau masukkan manual"
+                      onScan={(value) => {
+                        if (!isValidImei(value)) {
+                          setClientError("IMEI hasil scan harus 15 digit dan valid.");
+                          return;
+                        }
+                        const targetIndex = state.units.findIndex(
+                          (unit) => !unit.imei1.trim()
+                        );
+                        if (targetIndex < 0) {
+                          setClientError("Semua baris IMEI unit sudah terisi.");
+                          return;
+                        }
+                        updateUnit(index, targetIndex, { imei1: value });
+                        setClientError("");
+                      }}
+                    />
+                  )}
 
                   {state.units.map((unit, unitIndex) => (
                     <div

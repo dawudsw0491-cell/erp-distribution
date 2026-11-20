@@ -277,6 +277,7 @@ export async function createProduct(formData: FormData) {
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
+  const modelId = getOptionalUuid(formData.get("model_id"));
 
   let minimumStock = getMinimumStock(
     formData.get("minimum_stock")
@@ -309,7 +310,8 @@ export async function createProduct(formData: FormData) {
   if (
     categoryId === undefined ||
     subcategoryId === undefined ||
-    brandId === undefined
+    brandId === undefined ||
+    modelId === undefined
   ) {
     redirect("/products/new?error=invalid_reference");
   }
@@ -381,6 +383,19 @@ export async function createProduct(formData: FormData) {
     }
   }
 
+  if (modelId) {
+    const { data: model, error } = await auth.supabase
+      .from("product_models")
+      .select("id, brand_id")
+      .eq("id", modelId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !model || model.brand_id !== brandId) {
+      redirect("/products/new?error=invalid_model");
+    }
+  }
+
   const { data, error } = await auth.supabase
     .from("products")
     .insert({
@@ -391,6 +406,7 @@ export async function createProduct(formData: FormData) {
       product_subcategory_id: subcategoryId,
       product_condition: productCondition,
       brand_id: brandId,
+      model_id: productType === "goods" ? modelId : null,
       product_type: productType,
       tracking_type: trackingType,
       unit,
@@ -438,7 +454,7 @@ export async function updateProduct(formData: FormData) {
 
   const { data: existingProduct, error: lookupError } = await auth.supabase
     .from("products")
-    .select("id")
+    .select("id, model_id")
     .eq("id", productId)
     .maybeSingle();
 
@@ -477,6 +493,7 @@ export async function updateProduct(formData: FormData) {
   );
 
   const brandId = getOptionalUuid(formData.get("brand_id"));
+  const modelId = getOptionalUuid(formData.get("model_id"));
 
   let minimumStock = getMinimumStock(
     formData.get("minimum_stock")
@@ -509,7 +526,8 @@ export async function updateProduct(formData: FormData) {
   if (
     categoryId === undefined ||
     subcategoryId === undefined ||
-    brandId === undefined
+    brandId === undefined ||
+    modelId === undefined
   ) {
     redirect(`${editPath}?error=invalid_reference`);
   }
@@ -581,6 +599,19 @@ export async function updateProduct(formData: FormData) {
     }
   }
 
+  if (modelId) {
+    const { data: model, error } = await auth.supabase
+      .from("product_models")
+      .select("id, brand_id")
+      .eq("id", modelId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !model || model.brand_id !== brandId) {
+      redirect(`${editPath}?error=invalid_model`);
+    }
+  }
+
   const { error } = await auth.supabase
     .from("products")
     .update({
@@ -592,6 +623,7 @@ export async function updateProduct(formData: FormData) {
       product_subcategory_id: subcategoryId,
       product_condition: productCondition,
       brand_id: brandId,
+      model_id: productType === "goods" ? modelId : null,
       product_type: productType,
       tracking_type: trackingType,
       unit,

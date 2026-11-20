@@ -21,6 +21,15 @@ type ModelOption = {
   model_code: string;
 };
 
+type VariantDraft = {
+  variant_name: string;
+  barcode: string;
+  ram: string;
+  rom: string;
+  color: string;
+  warranty: string;
+};
+
 type CreateMasterResult =
   | {
       success: true;
@@ -185,6 +194,15 @@ export default function ProductForm({
   const [productType, setProductType] = useState("goods");
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
+  const [variants, setVariants] = useState<VariantDraft[]>([{
+    variant_name: "Default", barcode: "", ram: "", rom: "", color: "", warranty: "",
+  }]);
+
+  function updateVariant(index: number, field: keyof VariantDraft, value: string) {
+    setVariants((current) => current.map((variant, rowIndex) =>
+      rowIndex === index ? { ...variant, [field]: value } : variant
+    ));
+  }
 
   const mainCategories = useMemo(
     () =>
@@ -226,6 +244,7 @@ export default function ProductForm({
 
   return (
     <form action={createProduct} className="space-y-6">
+      <input type="hidden" name="variants_json" value={JSON.stringify(productType === "goods" ? variants : [])} />
       <section className="space-y-4">
         <h2 className="border-b border-slate-200 pb-2 font-semibold text-slate-800">
           Informasi Produk
@@ -476,6 +495,35 @@ export default function ProductForm({
         </div>
       </section>
 
+      {productType === "goods" && (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+            <div><h2 className="font-semibold text-slate-800">Varian, SKU, Spesifikasi & Garansi</h2>
+            <p className="mt-1 text-xs text-slate-500">Semua varian dibuat bersama produk. SKU varian dibuat otomatis setelah penyimpanan.</p></div>
+            <button type="button" onClick={() => setVariants((current) => [...current, { variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "" }])} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">+ Tambah Varian</button>
+          </div>
+          <div className="space-y-4">
+            {variants.map((variant, index) => (
+              <div key={index} className="rounded-xl border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between"><h3 className="font-medium text-slate-800">Varian {index + 1}</h3>
+                  {variants.length > 1 && <button type="button" onClick={() => setVariants((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="text-xs text-red-600 hover:underline">Hapus varian</button>}</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div><label className={labelClass}>Nama Varian <span className="text-red-600">*</span></label><input required maxLength={200} value={variant.variant_name} onChange={(event) => updateVariant(index, "variant_name", event.target.value)} className={inputClass} placeholder="Contoh: 8GB / 256GB - Black" /></div>
+                  <div><label className={labelClass}>Barcode</label><input maxLength={100} value={variant.barcode} onChange={(event) => updateVariant(index, "barcode", event.target.value)} className={inputClass} placeholder="Barcode (opsional)" /></div>
+                  <div><label className={labelClass}>RAM</label><input maxLength={100} list="variant-ram-options" value={variant.ram} onChange={(event) => updateVariant(index, "ram", event.target.value)} className={inputClass} placeholder="Contoh: 8 GB" /></div>
+                  <div><label className={labelClass}>ROM / Penyimpanan</label><input maxLength={100} list="variant-rom-options" value={variant.rom} onChange={(event) => updateVariant(index, "rom", event.target.value)} className={inputClass} placeholder="Contoh: 256 GB" /></div>
+                  <div><label className={labelClass}>Warna</label><input maxLength={100} list="variant-color-options" value={variant.color} onChange={(event) => updateVariant(index, "color", event.target.value)} className={inputClass} placeholder="Contoh: Graphite" /></div>
+                  <div><label className={labelClass}>Jenis Garansi</label><input maxLength={100} list="variant-warranty-options" value={variant.warranty} onChange={(event) => updateVariant(index, "warranty", event.target.value)} className={inputClass} placeholder="Pilih atau ketik garansi" /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <datalist id="variant-ram-options"><option value="2 GB"/><option value="3 GB"/><option value="4 GB"/><option value="6 GB"/><option value="8 GB"/><option value="12 GB"/><option value="16 GB"/></datalist>
+          <datalist id="variant-rom-options"><option value="32 GB"/><option value="64 GB"/><option value="128 GB"/><option value="256 GB"/><option value="512 GB"/><option value="1 TB"/></datalist>
+          <datalist id="variant-color-options"><option value="Black"/><option value="White"/><option value="Blue"/><option value="Silver"/><option value="Graphite"/></datalist>
+          <datalist id="variant-warranty-options"><option value="SEIN"/><option value="TAM"/><option value="B-CELL"/><option value="DISTRIBUTOR"/><option value="INTERNASIONAL"/><option value="GARANSI TOKO"/><option value="TANPA GARANSI"/></datalist>
+        </section>
+      )}
       <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
         <Link
           href="/products"

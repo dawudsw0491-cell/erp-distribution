@@ -19,8 +19,8 @@ type PurchaseOrderRow = {
   expected_date: string | null;
   status: string;
   grand_total: number | string | null;
-  supplier: { supplier_name: string | null; supplier_code: string | null } | null;
-  warehouse: { warehouse_name: string | null; warehouse_code: string | null } | null;
+  supplier: { supplier_name: string | null; supplier_code: string | null }[] | null;
+  warehouse: { warehouse_name: string | null; warehouse_code: string | null }[] | null;
 };
 
 type PurchasesPageProps = {
@@ -463,11 +463,11 @@ async function PurchasesContent({
                           </td>
 
                           <td className="px-5 py-4 text-slate-700">
-                            {order.supplier?.supplier_name ?? "-"}
+                            {order.supplier?.[0]?.supplier_name ?? "-"}
                           </td>
 
                           <td className="px-5 py-4 text-slate-700">
-                            {order.warehouse?.warehouse_name ?? "-"}
+                            {order.warehouse?.[0]?.warehouse_name ?? "-"}
                           </td>
 
                           <td className="whitespace-nowrap px-5 py-4 text-slate-700">

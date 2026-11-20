@@ -6,18 +6,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 import { createBrandRecord } from "@/lib/master-data/brands";
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-] as const;
+
 
 type ProductCondition = "BARU" | "SECOND";
 

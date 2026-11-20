@@ -235,7 +235,7 @@ export async function createProduct(formData: FormData) {
     formData.get("tracking_type") ?? "quantity"
   );
 
-  const unit = String(formData.get("unit") ?? "pcs").trim();
+  const unit = String(formData.get("unit") ?? "Unit").trim();
   const description =
     String(formData.get("description") ?? "").trim() || null;
 

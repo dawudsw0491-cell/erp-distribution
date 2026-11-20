@@ -930,6 +930,9 @@ BEGIN
         END IF;
 
     ELSIF v_tracking_type = 'imei' THEN
+        IF p_product_unit_id IS NULL AND p_quantity <> TRUNC(p_quantity) THEN
+            RAISE EXCEPTION 'Aggregate IMEI transfer quantity must be a whole unit quantity.';
+        END IF;
         IF p_product_unit_id IS NOT NULL THEN
             IF p_quantity <> 1 THEN
                 RAISE EXCEPTION 'Unit IMEI individual harus ditransfer satu unit.';

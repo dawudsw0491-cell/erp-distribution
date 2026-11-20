@@ -81,6 +81,33 @@ export default async function ProductVariantDetailPage({ params }: Props) {
 
   if (!variant) notFound();
 
+  const { data: warrantyAttribute } = await supabase
+    .from("product_attributes")
+    .select("id")
+    .eq("attribute_code", "WARRANTY")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  let warrantyName = "";
+  if (warrantyAttribute) {
+    const { data: warrantyMapping } = await supabase
+      .from("product_variant_attribute_values")
+      .select("attribute_value_id")
+      .eq("product_variant_id", variantId)
+      .eq("attribute_id", warrantyAttribute.id)
+      .maybeSingle();
+
+    if (warrantyMapping?.attribute_value_id) {
+      const { data: warrantyValue } = await supabase
+        .from("product_attribute_values")
+        .select("value_name")
+        .eq("id", warrantyMapping.attribute_value_id)
+        .eq("attribute_id", warrantyAttribute.id)
+        .maybeSingle();
+      warrantyName = warrantyValue?.value_name ?? "";
+    }
+  }
+
   const { data: canUpdate } = await supabase.rpc("has_permission", {
     required_permission: "master.update",
   });
@@ -147,6 +174,13 @@ export default async function ProductVariantDetailPage({ params }: Props) {
                 <p className="text-sm text-slate-500">Nama Variant</p>
                 <p className="mt-1 font-semibold text-slate-800">
                   {variant.variant_name}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-slate-500">Warranty</p>
+                <p className="mt-1 font-medium text-slate-800">
+                  {warrantyName || "-"}
                 </p>
               </div>
 

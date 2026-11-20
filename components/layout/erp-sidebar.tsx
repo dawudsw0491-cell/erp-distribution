@@ -14,14 +14,11 @@ import {
   ShoppingCart,
   Boxes,
   ArrowLeftRight,
-  ClipboardList,
-  Smartphone,
   ChevronDown,
   ShoppingBag,
   RotateCcw,
   Wallet,
   Settings,
-  Tags,
 } from "lucide-react";
 
 import LogoutButton from "@/components/layout/logout-button";
@@ -60,11 +57,6 @@ const menuGroups: MenuGroup[] = [
         icon: <Package size={16} />,
       },
       {
-        label: "Kategori Produk",
-        href: "/product-categories",
-        icon: <Tags size={16} />,
-      },
-      {
         label: "Pelanggan",
         href: "/customers",
         icon: <Users size={16} />,
@@ -78,21 +70,6 @@ const menuGroups: MenuGroup[] = [
         label: "Warehouse",
         href: "/warehouses",
         icon: <Warehouse size={16} />,
-      },
-      {
-        label: "Product Models",
-        href: "/product-models",
-        icon: <Boxes size={16} />,
-      },
-      {
-        label: "Product Attributes",
-        href: "/product-attributes",
-        icon: <Settings size={16} />,
-      },
-      {
-        label: "Product Attribute Values",
-        href: "/product-attribute-values",
-        icon: <ClipboardList size={16} />,
       },
     ],
   },

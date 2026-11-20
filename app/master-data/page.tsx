@@ -16,19 +16,11 @@ export const metadata = {
 
 const masterDataItems = [
   {
-    code: "MP",
-    title: "Master Product",
+    code: "PM",
+    title: "Product Management",
     description:
-      "Kelola SKU, barcode, nama produk, brand, satuan, tipe produk, dan metode pelacakan stok.",
+      "Satu lembar kerja untuk mengelola identitas produk, SKU, kategori, brand, model, varian, dan spesifikasi.",
     href: "/products",
-    available: true,
-  },
-  {
-    code: "KT",
-    title: "Kategori Produk",
-    description:
-      "Kelola kode kategori, nama kategori, kategori induk, subkategori, deskripsi, dan status kategori.",
-    href: "/product-categories",
     available: true,
   },
   {
@@ -53,30 +45,6 @@ const masterDataItems = [
     description:
       "Kelola data gudang, kode warehouse, alamat, lokasi, kontak, dan status gudang perusahaan.",
     href: "/warehouses",
-    available: true,
-  },
-  {
-    code: "PM",
-    title: "Product Models",
-    description:
-      "Kelola model produk dan pengelompokan spesifikasi yang digunakan oleh produk.",
-    href: "/product-models",
-    available: true,
-  },
-  {
-    code: "PA",
-    title: "Product Attributes",
-    description:
-      "Kelola kamus atribut spesifikasi, tipe data, satuan, dan penerapan kategori.",
-    href: "/product-attributes",
-    available: true,
-  },
-  {
-    code: "AV",
-    title: "Product Attribute Values",
-    description:
-      "Kelola nilai atribut spesifikasi yang telah dikaitkan dengan varian produk.",
-    href: "/product-attribute-values",
     available: true,
   },
 ];
@@ -143,8 +111,7 @@ export default async function MasterDataPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-600">
-                Delapan area kerja untuk mengelola data referensi
-                utama perusahaan.
+                Empat area kerja inti. Seluruh identitas dan detail SKU dikelola melalui satu Product Management.
               </p>
             </div>
 

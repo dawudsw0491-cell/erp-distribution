@@ -17,6 +17,13 @@ type BrandOption = {
   brand_name: string;
 };
 
+type ModelOption = {
+  id: string;
+  brand_id: string;
+  model_name: string;
+  model_code: string;
+};
+
 type ProductData = {
   id: string;
   sku: string;
@@ -26,6 +33,7 @@ type ProductData = {
   product_subcategory_id: string | null;
   product_condition: string | null;
   brand_id: string | null;
+  model_id: string | null;
   product_type: string;
   tracking_type: string;
   unit: string;
@@ -37,16 +45,10 @@ type EditProductFormProps = {
   product: ProductData;
   categories: CategoryOption[];
   brands: BrandOption[];
+  models: ModelOption[];
 };
 
-const MAIN_CATEGORIES = [
-  "SMARTPHONE",
-  "TABLET",
-  "AKSESORIS",
-  "KOMPUTER DAN LAPTOP",
-  "NETWORKING",
-  "KOMPONEN ELEKTRONIK",
-];
+import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 
 const inputClass =
   "box-border w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -152,6 +154,7 @@ export default function EditProductForm({
   product,
   categories,
   brands,
+  models,
 }: EditProductFormProps) {
   const initialCategory = categories.find(
     (item) => item.id === product.category_id
@@ -159,6 +162,7 @@ export default function EditProductForm({
 
   const [productName, setProductName] = useState(product.product_name);
   const [brandId, setBrandId] = useState(product.brand_id ?? "");
+  const [modelId, setModelId] = useState(product.model_id ?? "");
   const [condition, setCondition] = useState(
     product.product_condition ?? ""
   );
@@ -178,7 +182,7 @@ export default function EditProductForm({
       categories.filter(
         (item) =>
           item.parent_id === null &&
-          MAIN_CATEGORIES.includes(item.category_name) &&
+          MAIN_PRODUCT_CATEGORIES.includes(item.category_name as (typeof MAIN_PRODUCT_CATEGORIES)[number]) &&
           item.is_active !== false
       ),
     [categories]
@@ -283,7 +287,10 @@ export default function EditProductForm({
             id="brand_id"
             name="brand_id"
             value={brandId}
-            onChange={(event) => setBrandId(event.target.value)}
+            onChange={(event) => {
+              setBrandId(event.target.value);
+              setModelId("");
+            }}
             className={inputClass}
           >
             <option value="">Tanpa Brand</option>
@@ -293,6 +300,31 @@ export default function EditProductForm({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Product Model */}
+        <div className="min-w-0">
+          <label htmlFor="model_id" className={labelClass}>
+            Product Model
+          </label>
+          <select
+            id="model_id"
+            name="model_id"
+            value={modelId}
+            onChange={(event) => setModelId(event.target.value)}
+            disabled={!brandId || productType === "service"}
+            className={inputClass}
+          >
+            <option value="">Tanpa Model</option>
+            {models.filter((item) => item.brand_id === brandId).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.model_name} ({item.model_code})
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Model harus berasal dari Brand yang dipilih.
+          </p>
         </div>
 
         {/* Product Type */}

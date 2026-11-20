@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -416,95 +417,38 @@ async function UnitRegistryContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-slate-900">
-              Pencarian dan Filter
-            </h2>
-
-            <form
-              action="/inventory/units"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-            >
-              <div>
-                <label
-                  htmlFor="unit-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-                <input
-                  id="unit-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="IMEI, serial, SKU, produk..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="unit-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status Unit
-                </label>
-                <select
-                  id="unit-status"
-                  name="status"
-                  defaultValue={statusFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Status</option>
-                  {Object.entries(unitStatuses).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="unit-warehouse"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Gudang
-                </label>
-                <select
-                  id="unit-warehouse"
-                  name="warehouse"
-                  defaultValue={warehouseFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Gudang</option>
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.warehouse_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/inventory/units"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <RealtimeFilterBar
+            initialKeyword={keyword}
+            searchLabel="Pencarian Unit"
+            searchPlaceholder="IMEI, serial, kode unit, SKU, produk..."
+            helperText="Cari berdasarkan IMEI, serial, kode unit, SKU, nama produk, atau gudang. Status unit dan gudang diterapkan otomatis."
+            filters={[
+              {
+                param: "status",
+                label: "Status Unit",
+                initialValue: statusFilter,
+                options: [
+                  { value: "", label: "Semua Status" },
+                  ...Object.entries(unitStatuses).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                ],
+              },
+              {
+                param: "warehouse",
+                label: "Gudang",
+                initialValue: warehouseFilter,
+                options: [
+                  { value: "", label: "Semua Gudang" },
+                  ...warehouses.map((warehouse) => ({
+                    value: warehouse.id,
+                    label: warehouse.warehouse_name,
+                  })),
+                ],
+              },
+            ]}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-4">

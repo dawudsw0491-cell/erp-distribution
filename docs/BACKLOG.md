@@ -4,9 +4,9 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 
 | ID | Priority | Module / Work Item | Status | Evidence / Exit Criteria |
 |---|---|---|---|---|
-| MD-001 | P1 | Master Data Hub exposes all existing master routes | DONE | Hub links to eight existing master work areas on this branch |
+| MD-001 | P1 | Master Data Hub exposes approved master work areas | DONE | Hub exposes Product Management as the single product setup workspace plus Customers, Suppliers, and Warehouses; standalone product setup links are removed from Hub/sidebar |
 | MD-002 | P1 | Centralize Brand creation | DONE | Product and Product Model delegate to shared server-only helper |
-| MD-003 | P1 | Canonical Product Model / Product Attribute relationship | PARTIAL | Live composite FKs enforce variant/product, product/attribute assignment, and attribute/value consistency; app currently exposes Attribute and Attribute Value CRUD, but no complete product-assignment/variant-value maintenance flow was found in inspected routes; PostgREST relationship dependencies still require full source tracing |
+| MD-003 | P1 | Canonical Product Model / Product Attribute relationship | PARTIAL | Product Variant create/edit/detail now manages RAM, ROM, COLOR, and WARRANTY via the existing attribute dictionary and a SECURITY INVOKER RPC; product-level assignment is created by the RPC. Runtime permission tests, Product Model lifecycle, and PostgREST relationship dependency tracing remain open |
 | MD-004 | P1 | Source-controlled DDL for Product Model and attribute relations | PARTIAL | Live DB contains product_models, product_attribute_assignments, product_variant_attribute_values; legacy SQL 22/23 definitions differ materially from live schema; reconcile provenance before changing DDL |
 | MD-005 | P2 | Dedicated Brand management route | NOT IMPLEMENTED | Decide whether inline shared brand helper is sufficient or standalone CRUD is required |
 | MD-006 | P1 | Product / Variant / Model ownership and lifecycle | PARTIAL | Product create/edit UI and server actions already read, validate, and persist model_id; brand_id is also stored on Product and must remain consistent with Product Model.brand_id. Lifecycle and transaction-level verification remain open |
@@ -23,7 +23,7 @@ Priority: P0 Critical, P1 High, P2 Medium, P3 Low. Status is module/work-item st
 | NAV-001 | P2 | Resolve sidebar links without matching routes | NOT IMPLEMENTED / SCOPE CHECK | /sales, /returns, /accounting, /settings need scope decision or route implementation |
 | INT-001 | P1 | Verify Purchasing → Goods Receipt → Inventory | PARTIAL | RPCs/tables exist; execute controlled end-to-end tests with demo fixtures |
 | DOC-001 | P2 | Replace starter README with operating guide | OPEN | README still create-next-app template |
-| GOV-001 | P1 | Reconcile Git migration files with Supabase migration ledger | OPEN | Repository has 48 numbered SQL files; live migration list initially empty, now records HEXA migration only |
+| GOV-001 | P1 | Reconcile Git migration files with Supabase migration ledger | OPEN | Live migration ledger now records four migrations (security ACL, warranty templates, RAM/ROM attributes + mapping delete policy, specification RPC). Historical numbered SQL files still require provenance reconciliation |
 | GOV-002 | P1 | Maintain single shared backlog and decision log | IN PROGRESS | This file is the canonical backlog on implementation branch |
 
 | MD-010 | P0 | Consolidate all product setup into one Product Management workspace | IN PROGRESS | Master Data Hub and sidebar expose one Product Management entry. Variant create/edit/detail now manage RAM, ROM, COLOR, and WARRANTY through one reusable attribute dictionary; RAM/ROM attributes and an RLS-scoped delete policy are applied. Product create/edit still does not create/manage variants in the same submit; route retirement and schema cleanup remain open pending dependency proof |

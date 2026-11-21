@@ -611,13 +611,7 @@ export default function SuppliersPage({
 }: SuppliersPageProps) {
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-slate-100">
-          <p className="text-sm text-slate-600">
-            Memuat data supplier...
-          </p>
-        </main>
-      }
+      fallback={null}
     >
       <SuppliersContent searchParams={searchParams} />
     </Suspense>

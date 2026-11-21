@@ -76,6 +76,34 @@ Live SELECT policies were inspected for the following tables:
 
 **Important:** This is an observed policy gap, not a conclusion that unauthorized users have already accessed data. Application query filters, SECURITY DEFINER RPC validation and role behavior must be tested before deciding a remediation. The next security task must evaluate whether to enforce warehouse scope in RLS, in SECURITY DEFINER function guards, or both. Do not widen permissions and do not add policies without dependency analysis and an approved migration.
 
+### 5.1 Live RBAC assignment and permission-key snapshot
+
+A read-only join of `roles`, `role_permissions`, `permissions`, and `user_roles` returned this live state on 2026-11-21:
+
+| Role | Active | Assigned users | Permission count |
+|---|---:|---:|---:|
+| auditor | No | 0 | 11 |
+| finance | Yes | 0 | 10 |
+| manager | Yes | 0 | 20 |
+| owner | Yes | 1 | 34 |
+| purchasing | Yes | 0 | 11 |
+| sales | No | 0 | 7 |
+| warehouse | No | 0 | 7 |
+
+Only the Owner role currently has an assigned user. Role/warehouse browser verification cannot be demonstrated using existing assigned non-owner accounts. Do not activate roles or assign users just to make tests pass; use an explicitly approved test-account and role-assignment plan.
+
+The live `permissions` dictionary contains `goods_receipt.create`, `goods_receipt.post`, `goods_receipt.update`, and `goods_receipt.view`, but the live `role_permissions` mapping contains none of these permission codes for any role. The source documentation `database/06_rbac_role_mapping.sql` also does not map Goods Receipt permissions to roles and is explicitly marked documentation-only; do not rerun it as a migration.
+
+There is an additional permission-key mismatch in the live Goods Receipt path:
+
+- Goods Receipt table RLS policies require `goods_receipt.view/create/update/post`.
+- The current application/RPC flow uses Purchase permissions: `create_goods_receipt_by_product` checks `purchasing.create`; `post_goods_receipt_by_product` checks `purchasing.approve`.
+- Dashboard activity feed reads Goods Receipts only when `goods_receipt.view` is authorized.
+
+Consequently, the current active roles do not satisfy the Goods Receipt table policy permission keys. SECURITY DEFINER RPCs that use the purchasing permission keys may still perform their guarded operation, but direct RLS-protected reads/updates and the Dashboard Goods Receipt feed can be unavailable. This must be resolved with one canonical permission model and an explicit role matrix; do not patch it by adding arbitrary role grants.
+
+The live `has_warehouse_access(uuid)` function recognizes active `manager`, `finance`, and `purchasing` roles as broad warehouse-access roles; a `warehouse` role needs an active `user_warehouse_access` assignment. The `warehouse` role is currently inactive with no assigned users. The function's intended policy must be reconciled with the observed role map and module RLS policies.
+
 ## 6. Live database vs source migration alignment
 
 The live migration ledger currently contains seven applied versions, ending at `20261120081908 canonical_variant_sku_and_unit_label`.

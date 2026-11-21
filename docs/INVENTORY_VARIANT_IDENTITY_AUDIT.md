@@ -326,3 +326,86 @@ All four rows violate the expected Product/Variant parent relationship. This is 
 Before identity migration, validate every upstream document line carrying both Product ID and Variant ID—not only PO items. At minimum, inspect Purchase Order items, Goods Receipt items through their PO item, Stock Opname items, transfer/movement source documents, and any Sales/return document lines if present. Add a future database-level consistency guard only after existing invalid rows are classified and corrected under an approved plan.
 
 No rows were modified. The four PO mismatches are evidence for reconciliation, not an automatic correction list.
+
+
+## 15. Extended Product ↔ Variant consistency scan — live Development
+
+The scan covered all live public tables with both `product_id` and `product_variant_id`:
+
+- `inventory_balances`
+- `inventory_movements`
+- `inventory_valuation_logs`
+- `product_units`
+- `product_variant_attribute_values`
+- `purchase_order_items`
+- `stock_opname_items`
+
+### 15.1 Stock Opname — posted session contains 25 cross-Product rows
+
+Session `OPN-20261112-3C43CE0A` is **posted**, with 25 items. All 25 items have a Product ID that differs from the referenced Variant's parent Product ID. The rows are grouped into five mismatched Product/Variant pairs, five rows each:
+
+| Opname Product SKU | Variant SKU | Variant parent Product SKU | Rows | Snapshot / Count / Variance |
+|---|---|---|---:|---:|
+| IPH-128-BLK | BLACK | TEST-IPHONE-001 | 5 | 0 / 0 / 0 |
+| IPH-15-128-WHT | IPH-15-128 | TEST-IPHONE-001 | 5 | 0 / 0 / 0 |
+| IPH-15-256-WHT | IPH-15-256 | TEST-IPHONE-001 | 5 | 0 / 0 / 0 |
+| IPH-256-PUR | PURPLE | TEST-IPHONE-001 | 5 | 0 / 0 / 0 |
+| SS-FOLD-128GB-WHT | WHITE | SS-FOLD-128GB-BLK | 5 | 0 / 0 / 0 |
+
+All 25 mismatched rows have zero snapshot, counted, and variance quantities. The session is nevertheless posted, so these are persistent posted-document identity defects, not merely draft data.
+
+Other sessions in the inspected Development state:
+- `OPN-20261112-455A6DF3`: cancelled, 50 items, no Product/Variant parent mismatches.
+- `OPN-20261117-BC59544D`: posted, 65 items, no Product/Variant parent mismatches.
+- `OPN-20261117-191357D5`: draft, 0 items.
+
+Do not delete or rewrite the 25 posted rows solely because their quantities are zero. Their posted session and audit history remain relevant.
+
+### 15.2 Inventory balances — five non-null Variant IDs are cross-Product
+
+The live `inventory_balances` table has 16 rows:
+- 11 rows with `product_variant_id IS NULL`.
+- 5 rows with non-null Variant IDs; **all five** have a Product ID that differs from the Variant's parent Product ID.
+
+| Balance Product SKU | Variant SKU | Variant parent Product SKU | On hand | Inventory value |
+|---|---|---|---:|---:|
+| IPH-128-BLK | BLACK | TEST-IPHONE-001 | 0 | Rp0 |
+| IPH-15-128-WHT | IPH-15-128 | TEST-IPHONE-001 | 0 | Rp0 |
+| IPH-15-256-WHT | IPH-15-256 | TEST-IPHONE-001 | 9 | Rp11,250,000 |
+| IPH-256-PUR | PURPLE | TEST-IPHONE-001 | 0 | Rp0 |
+| SS-FOLD-128GB-WHT | WHITE | SS-FOLD-128GB-BLK | 0 | Rp0 |
+
+The IPH-15-256-WHT balance is especially critical: it contains 9 Units and Rp11,250,000, but its non-null Variant ID points to a Variant belonging to TEST-IPHONE-001. This row must not be treated as a valid variant-level balance. Its quantity/value must remain preserved while the intended identity is resolved from authoritative business documents.
+
+### 15.3 Movement, valuation and serialized units
+
+Current live counts:
+- `inventory_movements`: 9 rows; all 9 have NULL Variant ID.
+- `inventory_valuation_logs`: 9 rows; all 9 have NULL Variant ID.
+- `product_units`: 3 rows; all 3 have NULL Variant ID.
+- The scan found no non-null cross-Product Variant rows in these three tables because their Variant IDs are all NULL. This is absence of identity, not proof of correct identity.
+
+The nine movements and nine valuation rows were individually enumerated in the read-only query. They comprise the IPH-15-256-WHT receipt/transfer chain, HXA-000002/003/004 Goods Receipt movements, HXA-000002 transfer pair, and TEST-HEXA-001 receipt.
+
+### 15.4 Variant attribute values
+
+`product_variant_attribute_values` contains 74 rows. All 74 have a non-null Product ID matching the referenced Variant's parent Product ID. No cross-Product mismatch or null Product ID was found in this table.
+
+This table is not an inventory ledger, but its consistency confirms that the parent mismatch is concentrated in transaction/inventory document data rather than every Product/Variant relationship table.
+
+### 15.5 Revised severity and transition boundary
+
+The defect is now confirmed in three live transaction/inventory layers:
+1. Purchase Order items: 4 cross-Product rows.
+2. Posted Stock Opname: 25 cross-Product rows in one posted session.
+3. Inventory balances: 5 cross-Product rows, including one active balance with 9 Units / Rp11,250,000.
+
+Inventory movements, valuation logs, and serialized units instead have missing Variant IDs throughout their inspected rowsets.
+
+The next transition design must explicitly separate:
+- **Invalid non-null Variant references** — retain the row and value; require authoritative remapping decision.
+- **NULL Variant identity** — do not infer from Product ID or descriptive SKU text alone.
+- **Zero-balance / zero-quantity posted history** — retain for audit; no automatic deletion.
+- **Valid Variant parent relationships** — preserve unchanged.
+
+No database rows or schema objects were modified. MD-014 remains P0 / BLOCKING; Sales implementation remains blocked.

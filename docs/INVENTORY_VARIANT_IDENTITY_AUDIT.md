@@ -117,3 +117,66 @@ Only category 1 can be migrated automatically. Categories 2 and 3 must be retain
 ## 7. Current status
 
 **MD-014 remains P0 / BLOCKING.** The investigation confirms the mismatch spans source migrations, live database functions, UI action contracts, and historical data. The next implementation unit is a complete function and query dependency map plus a non-destructive data classification—not a schema migration.
+
+
+## 8. Follow-up dependency map — live functions, UI, RLS and triggers
+
+A second read-only pass inspected the active live RPC catalog, RLS policies, foreign keys, triggers, and current application query contracts.
+
+### 8.1 Live RPC inventory
+
+The live Development database exposes both product-level and variant-level overloads:
+
+- Variant-level creation functions exist: `create_inventory_movement(p_product_variant_id, ...)` and `create_inventory_transfer(p_product_variant_id, ...)`.
+- Product-level creation functions also exist: `create_inventory_movement_by_product(p_product_id, ...)` and `create_inventory_transfer_by_product(p_product_id, ...)`.
+- The active live `post_inventory_transfer_unlocked(uuid)` validates `product_id`, locks/upserts balances with `ON CONFLICT (product_id, warehouse_id)`, and calculates transfer valuation at Product level.
+- The active live `post_inventory_reversal_unlocked(uuid, uuid)` validates original/reversal identity by `product_id`, locks the balance by Product ID, and writes valuation rows containing both nullable product and variant fields.
+- The active live `post_goods_receipt_by_product(uuid)` reads the PO item Product ID and creates product-level movement/unit records.
+- The active live `post_stock_opname_unlocked(uuid)` posts by `product_id` and uses `ON CONFLICT (product_id, warehouse_id)`.
+- The active live `create_inventory_movement_by_product` and `create_inventory_transfer_by_product` are `SECURITY DEFINER` functions. The variant-level counterparts are also `SECURITY DEFINER`. Function exposure/grants and permission enforcement must be reviewed as part of the transition; this audit did not alter grants or function security.
+
+The coexistence of these overloads is a concrete source of ambiguity: callers can select different identity contracts based on function name/signature even though they operate on the same balance table.
+
+### 8.2 Application read/write contract map
+
+| Application surface | Current source contract | Consequence |
+|---|---|---|
+| `app/inventory/balances/page.tsx` | Selects `inventory_balances` by `product_id`, filters non-null Product ID, aggregates product-level balances | Product-level UI contract |
+| `app/inventory/page.tsx` | Selects `product_variant_id` from balances, and joins variant records | Variant-level read contract; may omit product-only balances |
+| `app/inventory/movements/actions.ts` and page | Form/action uses `product_id`; movement list joins Products by Product ID | Product-level movement contract |
+| `app/inventory/transfers/actions.ts` and page | Form/action uses `product_id`; transfer matching compares Product IDs | Product-level transfer contract |
+| `app/inventory/opname/[id]/page.tsx` | Stock Opname items and unit matching use Product ID; UI includes aggregate IMEI count | Product-level Opname contract |
+| `app/inventory/units/page.tsx` | Unit list queries `product_id` and Product relation | Product-level unit display contract |
+| `app/inventory/stock-balance-realtime.tsx` | Subscribes to `inventory_balances` and `product_units` | Realtime refresh is table-based; it does not itself reconcile identity |
+| `app/purchases/[id]/goods-receipts/[receiptId]/page.tsx` | Goods Receipt display follows PO item Product relation | Display does not prove posting is variant-safe |
+| `docs/DASHBOARD_INTEGRATION_CONTRACT.md` | KPI contract uses Product ID with Variant ID fallback for SKU count; inventory values from balances | Dashboard semantics must be redefined against one canonical identity |
+
+The Inventory overview and Stock Balances pages currently have different identity contracts. This can create mismatched totals even before any Sales module is added.
+
+### 8.3 RLS and triggers
+
+- `inventory_balances` SELECT policy checks `inventory.view` and `has_warehouse_access(warehouse_id)`.
+- `inventory_movements` SELECT policy checks `inventory.view OR is_owner()` plus warehouse access.
+- `inventory_valuation_logs` SELECT policy checks `inventory.view OR is_owner()` but the observed policy does not include an explicit warehouse-scope predicate. This is a separate security-review item; do not silently change it as part of the identity migration.
+- `product_units` SELECT policy includes permission and nullable warehouse-scope handling.
+- Stock Opname session/item/unit-count policies derive access from warehouse scope.
+- Warehouse-scope enforcement triggers are present on balances, movements, units, goods receipts, and Stock Opname tables. Catalog output showed repeated trigger entries with the same trigger name/table/action; exact event/timing duplication should be checked against `pg_trigger` before proposing cleanup.
+- Valuation logs have multiple update/delete protection triggers in the live catalog. Do not drop or consolidate without identifying which functions are active and proving append-only behavior remains enforced.
+
+### 8.4 Foreign key and nullability finding
+
+Live schema retains both nullable `product_id` and nullable `product_variant_id` foreign keys across balances, movements, valuation logs, units, and Stock Opname items. The database therefore permits records without a canonical identity and does not enforce that Product ID matches the Product referenced by Product Variant ID.
+
+This must be addressed through validated constraints and transition logic, not by assuming the two columns are interchangeable.
+
+## 9. Updated implementation boundary
+
+MD-014 must produce a single identity transition design covering:
+- all live function overloads and execute grants;
+- application reads and writes on Inventory overview, balances, movements, transfers, units, Stock Opname and dashboard;
+- RLS and warehouse-scope behavior;
+- trigger timing/events and duplicate protections;
+- all FKs, nullability, and cross-column Product/Variant consistency;
+- legacy balance, movement, valuation and unit classification.
+
+No application-side partial fix should switch only one page or action to Variant ID while the corresponding live posting function still writes Product ID.

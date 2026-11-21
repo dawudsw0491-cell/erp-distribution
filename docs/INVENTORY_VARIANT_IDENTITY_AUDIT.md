@@ -846,3 +846,73 @@ No exact destructive manifest is approved yet. Before requesting execution appro
 6. request approval for that exact manifest before any destructive action.
 
 **Status remains:** MD-014 P0 / BLOCKING. This section records read-only findings only. No DDL/DML, migration, RPC, trigger, ACL, RLS, or Production operation was performed.
+
+
+## 21. Reset-relevant RPC and immutable-ledger function review
+
+A read-only definition and ACL review covered the currently active product-oriented movement/transfer, Goods Receipt, Stock Opname posting functions, inventory movement update guard, valuation insert validation, serialized identifier validation, and SKU registry synchronization.
+
+### 21.1 Movement lifecycle guard
+
+The live guard on Inventory Movements enforces:
+- A posted movement cannot be updated; correction must use reversal.
+- A cancelled movement cannot be reactivated or changed.
+- A draft may remain draft or transition to posted/cancelled only.
+- A posted transition requires posted_by and posted_at metadata.
+- A cancelled transition must not have posting metadata.
+
+The separate BEFORE DELETE guard rejects every delete regardless of movement status. Therefore the supported business lifecycle (cancel draft / reverse posted) is not equivalent to a test-data purge mechanism. The final reset design must not pretend that ordinary lifecycle actions erase ledger history.
+
+### 21.2 Valuation insert consistency and identity gap
+
+The live valuation insert validator requires:
+- a referenced movement exists and is posted;
+- transaction_type equals movement_type;
+- Product ID and Warehouse ID match the movement;
+- quantity_delta matches the movement.
+
+The inspected validator does not compare Product Variant ID because its selected movement identity is Product ID. This is another active product-level contract and must be redesigned with the canonical Variant contract. The separate update/delete triggers still make valuation rows immutable.
+
+### 21.3 Product-oriented RPC behavior
+
+The active SECURITY DEFINER product-oriented functions reviewed include:
+- create_inventory_movement_by_product(...)
+- create_inventory_transfer_by_product(...)
+- post_goods_receipt_by_product(...)
+- post_stock_opname_unlocked(...)
+
+Observed behavior:
+- Movement creation validates Product tracking_type and writes Product ID to a draft movement. Quantity-tracked Products reject product_unit_id; IMEI/Serial products require a specific Product Unit and movement quantity magnitude 1.
+- Transfer creation reads and locks inventory_balances using product_id + warehouse_id, checks Product tracking_type, and writes transfer_out/transfer_in movement pairs with Product ID.
+- Goods Receipt posting is implemented through the Product-oriented receipt path and creates Product-level inventory movement/unit records.
+- Stock Opname posting inserts/locks/updates inventory_balances using product_id + warehouse_id, creates Product-level adjustment movements and valuation logs, and skips per-unit IMEI/Serial variance in the inspected path.
+- These function definitions are not a valid implementation of the accepted Variant SKU stock identity. The reset decision does not remove the need to implement and test the canonical posting contract before reseeding inventory.
+
+### 21.4 Serialized identifier validation
+
+The live unit-identifier validator checks that:
+- the Product Unit exists;
+- when both Product ID and Variant parent Product ID are present, they match;
+- IMEI identifiers are used only for IMEI-tracked Products;
+- Serial identifiers are limited to the configured IMEI/Serial tracking types.
+
+This validation does not make Product Variant ID mandatory. Existing Product Units with NULL Variant IDs therefore remain unresolved under the current contract.
+
+### 21.5 SKU registry trigger side effects and ACL
+
+The SECURITY DEFINER sync_sku_registry() trigger function:
+- derives the entity type and identity from Products or Product Variants;
+- removes the matching registry row when a Product/Variant is deleted;
+- inserts or updates the registry on creation/change;
+- uses transaction-scoped advisory locks for SKU keys;
+- rejects a collision when the key is owned by a different entity.
+
+The function is owned by postgres and the inspected ACL grants execution to postgres/service_role; application synchronization occurs through its trigger. A future catalog reset must validate that the registry is empty or exactly synchronized after the approved catalog operation. Do not manually delete registry entries in parallel with trigger-driven deletion.
+
+### 21.6 Privilege boundary
+
+The reviewed product-level movement and transfer creation RPCs are SECURITY DEFINER and their observed ACL includes authenticated. The reviewed posting helper post_stock_opname_unlocked(uuid) is SECURITY DEFINER but its observed ACL is restricted to postgres/service_role. Trigger guard functions are not general reset APIs.
+
+Any future replacement or reset helper must have an explicit privilege review, fixed search_path, narrow execution grants, caller authorization where relevant, and a verified rollback path. No ACL or function was changed during this review.
+
+**Conclusion:** Current live posting and validation code is Product-oriented, and the immutable ledger guards intentionally prevent destructive correction. The reset operation cannot safely precede the canonical Variant-level posting implementation and a separately verified recovery mechanism. MD-014 remains P0 / BLOCKING.

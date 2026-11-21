@@ -708,3 +708,141 @@ The table list also includes product/category/attribute/model, customer, supplie
 The user’s instruction to proceed is recorded as approval to advance MD-014 reset preparation. It is not treated as approval for an unspecified whole-database destructive operation. A final execution approval must identify the exact Development project, table scope, order, backup/restore point and expected retained records.
 
 No DDL, DML, migration application, RPC, RLS, trigger, ACL or Production change was performed in this inspection.
+
+## 20. Reset preparation — complete public-table inventory, guards and backup evidence
+
+**Inspection date:** 2026-11-21  
+**Environment:** Development only (erp-distribution-dev, project ref vwxzlvsigxeopibnfuhp)  
+**Mode:** Read-only. No DDL, DML, migration, RPC, trigger, ACL, RLS, or Production operation was performed.
+
+### 20.1 Exact current public-table counts
+
+A fresh count query was executed against all 46 ordinary tables in schema public. These counts supersede earlier estimates and are a point-in-time snapshot.
+
+| Table | Rows | Preliminary disposition | Reason / condition |
+|---|---:|---|---|
+| brands | 8 | REVIEW / RESEED | Catalog master; decide canonical seed set |
+| category_attribute_templates | 0 | KEEP schema; no row action | Empty structural/configuration table |
+| connection_test | 1 | RESET candidate | Test-only table; verify no operational dependency before clearing row |
+| customers | 1 | REVIEW / RESEED | Master/business record; not assumed test-only from count |
+| goods_receipt_items | 5 | RESET | Test transaction detail; FK child of GR and PO item |
+| goods_receipt_unit_identifiers | 3 | RESET | Child identifiers; delete before GR units |
+| goods_receipt_units | 3 | RESET | Serialized GR unit rows; delete after identifiers |
+| goods_receipts | 3 | RESET | Test GR headers; delete after GR items |
+| import_indonesia_provinces | 0 | KEEP schema; no row action | Empty import/staging table |
+| import_indonesia_regencies | 0 | KEEP schema; no row action | Empty import/staging table |
+| indonesia_districts | 7,285 | KEEP | Geographic reference data |
+| indonesia_provinces | 38 | KEEP | Geographic reference data |
+| indonesia_regencies | 514 | KEEP | Geographic reference data |
+| indonesia_villages | 83,762 | KEEP | Geographic reference data |
+| inventory_balances | 16 | RESET / REBUILD | Derived stock snapshot; rebuild only from canonical posted postings after identity contract passes |
+| inventory_movements | 9 | RESET candidate — guarded | Test transaction ledger; DELETE trigger rejects all direct deletes |
+| inventory_valuation_logs | 9 | RESET candidate — guarded | Append-only/immutable ledger; two independent DELETE/UPDATE guards |
+| permissions | 39 | KEEP | Authorization master |
+| product_attribute_assignments | 70 | REVIEW / RESEED | Product-to-attribute master association; depends on canonical catalog seed |
+| product_attribute_values | 16 | REVIEW / RESEED | Attribute value master; preserve/reseed canonical allowed values |
+| product_attributes | 5 | REVIEW / RESEED | Attribute definitions; preserve/reseed canonical definitions |
+| product_categories | 15 | REVIEW / RESEED | Category hierarchy; preserve/reseed canonical hierarchy |
+| product_models | 2 | REVIEW / RESEED | Product model master; verify canonical references |
+| product_suppliers | 0 | KEEP schema; no row action | Empty association table |
+| product_unit_identifiers | 3 | RESET candidate | Serialized unit identifier children; delete before Product Units |
+| product_units | 3 | RESET candidate | Test serialized inventory units; referenced by movement/opname records |
+| product_variant_attribute_values | 74 | REVIEW / RESEED | All 74 current rows passed Product/Variant parent consistency; canonical catalog mapping must be regenerated |
+| product_variants | 23 | REVIEW / RESEED | Variant SKU identity master; coordinate with Products and SKU registry triggers |
+| products | 31 | REVIEW / RESEED | Product master; only reset after dependent records/associations are classified |
+| purchase_order_items | 11 | RESET | Test PO detail; GR items must be cleared first |
+| purchase_orders | 7 | RESET | Test PO headers; GR references must be cleared first |
+| role_permissions | 100 | KEEP | Authorization mapping |
+| roles | 7 | KEEP / REVIEW | Preserve role definitions and Owner/bootstrap access |
+| sku_registry | 54 | DERIVED — RECONCILE | Do not clear independently; Product/Variant SKU triggers maintain this registry |
+| stock_opname_items | 140 | RESET candidate — guarded dependencies | Test Opname detail; clear unit-count children first |
+| stock_opname_sessions | 4 | RESET candidate | Test Opname headers; clear all items first |
+| stock_opname_unit_counts | 3 | RESET candidate | Child rows; also reference Product Units |
+| supplier_addresses | 2 | REVIEW / RESEED | Supplier master child; contains geographic FK references |
+| supplier_bank_accounts | 0 | KEEP schema; no row action | Empty supplier master child |
+| supplier_contacts | 0 | KEEP schema; no row action | Empty supplier master child |
+| suppliers | 3 | REVIEW / RESEED | Supplier master; count differs from earlier snapshot, preserve pending explicit classification |
+| user_audit_logs | 6 | KEEP | Preserve security/audit evidence unless separate retention approval |
+| user_deletion_requests | 1 | KEEP / SECURITY REVIEW | User/security workflow record; do not treat as generic demo data |
+| user_profiles | 1 | KEEP | Bootstrap Owner profile |
+| user_roles | 1 | KEEP | Bootstrap Owner role assignment |
+| user_warehouse_access | 0 | KEEP schema; no row action | Authorization/scope table |
+| warehouses | 2 | KEEP / REVIEW | Preserve warehouse identity and access model until canonical warehouse decision |
+
+The earlier shorthand that one supplier exists is stale: the latest exact count is 3 suppliers. The current exact product_variant_attribute_values count is 74, confirming the earlier detailed audit count.
+
+### 20.2 Protected Supabase-managed schemas and identity
+
+The reset scope is limited to explicitly classified application data in public. It does not include wholesale reset, truncate, or deletion of auth, storage, realtime, vault, extensions, system catalogs, or migration ledger objects.
+
+The bootstrap identity remains protected:
+- auth.users: 1 row — KEEP.
+- public.user_profiles: 1 row — KEEP.
+- public.user_roles: 1 row — KEEP.
+- Roles, permissions, role-permission mappings and warehouse access model — KEEP.
+
+No Storage buckets were present in the prior inspection. This does not authorize modifying Storage schema or its managed metadata.
+
+### 20.3 FK graph and candidate child-first dependency order
+
+The current public schema has 90 foreign-key constraints. The principal reset dependencies are:
+
+1. Goods Receipt descendants: goods_receipt_unit_identifiers → goods_receipt_units → goods_receipt_items → goods_receipts; GR items also reference PO items.
+2. Purchase Orders: purchase_order_items → purchase_orders; Goods Receipt headers reference PO headers.
+3. Stock Opname: stock_opname_unit_counts → stock_opname_items → stock_opname_sessions; unit counts also reference Product Units.
+4. Serialized inventory: product_unit_identifiers → product_units; Inventory Movements also reference Product Units.
+5. Inventory valuation and movement: inventory_valuation_logs → inventory_movements; movement rows have a self-reference through reversal_of_id. Any approved reset must handle this graph and its guards.
+6. Catalog dependencies: product_variant_attribute_values references Product Variant, Product Attribute Value, Product Attribute Assignment and Product Attribute; Product Attribute Assignments reference Products and Attributes; Product Variants reference Products; Products reference Model, Brand and Category; Product Models reference Brands.
+7. SKU registry: Product and Product Variant BEFORE INSERT/UPDATE/DELETE triggers synchronize sku_registry. A catalog reset must account for these side effects and validate the resulting registry; do not independently clear registry rows.
+8. Supplier graph: Supplier contacts, addresses and bank accounts reference Suppliers; Supplier Addresses also reference Indonesia geographic reference tables. Keep geographic parents.
+9. Authorization graph: Role Permissions reference Roles and Permissions; User Roles reference Auth Users and Roles; user profiles/warehouse access are protected.
+
+This is a dependency map, not an executable deletion order. The final manifest must be generated from the full FK graph and actual row relationships, including all remaining constraints, not just the summarized chains above.
+
+### 20.4 Trigger and function guard findings
+
+The latest direct pg_trigger inspection confirms:
+
+- inventory_movements has a BEFORE DELETE trigger trg_guard_inventory_movement_delete; its function always raises an exception and explicitly requires draft cancellation or posted reversal instead of direct deletion.
+- inventory_movements also has an UPDATE guard. Its body must be included in the final reset-method review.
+- inventory_valuation_logs has two distinct BEFORE UPDATE OR DELETE guards. Both functions unconditionally reject mutation and describe the valuation log as append-only/immutable. There is no safe basis for assuming either guard can be bypassed.
+- inventory_valuation_logs also has insert validation/guard triggers.
+- private.enforce_warehouse_scope() is attached to multiple transaction and inventory tables. Its body has a service-role branch, but it is not a generic reset authorization contract and does not override the movement/valuation immutability guards.
+- Product and Product Variant BEFORE INSERT/UPDATE/DELETE triggers call SECURITY DEFINER sync_sku_registry(). Deleting a catalog row has a side effect that deletes its corresponding registry entry; a catalog reset must account for transaction rollback and registry consistency.
+- validate_product_unit_tracking() requires a Product or Variant-linked tracked Product Unit and only permits IMEI/Serial tracking types.
+- No trigger was disabled, replaced, dropped, or bypassed.
+
+**Reset implication:** A direct DELETE plan for movement/valuation ledgers will fail by design. Do not disable triggers, change their functions, or use an undocumented bypass. The reset design must either use a supported project-level Development restore/reseed workflow with verified recovery, or propose a separately reviewed and explicitly approved controlled reset mechanism whose audit/security impact is documented. The current inspection does not authorize either method.
+
+### 20.5 Backup and recovery evidence
+
+Read-only PostgreSQL settings show:
+- PostgreSQL version: 17.11.
+- archive_mode = on.
+- wal_level = logical.
+- WAL archive command is configured through the provider's WAL-G/admin manager.
+- pg_stat_archiver: 955 archived WAL files, 0 failures; most recent archived WAL timestamp returned as 2026-11-21 14:16:23.61709+00.
+
+This proves WAL archiving is configured and has recently succeeded. It does not prove a specific restorable base backup exists, prove the required point-in-time recovery window, or prove a restore drill succeeded. No backup artifact, restore point ID, backup timestamp, or restore test was independently verified in this pass.
+
+**Backup gate remains BLOCKED:** before any reset, confirm in Supabase Dashboard/provider backup controls that a usable backup or PITR point covers the exact pre-reset state; record the timestamp/identifier and retention window; and verify a restore path or isolated restore test. Do not represent WAL archive statistics as proof of a complete backup.
+
+### 20.6 Preliminary disposition and reset boundary
+
+The current reset scope is deliberately split:
+
+- RESET candidates: application-entered PO/GR/Inventory/Stock Opname test transactions and their dependent rows, plus the single connection_test row after confirming it is disposable.
+- REBUILD: inventory_balances must be regenerated from canonical variant-level postings, not preserved as the current product-keyed derived balance.
+- REVIEW / RESEED: Products, Variants, SKU registry, product attributes/values/assignments, categories, brands, models, Suppliers and Customers. The exact canonical seed set and any legitimate records must be approved before reset.
+- KEEP: bootstrap Auth/Owner identity, authorization tables and mappings, warehouses pending canonical decision, audit logs, deletion-request/security records, and Indonesia geographic reference tables.
+- KEEP schema / no row action: empty staging/configuration tables.
+
+No exact destructive manifest is approved yet. Before requesting execution approval, remaining work is to:
+1. enumerate and inspect every public FK edge not covered by the principal chains above, including actual referencing rows;
+2. inspect all reset-relevant trigger function bodies and every RPC that could mutate these ledgers or cascade side effects;
+3. determine whether provider backup/PITR is available and identify a concrete restorable point;
+4. settle the catalog KEEP/RESET/RESEED list and canonical seed content;
+5. produce a manifest with exact table scope, row predicates/expected counts, dependency order, transaction/restore boundaries, preconditions, and abort assertions;
+6. request approval for that exact manifest before any destructive action.
+
+**Status remains:** MD-014 P0 / BLOCKING. This section records read-only findings only. No DDL/DML, migration, RPC, trigger, ACL, RLS, or Production operation was performed.

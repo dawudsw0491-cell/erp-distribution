@@ -6,15 +6,22 @@ import ErpSidebar from "@/components/layout/erp-sidebar";
 import MasterDataLoading from "@/components/layout/master-data-loading";
 
 const MASTER_DATA_PATHS = ["/products", "/customers", "/suppliers", "/warehouses"];
+const MINIMUM_LOADER_MS = 500;
+const NAVIGATION_TIMEOUT_MS = 12000;
 
 function isMasterDataPath(path: string) {
   return MASTER_DATA_PATHS.some((base) => path === base || path.startsWith(`${base}/`));
 }
 
+type PendingNavigation = {
+  destination: string;
+  startedAt: number;
+};
+
 export default function MasterDataNavigationShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "";
   const isMasterData = isMasterDataPath(pathname);
-  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
 
   function handleNavigation(event: MouseEvent<HTMLDivElement>) {
     if (
@@ -40,19 +47,27 @@ export default function MasterDataNavigationShell({ children }: { children: Reac
       isMasterDataPath(destination.pathname) &&
       isMasterDataPath(pathname)
     ) {
-      setPendingPath(destination.pathname);
+      setPendingNavigation({
+        destination: destination.pathname,
+        startedAt: Date.now(),
+      });
     }
   }
 
   useEffect(() => {
-    if (!pendingPath) return;
-    const arrived = pathname === pendingPath;
-    const timeout = window.setTimeout(
-      () => setPendingPath(null),
-      arrived ? 220 : 12000
-    );
+    if (!pendingNavigation) return;
+
+    const arrived = pathname === pendingNavigation.destination;
+    const elapsed = Date.now() - pendingNavigation.startedAt;
+    const remainingMinimum = Math.max(0, MINIMUM_LOADER_MS - elapsed);
+    const delay = arrived ? remainingMinimum : NAVIGATION_TIMEOUT_MS;
+
+    const timeout = window.setTimeout(() => {
+      setPendingNavigation(null);
+    }, delay);
+
     return () => window.clearTimeout(timeout);
-  }, [pendingPath, pathname]);
+  }, [pendingNavigation, pathname]);
 
   if (!isMasterData) return <>{children}</>;
 
@@ -60,12 +75,12 @@ export default function MasterDataNavigationShell({ children }: { children: Reac
     <div
       className="flex min-h-screen w-full bg-slate-100"
       onClickCapture={handleNavigation}
-      aria-busy={pendingPath !== null}
+      aria-busy={pendingNavigation !== null}
     >
       <ErpSidebar persistent />
       <div className="relative min-w-0 flex-1">
         {children}
-        {pendingPath && (
+        {pendingNavigation && (
           <div className="fixed inset-y-0 left-64 right-0 z-[200] flex items-center justify-center bg-slate-100/80 backdrop-blur-[2px]">
             <div className="h-[70vh] w-full">
               <MasterDataLoading />

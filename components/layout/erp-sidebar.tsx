@@ -154,8 +154,6 @@ export default function ErpSidebar({
     (base) => currentPath === base || currentPath.startsWith(`${base}/`)
   );
 
-  if (isMasterDataRoute && !persistent) return null;
-
   // Warm the App Router cache before the user clicks a destination.
   // This changes navigation timing only; server authorization and data
   // fetching still run normally when the destination is requested.
@@ -166,6 +164,8 @@ export default function ErpSidebar({
   }
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  if (isMasterDataRoute && !persistent) return null;
 
   function toggleGroup(label: string, currentlyExpanded: boolean) {
     setExpandedGroups((previous) => ({

@@ -632,3 +632,79 @@ Stop without writing if any of the following is true:
 - Reset would affect Production, shared external storage, or external integrations outside the approved scope.
 
 **Current state:** Reset disposition selected; reset manifest and dependency discovery are pending. No data, schema, migration, RPC, RLS, trigger, ACL, or Production changes have been performed.
+
+
+## 19. Current Development reset dependency inspection — 2026-11-21
+
+This is a read-only inspection performed after the user requested to proceed with the selected test-data reset. No data or schema writes were executed.
+
+### 19.1 Environment and migration baseline
+
+- Confirmed project: `erp-distribution-dev`, project ref `vwxzlvsigxeopibnfuhp`, region `ap-southeast-1`, status `ACTIVE_HEALTHY`.
+- Confirmed migration ledger: 8 entries, latest `20261121050458 rbac_warehouse_scope_alignment`.
+- The migration ledger is infrastructure/provenance and is explicitly outside the reset scope.
+- The catalog contains Supabase-managed schemas (`auth`, `storage`, `realtime`, `vault`, `extensions`) in addition to `public`. Reset must not target these managed schemas wholesale.
+- `storage.buckets` returned zero rows at inspection time; no Storage bucket cleanup is currently indicated.
+
+### 19.2 Exact row counts observed for reset-sensitive and protected tables
+
+Counts are current query results from this inspection, not estimates:
+
+| Table | Rows | Initial classification |
+|---|---:|---|
+| `auth.users` | 1 | KEEP — bootstrap identity |
+| `public.user_profiles` | 1 | KEEP — Owner profile |
+| `public.user_roles` | 1 | KEEP — preserve Owner assignment |
+| `public.roles` | 7 | KEEP / REVIEW — authorization master |
+| `public.permissions` | 39 | KEEP — authorization master |
+| `public.role_permissions` | 100 | KEEP — authorization mapping |
+| `public.user_warehouse_access` | 0 | KEEP schema/configuration; no rows |
+| `public.warehouses` | 2 | REVIEW — preserve until canonical warehouse decision |
+| `public.purchase_orders` | 7 | RESET candidate |
+| `public.purchase_order_items` | 11 | RESET candidate |
+| `public.goods_receipts` | 3 | RESET candidate |
+| `public.goods_receipt_items` | 5 | RESET candidate |
+| `public.goods_receipt_units` | 3 | RESET candidate |
+| `public.goods_receipt_unit_identifiers` | 3 | RESET candidate |
+| `public.inventory_movements` | 9 | RESET candidate; guarded |
+| `public.inventory_valuation_logs` | 9 | RESET candidate; guarded |
+| `public.inventory_balances` | 16 | RESET candidate; rebuild from postings |
+| `public.product_units` | 3 | RESET candidate |
+| `public.stock_opname_sessions` | 4 | RESET candidate |
+| `public.stock_opname_items` | 140 | RESET candidate |
+| `public.stock_opname_unit_counts` | 3 | RESET candidate |
+| `public.user_audit_logs` | 6 | REVIEW — not ordinary test transaction data |
+| `public.products` | 31 | REVIEW / RESEED |
+| `public.product_variants` | 23 | REVIEW / RESEED |
+| `public.sku_registry` | 54 | REVIEW — synchronized by Product/Variant triggers |
+| `public.suppliers` | 1 | REVIEW / RESEED |
+| `public.product_variant_attribute_values` | 50 | REVIEW / RESEED — master associations |
+| `public.role_permissions` | 100 | KEEP — not business test data |
+
+The table list also includes product/category/attribute/model, customer, supplier-contact/address/bank-account, and Indonesia geographic reference tables. These must be individually classified; do not assume all are transactional or safe to delete.
+
+### 19.3 Critical dependency and guard findings
+
+- Goods Receipt descendants have restrictive FK relationships: `goods_receipt_unit_identifiers → goods_receipt_units → goods_receipt_items → goods_receipts`. Receipt items also reference PO items.
+- Inventory movements reference Product Units, Product Variants, Warehouses, Auth users, and can self-reference reversals. Movement deletion is protected by `trg_guard_inventory_movement_delete`.
+- Valuation logs reference inventory movements and have two distinct UPDATE/DELETE protection triggers: `trg_guard_inventory_valuation_update_delete` and `trg_prevent_valuation_log_update_delete`. Their functions must be reviewed before proposing any authorized bypass or cleanup path.
+- Product Unit identifiers reference Product Units with RESTRICT behavior; Product Units reference Product Variant and Warehouse.
+- Stock Opname items reference sessions and may reference Product Variant and Auth users; unit counts reference Opname items. Child-first order is required.
+- Product/Variant deletion is restricted by product-variant attribute values, Product Variant links, inventory, and other master associations.
+- Product and Product Variant changes invoke SECURITY DEFINER SKU registry synchronization triggers. Product/Variant reset must account for `sku_registry` and must not leave stale or duplicate SKU registry entries.
+- Purchase Order and Goods Receipt rows reference Auth users and warehouse/supplier masters. Preserve the bootstrap user, warehouses and supplier/master references until the reset/reseed manifest explicitly resolves them.
+- No separate public transfer header/line table appeared in the earlier catalog scan; transfer history is represented by inventory movement references/groups.
+
+### 19.4 Reset execution status and blockers
+
+**Reset is NOT EXECUTED.** The inspection confirms that a naive DELETE/TRUNCATE is unsafe:
+- Movement and valuation deletion guards are active.
+- Several FK edges are RESTRICT.
+- The single Owner/Auth account and security configuration must be preserved.
+- Warehouse, supplier, Product master, SKU registry, and audit-log rows need an explicit KEEP/RESET/RESEED decision.
+- No backup/restore artifact or restore verification has yet been established in this workstream.
+- The trigger/function dependency inventory is not yet complete enough to issue a safe reset script.
+
+The user’s instruction to proceed is recorded as approval to advance MD-014 reset preparation. It is not treated as approval for an unspecified whole-database destructive operation. A final execution approval must identify the exact Development project, table scope, order, backup/restore point and expected retained records.
+
+No DDL, DML, migration application, RPC, RLS, trigger, ACL or Production change was performed in this inspection.

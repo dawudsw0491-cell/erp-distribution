@@ -68,9 +68,15 @@ async function WarehousePageContent({
 
   const from = (currentPage - 1) * pageSize;
 
-  const { data, error, count } = await query
-    .order("warehouse_name", { ascending: true })
-    .range(from, from + pageSize - 1);
+  const [
+    { data, error, count },
+    { count: activeCount },
+    { count: inactiveCount },
+  ] = await Promise.all([
+    query.order("warehouse_name", { ascending: true }).range(from, from + pageSize - 1),
+    auth.supabase.from("warehouses").select("*", { count: "exact", head: true }).eq("is_active", true),
+    auth.supabase.from("warehouses").select("*", { count: "exact", head: true }).eq("is_active", false),
+  ]);
 
   if (error) {
     throw new Error("Gagal mengambil data warehouse.");
@@ -79,16 +85,6 @@ async function WarehousePageContent({
   const warehouseList = (data ?? []) as Warehouse[];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  const { count: activeCount } = await auth.supabase
-    .from("warehouses")
-    .select("*", { count: "exact", head: true })
-    .eq("is_active", true);
-
-  const { count: inactiveCount } = await auth.supabase
-    .from("warehouses")
-    .select("*", { count: "exact", head: true })
-    .eq("is_active", false);
 
   function pageUrl(page: number) {
     const search = new URLSearchParams();

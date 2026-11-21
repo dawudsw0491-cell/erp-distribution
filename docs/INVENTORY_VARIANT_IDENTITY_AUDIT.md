@@ -204,3 +204,20 @@ Function ACL inspection confirms:
 The aggregate snapshot is sufficient to prove ambiguity exists but not sufficient to map every record. The next read-only reconciliation query must enumerate the exact primary keys and source-document references for each balance, movement, valuation log, and product unit, then determine whether a trusted upstream PO/GR/identifier/document establishes a Variant ID.
 
 No record-level reassignment is justified from Product ID alone where the Product has multiple variants. No trigger duplication cleanup is indicated by the verified `pg_trigger` catalog.
+
+
+## 12. First record-level provenance test — Goods Receipt → Purchase Order Variant
+
+A read-only join was tested from Product-only inventory movements with `source_reference_type = 'goods_receipt'` through:
+
+`inventory_movements.source_reference_id → goods_receipts.id → goods_receipt_items → purchase_order_items.product_variant_id → product_variants`.
+
+Results:
+
+- The `IPH-15-256-WHT` Goods Receipt movement for quantity 10 links to PO item `e43edccb-fe79-4cef-a941-bde372d0f75b`, which explicitly references Variant SKU `IPH-15-256` (Variant ID `0e067953-7b23-4747-bff5-6f74ed2f52e2`).
+- The related posted transfer pair moves quantity 1 from the source warehouse to another warehouse and shares the same movement group/source reference. The source movement and PO receipt provide a plausible trace for both sides of this transfer; the receiving balance has quantity 1 while the source variant balance has quantity 9. This is a strong candidate for a provable variant mapping, but before migration the full movement-group integrity and valuation sequence must be checked.
+- The three IMEI products `HXA-000002`, `HXA-000003`, and `HXA-000004` have Goods Receipt → PO item links, but their PO items currently have `product_variant_id IS NULL`. The receipt link therefore does not establish a Variant ID.
+- `TEST-HEXA-001` also has a Product-only receipt/PO link with a NULL PO Variant ID. Do not infer a variant from its product label or treat it as a production-grade example.
+- The Goods Receipt provenance path is not a universal resolver. It can only establish a variant where the PO item itself has a non-null, valid Product Variant and the receipt/movement relationship is unique and quantity-consistent.
+
+No records were changed. The IPH-15-256 case is classified as **candidate provable mapping — pending transfer/valuation cross-check**. HXA-000002/003/004 and TEST-HEXA-001 remain **unresolved at the Variant identity level** based on the evidence retrieved so far.

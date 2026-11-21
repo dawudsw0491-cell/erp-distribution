@@ -124,3 +124,16 @@ Required prerequisite work under Inventory / MD-010 integration:
 - Run Goods Receipt, Inventory Movement, Transfer, Stock Opname, and valuation regression tests before unblocking SALES-001.
 
 No Sales migration or live schema change is authorized by this finding. Sales implementation remains blocked until this prerequisite is source-committed, validated in Development, and its migration/legacy-data reconciliation evidence is recorded.
+
+
+### 10.1 Expanded blocker evidence — source and UI contract divergence
+
+The follow-up read-only audit found that the conflict is broader than the original live balance key:
+
+- Variant-oriented migrations 26, 29, 33–35, and 44–49 define variant-based movement, balance, transfer, reversal, and Stock Opname paths.
+- Later source migrations 57–59 redefine Goods Receipt, movement creation/posting, transfer helpers, and mixed-IMEI Stock Opname around `product_id`.
+- Current Inventory server actions `app/inventory/movements/actions.ts` and `app/inventory/transfers/actions.ts` call RPCs with `p_product_id`.
+- The live Development database currently uses product-level posting and has 11 of 16 balance rows with NULL `product_variant_id`; some of those rows have non-zero on-hand quantity/value. Existing product-only movement and IMEI unit history also cannot be assigned to a variant from those rows alone.
+- The complete evidence, exact source references, and non-destructive remediation phases are recorded in `docs/INVENTORY_VARIANT_IDENTITY_AUDIT.md`.
+
+This means the Sales blocker cannot be resolved by changing the balance constraint alone or by introducing a second parallel variant balance table. All active posting/read paths and historical data treatment must be reconciled as one migration plan. SALES-001 remains blocked; no Sales schema or posting implementation is authorized before MD-014 passes its Development validation gates.

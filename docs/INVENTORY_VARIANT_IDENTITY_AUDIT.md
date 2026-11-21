@@ -303,3 +303,26 @@ The zero-balance classification applies only to the balance row at the time of i
 - No variant mapping is currently approved by this evidence.
 
 No database records, constraints, functions, triggers, or grants were changed. MD-014 remains P0 / BLOCKING.
+
+
+## 14. Purchase Order Product ↔ Variant parent consistency scan
+
+A read-only scan of all PO items with non-null `product_variant_id` compared:
+`purchase_order_items.product_id` against `product_variants.product_id`.
+
+The Development database returned **4 PO item rows with cross-Product Variant references**:
+
+| PO item ID | PO Product SKU | Referenced Variant SKU | Variant parent Product SKU |
+|---|---|---|---|
+| `b8bb71be-c22b-48a2-a72d-fb5293ad1a58` | IPH-15-256-WHT | IPH-15-256 | TEST-IPHONE-001 |
+| `e43edccb-fe79-4cef-a941-bde372d0f75b` | IPH-15-256-WHT | IPH-15-256 | TEST-IPHONE-001 |
+| `e81cf049-d6db-4e58-9059-865c8e1e1ab8` | IPH-256-PUR | PURPLE | TEST-IPHONE-001 |
+| `b940e9a0-a101-478e-ab52-5a10ca942461` | SS-FOLD-128GB-WHT | WHITE | SS-FOLD-128GB-BLK |
+
+All four rows violate the expected Product/Variant parent relationship. This is broader than one receipt: the PO layer itself contains cross-Product references. It is not safe to use PO `product_variant_id` as a migration resolver until these references are reconciled.
+
+### Required implication
+
+Before identity migration, validate every upstream document line carrying both Product ID and Variant ID—not only PO items. At minimum, inspect Purchase Order items, Goods Receipt items through their PO item, Stock Opname items, transfer/movement source documents, and any Sales/return document lines if present. Add a future database-level consistency guard only after existing invalid rows are classified and corrected under an approved plan.
+
+No rows were modified. The four PO mismatches are evidence for reconciliation, not an automatic correction list.

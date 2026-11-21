@@ -1,8 +1,8 @@
 # RBAC and Warehouse Access Implementation
 
 **Evidence date:** 2026-11-21  
-**Live project:** `vwxzlvsigxeopibnfuhp`  
-**Source status:** Implemented in Git; development database validation pending  
+**Development project:** `erp-distribution-dev` (`vwxzlvsigxeopibnfuhp`)  
+**Status:** Migration 60 applied to development; policy and trigger definitions verified; authenticated workflow tests pending  
 **Source migration:** `database/60_rbac_warehouse_scope_alignment.sql`  
 **Related backlog:** INT-002, SEC-003, GOV-001
 
@@ -10,13 +10,13 @@
 
 The source branch now uses one canonical permission namespace for Purchase Order and Goods Receipt: `purchasing.*`.
 
-The source migration adds warehouse-scope enforcement at both layers:
+Migration 60 has been applied to `erp-distribution-dev` and adds warehouse-scope enforcement at both layers:
 - 22 RLS policy updates for parent and child operational records.
 - A SECURITY INVOKER trigger function, `private.enforce_warehouse_scope()`, attached to 13 warehouse-related tables. It resolves child-record scope through the parent document and checks `public.has_warehouse_access()` for the existing and proposed row versions.
 - Transfer movement rows are checked independently, so the outbound and inbound warehouse IDs are each validated.
 - Dashboard activity feed reuses the same `purchasing.view` authorization context for Purchase Order and Goods Receipt.
 
-**This is source implementation only.** Migration 60 has not been applied to any database. The live Supabase catalog, policies, users, grants and data were not changed.
+**Development verification:** Migration ledger now records `20261121050458 rbac_warehouse_scope_alignment`. Read-only checks verified all 22 policy updates, 13 installed triggers, `SECURITY INVOKER` on the trigger function, and its schema/function grants (`authenticated` allowed; `anon` and `PUBLIC` denied). No production project was changed.
 
 ## 2. Live RBAC snapshot before source implementation
 

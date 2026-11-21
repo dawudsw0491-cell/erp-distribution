@@ -161,6 +161,7 @@ async function DashboardContent() {
     user,
     profile,
     authorized,
+    supabase,
   } = await getAuthorizationContext("dashboard.view");
 
   if (!user) {
@@ -183,6 +184,62 @@ async function DashboardContent() {
       </main>
     );
   }
+
+  // Status server ini hanya menyatakan bahwa request Dashboard sedang diproses.
+  // Koneksi database diverifikasi melalui pembacaan profil pengguna yang sedang login.
+  const databaseHealthProbe = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const databaseConnected =
+    !databaseHealthProbe.error && databaseHealthProbe.data?.id === user.id;
+  const databaseHealthStatus = databaseHealthProbe.error
+    ? "Gagal"
+    : databaseConnected
+      ? "Terhubung"
+      : "Tidak terverifikasi";
+
+  const systemHealthItems = [
+    {
+      label: "Status Server",
+      icon: "▤",
+      value: "Merespons",
+      tone: "ok" as const,
+    },
+    {
+      label: "Koneksi Database",
+      icon: "▥",
+      value: databaseHealthStatus,
+      tone: databaseConnected
+        ? "ok" as const
+        : databaseHealthProbe.error
+          ? "error" as const
+          : "warning" as const,
+    },
+    {
+      label: "Backup Terakhir",
+      icon: "◷",
+      value: "Tidak tersedia",
+      tone: "warning" as const,
+    },
+    {
+      label: "Uptime Sistem",
+      icon: "↗",
+      value: "Tidak tersedia",
+      tone: "warning" as const,
+    },
+  ];
+
+  const systemConditionLabel = databaseConnected
+    ? "Operasional terbatas"
+    : "Perlu pemeriksaan";
+  const systemConditionNote = databaseConnected
+    ? "Server merespons dan database berhasil diperiksa pada request ini. Backup serta uptime belum memiliki sumber telemetry."
+    : databaseHealthProbe.error
+      ? "Query pemeriksaan database gagal. Periksa koneksi database dan akses tabel profil."
+      : "Baris profil pengguna tidak dapat diverifikasi melalui query database.";
 
   const displayName =
     profile.full_name?.trim() || user.email || "Pengguna";
@@ -366,114 +423,126 @@ async function DashboardContent() {
     getAuthorizationContext("goods_receipt.view"),
   ]);
 
-  let authorizedActivitySourceCount = 0;
-  const activityLoadErrors: string[] = [];
-  let purchaseOrderActivityRows: PurchaseOrderActivityRow[] = [];
-  let goodsReceiptActivityRows: GoodsReceiptActivityRow[] = [];
-  let inventoryMovementActivityRows: InventoryMovementActivityRow[] = [];
-
-  const activityQueries: Promise<void>[] = [];
-
-  if (
+  const purchasingActivityAuthorized = Boolean(
     purchasingAccess.user &&
-    purchasingAccess.profile &&
-    purchasingAccess.authorized
-  ) {
-    authorizedActivitySourceCount += 1;
-    activityQueries.push((async () => {
-      const { data, error } = await purchasingAccess.supabase
-        .from("purchase_orders")
-        .select(`
-          id,
-          po_number,
-          status,
-          warehouse_id,
-          created_at,
-          updated_at,
-          submitted_at,
-          approved_at,
-          rejected_at,
-          cancelled_at
-        `)
-        .neq("status", "draft")
-        .order("updated_at", { ascending: false })
-        .limit(12);
-
-      if (error) {
-        activityLoadErrors.push("Purchase Order");
-      } else {
-        purchaseOrderActivityRows = (data ?? []) as PurchaseOrderActivityRow[];
-      }
-    })());
-  }
-
-  if (
+      purchasingAccess.profile &&
+      purchasingAccess.authorized
+  );
+  const goodsReceiptActivityAuthorized = Boolean(
     goodsReceiptAccess.user &&
-    goodsReceiptAccess.profile &&
-    goodsReceiptAccess.authorized
-  ) {
-    authorizedActivitySourceCount += 1;
-    activityQueries.push((async () => {
-      const { data, error } = await goodsReceiptAccess.supabase
-        .from("goods_receipts")
-        .select("id, receipt_number, purchase_order_id, warehouse_id, posted_at, created_at")
-        .eq("status", "posted")
-        .not("posted_at", "is", null)
-        .order("posted_at", { ascending: false })
-        .limit(12);
-
-      if (error) {
-        activityLoadErrors.push("Goods Receipt");
-      } else {
-        goodsReceiptActivityRows = (data ?? []) as GoodsReceiptActivityRow[];
-      }
-    })());
-  }
-
-  if (
+      goodsReceiptAccess.profile &&
+      goodsReceiptAccess.authorized
+  );
+  const inventoryActivityAuthorized = Boolean(
     inventoryAccess.user &&
-    inventoryAccess.profile &&
-    inventoryAccess.authorized
-  ) {
-    authorizedActivitySourceCount += 1;
-    activityQueries.push((async () => {
-      const { data, error } = await inventoryAccess.supabase
-        .from("inventory_movements")
-        .select(`
-          id,
-          warehouse_id,
-          movement_type,
-          source_reference_type,
-          source_reference_number,
-          posted_at,
-          created_at
-        `)
-        .eq("status", "posted")
-        .not("posted_at", "is", null)
-        .order("posted_at", { ascending: false })
-        .limit(12);
+      inventoryAccess.profile &&
+      inventoryAccess.authorized
+  );
 
-      if (error) {
-        activityLoadErrors.push("Inventory Movement");
-      } else {
-        inventoryMovementActivityRows =
-          (data ?? []) as InventoryMovementActivityRow[];
-      }
-    })());
-  }
+  const [
+    purchaseOrderActivityResult,
+    goodsReceiptActivityResult,
+    inventoryMovementActivityResult,
+  ] = await Promise.all([
+    purchasingActivityAuthorized
+      ? (async () => {
+          const { data, error } = await purchasingAccess.supabase
+            .from("purchase_orders")
+            .select(`
+              id,
+              po_number,
+              status,
+              warehouse_id,
+              created_at,
+              updated_at,
+              submitted_at,
+              approved_at,
+              rejected_at,
+              cancelled_at
+            `)
+            .neq("status", "draft")
+            .order("updated_at", { ascending: false })
+            .limit(12);
 
-  await Promise.all(activityQueries);
+          return {
+            rows: error ? [] : (data ?? []) as PurchaseOrderActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as PurchaseOrderActivityRow[],
+          hasError: false,
+        }),
+    goodsReceiptActivityAuthorized
+      ? (async () => {
+          const { data, error } = await goodsReceiptAccess.supabase
+            .from("goods_receipts")
+            .select("id, receipt_number, purchase_order_id, warehouse_id, posted_at, created_at")
+            .eq("status", "posted")
+            .not("posted_at", "is", null)
+            .order("posted_at", { ascending: false })
+            .limit(12);
+
+          return {
+            rows: error ? [] : (data ?? []) as GoodsReceiptActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as GoodsReceiptActivityRow[],
+          hasError: false,
+        }),
+    inventoryActivityAuthorized
+      ? (async () => {
+          const { data, error } = await inventoryAccess.supabase
+            .from("inventory_movements")
+            .select(`
+              id,
+              warehouse_id,
+              movement_type,
+              source_reference_type,
+              source_reference_number,
+              posted_at,
+              created_at
+            `)
+            .eq("status", "posted")
+            .not("posted_at", "is", null)
+            .order("posted_at", { ascending: false })
+            .limit(12);
+
+          return {
+            rows: error ? [] : (data ?? []) as InventoryMovementActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as InventoryMovementActivityRow[],
+          hasError: false,
+        }),
+  ]);
+
+  const authorizedActivitySourceCount = [
+    purchasingActivityAuthorized,
+    goodsReceiptActivityAuthorized,
+    inventoryActivityAuthorized,
+  ].filter(Boolean).length;
+
+  const sourceActivityLoadErrors = [
+    ...(purchaseOrderActivityResult.hasError ? ["Purchase Order"] : []),
+    ...(goodsReceiptActivityResult.hasError ? ["Goods Receipt"] : []),
+    ...(inventoryMovementActivityResult.hasError ? ["Inventory Movement"] : []),
+  ];
 
   const candidateActivityRows: ScopedActivityRow[] = [
-    ...purchaseOrderActivityRows.map((row) => ({
+    ...purchaseOrderActivityResult.rows.map((row) => ({
       ...row,
       kind: "purchase_order" as const,
     })),
-    ...goodsReceiptActivityRows.map((row) => ({
+    ...goodsReceiptActivityResult.rows.map((row) => ({
       ...row,
       kind: "goods_receipt" as const,
     })),
-    ...inventoryMovementActivityRows.map((row) => ({
+    ...inventoryMovementActivityResult.rows.map((row) => ({
       ...row,
       kind: "inventory_movement" as const,
     })),
@@ -489,9 +558,10 @@ async function DashboardContent() {
     candidateActivityRows
   );
 
-  if (warehouseAccessCheckFailed) {
-    activityLoadErrors.push("Pemeriksaan Akses Gudang");
-  }
+  const activityLoadErrors = [
+    ...sourceActivityLoadErrors,
+    ...(warehouseAccessCheckFailed ? ["Pemeriksaan Akses Gudang"] : []),
+  ];
 
   const activityItems: ActivityRecord[] = visibleActivityRows.map((row) => {
     if (row.kind === "purchase_order") {
@@ -945,12 +1015,7 @@ async function DashboardContent() {
                 </div>
               </div>
 
-              {[
-                { label: "Status Server", icon: "▤" },
-                { label: "Koneksi Database", icon: "▥" },
-                { label: "Backup Terakhir", icon: "◷" },
-                { label: "Uptime Sistem", icon: "↗" },
-              ].map((item) => (
+              {systemHealthItems.map((item) => (
                 <div key={item.label} className="mt-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
@@ -960,23 +1025,29 @@ async function DashboardContent() {
                       {item.label}
                     </span>
                   </div>
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-                    {item.label === "Status Server" || item.label === "Koneksi Database"
-                      ? "Belum diperiksa"
-                      : "Belum tersedia"}
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      item.tone === "ok"
+                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : item.tone === "error"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {item.value}
                   </span>
                 </div>
               ))}
 
-              <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-sky-100/80 to-blue-100/80 p-4">
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg text-blue-600">●</span>
+                  <span className={`text-lg ${databaseConnected ? "text-amber-600" : "text-red-600"}`}>●</span>
                   <span className="text-sm font-bold text-slate-700">
-                    Kondisi Sistem
+                    Kondisi Sistem: {systemConditionLabel}
                   </span>
                 </div>
-                <p className="mt-1 pl-6 text-xs text-slate-500">
-                  Menunggu hasil pemeriksaan layanan sistem.
+                <p className="mt-1 pl-6 text-xs text-slate-600">
+                  {systemConditionNote}
                 </p>
               </div>
             </div>

@@ -648,13 +648,7 @@ export default function ProductsPage({
 }: ProductsPageProps) {
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-slate-100">
-          <p className="text-sm text-slate-600">
-            Memuat data produk...
-          </p>
-        </main>
-      }
+      fallback={null}
     >
       <ProductsContent searchParams={searchParams} />
     </Suspense>

@@ -221,3 +221,85 @@ Results:
 - The Goods Receipt provenance path is not a universal resolver. It can only establish a variant where the PO item itself has a non-null, valid Product Variant and the receipt/movement relationship is unique and quantity-consistent.
 
 No records were changed. The IPH-15-256 case is classified as **candidate provable mapping — pending transfer/valuation cross-check**. HXA-000002/003/004 and TEST-HEXA-001 remain **unresolved at the Variant identity level** based on the evidence retrieved so far.
+
+
+## 13. Transfer and valuation cross-check — provenance candidate rejected
+
+A further read-only reconciliation checked the exact movement group, valuation entries, PO item identity, Variant parent Product, and serialized-unit links.
+
+### 13.1 IPH-15-256-WHT transfer group
+
+The posted transfer group is `1e071c07-2558-47eb-b8bf-67a58c4a7c1e`:
+
+| Movement | Warehouse | Quantity delta | Status | Product Variant |
+|---|---|---:|---|---|
+| `59dcf90a-9bb5-4ff9-81c3-052cf2064bbc` — transfer_out | GUDANG JAKPUS | -1 | posted | NULL |
+| `e448ab47-1545-47ff-9341-83bef0fb487b` — transfer_in | GUDANG TESTING | +1 | posted | NULL |
+
+Both legs share the same group ID, source transfer ID `1e071c07-2558-47eb-b8bf-67a58c4a7c1e`, reference number `TRF-1E071C072558`, Product ID, and posting timestamp window. The pair is quantity-balanced.
+
+### 13.2 Valuation chronology
+
+Three valuation rows are linked to the receipt and transfer movements:
+
+| Transaction | Quantity before → after | Value before → after | Average cost |
+|---|---:|---:|---:|
+| Purchase +10 | 0 → 10 | Rp0 → Rp12,500,000 | Rp1,250,000 |
+| Transfer out -1 | 10 → 9 | Rp12,500,000 → Rp11,250,000 | Rp1,250,000 |
+| Transfer in +1 | 0 → 1 | Rp0 → Rp1,250,000 | Rp1,250,000 |
+
+The transfer valuation is internally consistent: the source reduces one unit and Rp1,250,000; destination receives one unit at the same cost. All three valuation rows have `product_variant_id IS NULL`.
+
+### 13.3 Critical PO Product / Variant referential mismatch
+
+The receipt item links to PO item `e43edccb-fe79-4cef-a941-bde372d0f75b`:
+- PO item Product ID = `a18a7dd1-3db1-4c35-a6ce-2505d12e1adf` (`IPH-15-256-WHT`).
+- PO item Product Variant ID = `0e067953-7b23-4747-bff5-6f74ed2f52e2` (Variant SKU `IPH-15-256`).
+- That Product Variant's own parent Product ID is `511c2c29-c4ba-43a5-9a90-58aae612a0e1` (`TEST-IPHONE-001`), **not** the PO item's Product ID.
+
+The database therefore contains a cross-product identity mismatch in the upstream PO item. Although the PO item has a non-null Variant ID, it does not belong to the same Product. This invalidates the prior candidate mapping. The receipt movement, transfer pair, and valuation chronology are internally quantity/value-consistent but do not prove the correct Variant identity.
+
+**Classification correction:** IPH-15-256-WHT is **ambiguous / identity-conflicted**, not provable. Do not assign Variant SKU `IPH-15-256` to its balance, movements, valuation, or units without business/source-document reconciliation. This finding also demonstrates why a future database constraint must validate `product_variant_id → product_id` consistency, not merely non-nullness.
+
+### 13.4 Serialized IMEI unit trace
+
+The current serialized-unit query returns three unit records:
+- HXA-000002 — IMEI `356938035643809`
+- HXA-000003 — IMEI `352099001761481`
+- HXA-000004 — IMEI `490154203237518`
+
+Each unit has `product_variant_id IS NULL`. Their Goods Receipt-linked PO items also have `product_variant_id IS NULL`. Therefore none can be assigned to a Variant SKU from the available PO/GR provenance.
+
+HXA-000002 additionally has a posted transfer-out/in pair linked through the same `product_unit_id`; the unit remains represented by one unit row, while the movement history records its warehouse transfer. This does not supply missing Variant identity.
+
+The unit-to-GR join can produce multiple PO item candidates if it joins all receipt items for a receipt and Product; a safe future resolver must join through the exact Goods Receipt Item / PO Item relationship for the specific unit creation event, not infer from a broad receipt-level join.
+
+### 13.5 Product-only balance snapshot — unresolved rows
+
+The live Development query returned 10 rows with `product_variant_id IS NULL`:
+
+| Product SKU | Warehouse | On hand | Inventory value | Classification |
+|---|---|---:|---:|---|
+| HXA-000001 | GUDANG JAKPUS | 0 | Rp0 | Zero-balance historical |
+| HXA-000002 | GUDANG JAKPUS | 0 | Rp0 | Zero-balance historical |
+| HXA-000002 | GUDANG TESTING | 1 | Rp1,850,000 | Ambiguous product-only |
+| HXA-000003 | GUDANG JAKPUS | 1 | Rp1,250,000 | Ambiguous product-only |
+| HXA-000004 | GUDANG JAKPUS | 1 | Rp4,850,000 | Ambiguous product-only |
+| IPH-15-256-WHT | GUDANG TESTING | 1 | Rp1,250,000 | Ambiguous / PO Product-Variant conflict |
+| PRD-8C9F56BBF9D44657A0341DA9F1375A57 | GUDANG JAKPUS | 0 | Rp0 | Zero-balance historical |
+| SAM-FOLD-128-BLK | GUDANG JAKPUS | 0 | Rp0 | Zero-balance historical |
+| SS-FOLD-128GB-BLK | GUDANG JAKPUS | 0 | Rp0 | Zero-balance historical |
+| TEST-HEXA-001 | GUDANG JAKPUS | 1 | Rp1,020,000.26 | Ambiguous product-only; test-labelled record, not auto-discarded |
+
+The zero-balance classification applies only to the balance row at the time of inspection; it does not mean its movement/valuation history can be deleted. The table is a live snapshot, not an approved cleanup list.
+
+### 13.6 Updated disposition
+
+- IPH-15-256-WHT: provenance candidate rejected due to PO Product/Variant parent mismatch.
+- HXA-000002/003/004: serialized units and active balances remain ambiguous; upstream PO Variant IDs are NULL.
+- TEST-HEXA-001: remains ambiguous despite test-like naming; no deletion or reassignment.
+- Four product-only balances shown above have zero quantity and zero value; preserve historical references pending dependency analysis.
+- Transfer quantity and valuation arithmetic for the IPH group reconcile, but identity does not.
+- No variant mapping is currently approved by this evidence.
+
+No database records, constraints, functions, triggers, or grants were changed. MD-014 remains P0 / BLOCKING.

@@ -132,3 +132,21 @@ The user may choose the grouping at invoice creation. Only posted DO quantities 
 If only part of a delivered quantity is invoiced, the remaining delivered-but-unbilled quantity remains available for a later invoice. Invoice posting is a billing/receivable workflow and must not create a second sales-recognition or inventory-reduction event; those events remain tied to DO posting under ADR-010.
 
 This decision establishes invoice grouping and quantity linkage only. Customer/currency/tax grouping constraints, invoice numbering, receivable recognition, payment terms, credit notes, cancellation/reversal, and accounting mappings remain design gates before implementing those postings. No live schema, database migration, or Production resource is changed by accepting this decision.
+
+
+## ADR-014 — Initial Sales delivery and reservation operating rules
+
+**Date:** 2026-11-21  
+**Status:** Accepted as implementation baseline
+
+To implement the accepted Sales Order → partial Delivery Order flow without adding a separate reservation or fulfillment module:
+
+- Soft reservation is derived from confirmed Sales Order line quantities less quantities already delivered by posted DOs. No independent reservation ledger is introduced in the initial implementation.
+- Reservation priority is FIFO by confirmation timestamp, with Sales Order number/ID as a stable tie-breaker.
+- Reservations are warehouse-specific. The system does not silently substitute another warehouse or automatically create inter-warehouse transfers.
+- There is no automatic reservation expiry. Reservation demand is released when the SO is cancelled under valid conditions or fully delivered.
+- Only the existing sellable/available inventory bucket may satisfy a DO. Quarantine, damaged, repair, and other non-sellable stock are excluded.
+- Draft documents do not affect inventory or sales recognition. Posted DO is the sole operational sales-recognition and stock-issue boundary.
+- Phase 1 is limited to Sales Order and Delivery Order. Sales Invoice is Phase 2 and is not implemented as a partial financial ledger. Accounts Receivable, payments, tax, revenue/COGS journal, credit-limit enforcement, returns/credit notes, and reversal UI remain excluded until their own accounting and lifecycle decisions are accepted.
+
+These defaults are chosen to make stock allocation deterministic while keeping warehouse operations explicit and avoiding duplicate modules. They do not authorize any Production or live database changes.

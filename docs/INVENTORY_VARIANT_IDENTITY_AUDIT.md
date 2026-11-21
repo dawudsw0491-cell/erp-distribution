@@ -916,3 +916,27 @@ The reviewed product-level movement and transfer creation RPCs are SECURITY DEFI
 Any future replacement or reset helper must have an explicit privilege review, fixed search_path, narrow execution grants, caller authorization where relevant, and a verified rollback path. No ACL or function was changed during this review.
 
 **Conclusion:** Current live posting and validation code is Product-oriented, and the immutable ledger guards intentionally prevent destructive correction. The reset operation cannot safely precede the canonical Variant-level posting implementation and a separately verified recovery mechanism. MD-014 remains P0 / BLOCKING.
+
+
+## 22. Catalog test-label screening — not sufficient for deletion classification
+
+A read-only heuristic scan checked whether selected master records contain the text TEST in their code/name fields. Results:
+
+| Entity | Total | Test-labelled |
+|---|---:|---:|
+| Products | 31 | 2 |
+| Product Variants | 23 | 0 |
+| Brands | 8 | 0 |
+| Product Categories | 15 | 0 |
+| Product Models | 2 | 0 |
+| Suppliers | 3 | 0 |
+| Customers | 1 | 0 |
+| Warehouses | 2 | 1 |
+
+This is only a label-based screening signal. It does not establish that a row is disposable or that a row without TEST is production-ready master data. In particular:
+- The 2 test-labelled Products still have dependent Variants, attribute mappings, SKU registry entries and potentially transaction references.
+- No Variant SKU contains TEST under the tested expression, but that does not make the 23 Variants canonical or safe to retain.
+- One Warehouse is test-labelled, but Warehouses are referenced by inventory, PO/GR, Stock Opname and user warehouse access. Preserve both until the canonical warehouse set and access mapping are explicitly approved.
+- Supplier and Customer names/codes do not contain TEST, but their business legitimacy has not been independently established.
+
+Therefore no catalog or warehouse row is reclassified from REVIEW to RESET solely by this heuristic. The canonical catalog and warehouse seed list remains a required business decision before final manifest approval.

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
-        {children}
+        <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
       </body>
     </html>
   );

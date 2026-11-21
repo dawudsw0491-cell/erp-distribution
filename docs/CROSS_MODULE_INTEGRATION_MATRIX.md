@@ -104,6 +104,28 @@ Consequently, the current active roles do not satisfy the Goods Receipt table po
 
 The live `has_warehouse_access(uuid)` function recognizes active `manager`, `finance`, and `purchasing` roles as broad warehouse-access roles; a `warehouse` role needs an active `user_warehouse_access` assignment. The `warehouse` role is currently inactive with no assigned users. The function's intended policy must be reconciled with the observed role map and module RLS policies.
 
+### 5.1 SECURITY DEFINER warehouse-check follow-up
+
+A follow-up read-only inspection of function definitions found that the sampled mutation functions below check `auth.uid()` and/or module permissions but do not directly call `has_warehouse_access()`:
+
+- Purchase Order create/approve/cancel
+- Goods Receipt create/post
+- Inventory Movement create and unlocked post
+- Inventory Transfer create and unlocked post
+- Stock Opname create/start/count/bulk-count/unit-count/reconcile/unlocked post
+
+The locking wrappers for Inventory Movement, Inventory Transfer and Stock Opname resolve and lock the target warehouse/session before delegating to the unlocked workflow. Their shared `lock_inventory_warehouse(uuid)` helper acquires an advisory transaction lock only; it is not an authorization check.
+
+Because these functions run as SECURITY DEFINER, table RLS alone cannot establish warehouse isolation for their internal writes. Before any assignment-scoped Warehouse role is activated, each write path must validate the warehouse ID resolved from the locked database records. Transfer must validate both source and destination. This is a catalog-level authorization gap requiring a focused call-graph review and transaction test; it is not proof of an observed exploit.
+
+The inspected function ACLs for the sampled operational functions list `authenticated`, `service_role`, and `postgres`; no `PUBLIC` or `anon` EXECUTE entry was returned. Their inspected `search_path` is empty. These positive controls do not replace user/warehouse checks inside SECURITY DEFINER functions.
+
+### 5.2 Current warehouse-role semantics
+
+The live `has_warehouse_access(uuid)` helper grants Owner and active Manager, Finance, and Purchasing roles access to every active warehouse. An active Warehouse role requires a matching active `user_warehouse_access` assignment. Only the Owner role currently has a user assignment; the Warehouse role is inactive. The helper rejects inactive warehouse rows, including for Owner, so historical access to inactive warehouses needs an explicit policy decision.
+
+See `docs/RBAC_WAREHOUSE_ACCESS_REMEDIATION.md` for the current role snapshot, Goods Receipt permission options, target policy coverage, required tests, and approval gates.
+
 ## 6. Live database vs source migration alignment
 
 The live migration ledger currently contains seven applied versions, ending at `20261120081908 canonical_variant_sku_and_unit_label`.

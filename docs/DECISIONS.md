@@ -66,7 +66,7 @@ For products configured with IMEI tracking, Goods Receipt may register zero or m
 ## ADR-009 — Query-aware loading across core ERP modules
 
 **Date:** 2026-11-21  
-**Status:** Accepted; phased implementation pending
+**Status:** Accepted; global route fallback implemented, client-query audit pending
 
 The loading experience is standardized across the first implementation phase: Dashboard; Master Data (Product Management and its submodules, Customers, Suppliers, Warehouses); Purchasing (Purchase Order and Goods Receipt); and Inventory (Stock Balance, Movement, IMEI Registry, Transfer, Stock Opname, and existing submodules).
 

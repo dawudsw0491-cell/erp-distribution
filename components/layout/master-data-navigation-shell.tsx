@@ -14,7 +14,7 @@ export default function MasterDataNavigationShell({ children }: { children: Reac
   const pathname = usePathname();
   const isMasterData = isMasterDataPath(pathname || "");
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
-  const loading = loadingPath === pathname;
+  const loading = loadingPath !== null && loadingPath !== pathname;
 
   function handleNavigation(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;

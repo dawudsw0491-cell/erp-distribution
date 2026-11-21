@@ -158,12 +158,21 @@ function getInventoryMovementActivityLabel(movementType: string) {
 async function DashboardContent() {
   await connection();
 
-  const {
-    user,
-    profile,
-    authorized,
-    supabase,
-  } = await getAuthorizationContext("dashboard.view");
+  // Jalankan pemeriksaan permission secara paralel agar waktu tunggu tidak
+  // menumpuk untuk setiap modul dashboard.
+  const [
+    dashboardAccess,
+    masterAccess,
+    inventoryAccess,
+    purchasingAccess,
+  ] = await Promise.all([
+    getAuthorizationContext("dashboard.view"),
+    getAuthorizationContext("master.view"),
+    getAuthorizationContext("inventory.view"),
+    getAuthorizationContext("purchasing.view"),
+  ]);
+
+  const { user, profile, authorized, supabase } = dashboardAccess;
 
   if (!user) {
     redirect("/login");
@@ -248,7 +257,7 @@ async function DashboardContent() {
   const initial = displayName.charAt(0).toUpperCase();
 
   // Product KPI mengikuti permission dan statistik resmi Master Data.
-  const masterAccess = await getAuthorizationContext("master.view");
+
   let totalProductCount: number | null = null;
   let productLoadError = false;
 
@@ -270,8 +279,7 @@ async function DashboardContent() {
   }
 
   // INVENTORY OVERVIEW ACCESS
-  const inventoryAccess =
-    await getAuthorizationContext("inventory.view");
+
 
   let inventoryData:
     | {
@@ -419,7 +427,7 @@ async function DashboardContent() {
   // BUSINESS ACTIVITY FEED
   // Purchase Order dan Goods Receipt menggunakan permission Purchasing yang sama.
   // Reuse satu authorization context agar tidak melakukan query permission ganda.
-  const purchasingAccess = await getAuthorizationContext("purchasing.view");
+
   const goodsReceiptAccess = purchasingAccess;
 
   const purchasingActivityAuthorized = Boolean(

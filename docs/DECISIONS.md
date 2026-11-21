@@ -92,3 +92,15 @@ The Sales module must preserve the distinction between:
 Inventory reduction and the sales-recognition event must be coordinated with the DO posting transaction. Invoice creation/posting must not recognize the same sale a second time. Revenue account mapping, tax treatment, receivable recognition, cost-of-goods-sold accounting, partial delivery, cancellation/reversal, and payment terms remain separate design decisions and must be resolved before implementing their respective postings.
 
 No live schema, database migration, or Production resource is changed by accepting this decision.
+
+
+## ADR-011 — Allow partial Delivery Order fulfillment
+
+**Date:** 2026-11-21  
+**Status:** Accepted
+
+A Sales Order may be fulfilled through multiple Delivery Orders. Each successfully posted DO fulfills and recognizes only the quantities included in that DO. The Sales Order remains partially fulfilled while any ordered quantity remains outstanding; it becomes fully fulfilled only when all eligible quantities have been delivered.
+
+Each DO posting must coordinate the stock reduction and sales-recognition event for its own quantities. The outstanding quantity remains visible as backorder / unfulfilled quantity and must not be recognized as delivered or sold. Invoice documents must reference the relevant delivered quantities and must not duplicate sales recognition.
+
+This decision establishes partial fulfillment behavior only. It does not yet decide stock reservation, availability checks, backorder release, customer credit/payment terms, invoicing aggregation, cancellation/reversal, or accounting/tax treatment. No live schema, database migration, or Production resource is changed by accepting this decision.

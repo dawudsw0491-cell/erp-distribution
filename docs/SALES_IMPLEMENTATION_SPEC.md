@@ -107,3 +107,20 @@ Use the existing getAuthorizationContext application pattern and existing RBAC h
 - External carrier/shipping integrations.
 
 These are not silently inferred from customer master fields or existing inventory movement types.
+
+
+## 10. Implementation blocker — inventory variant granularity
+
+A live Development schema inspection on 2026-11-21 found that `inventory_balances` has the unique constraint `(product_id, warehouse_id)`. The current `post_inventory_movement_unlocked` implementation locks and updates the balance using `product_id + warehouse_id`; it does not partition the balance by `product_variant_id`. Although `inventory_movements`, `inventory_balances`, and `product_units` contain nullable `product_variant_id` columns, this does not provide independent stock balances for multiple variants of one Product.
+
+This conflicts with the accepted product identity model in which each Product Variant has its own immutable SKU and stock must be attributable to that SKU. Sales Order reservation, Delivery Order availability checks, and outbound posting cannot safely be implemented at variant level until Inventory supports a canonical balance key of `product_variant_id + warehouse_id` (or a formally accepted equivalent that preserves SKU-level stock identity).
+
+Required prerequisite work under Inventory / MD-010 integration:
+- Inspect all existing Inventory read/write RPCs, balance views, valuation logs, stock opname, transfers, Goods Receipt, and product-unit tracking for assumptions that balances are product-level.
+- Define a non-destructive migration from current product-level rows to variant-level balances. Do not guess a variant assignment for historical aggregate balances where the source cannot prove it.
+- Update all stock movement posting and valuation paths to lock and update the canonical stock key consistently, including quantity-tracked and IMEI/Serial-tracked products.
+- Add uniqueness, FK, RLS, warehouse scope, and concurrency controls for variant-level balances.
+- Verify existing historical movements reconcile to opening balances and valuation totals; ambiguous legacy balances must remain explicitly unresolved rather than silently allocated.
+- Run Goods Receipt, Inventory Movement, Transfer, Stock Opname, and valuation regression tests before unblocking SALES-001.
+
+No Sales migration or live schema change is authorized by this finding. Sales implementation remains blocked until this prerequisite is source-committed, validated in Development, and its migration/legacy-data reconciliation evidence is recorded.

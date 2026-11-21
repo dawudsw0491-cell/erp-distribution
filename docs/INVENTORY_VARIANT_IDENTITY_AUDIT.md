@@ -409,3 +409,43 @@ The next transition design must explicitly separate:
 - **Valid Variant parent relationships** — preserve unchanged.
 
 No database rows or schema objects were modified. MD-014 remains P0 / BLOCKING; Sales implementation remains blocked.
+
+
+## 16. Goods Receipt unit-level lineage and transfer source-table check
+
+### 16.1 IMEI provenance is exact at receipt-item level, but Variant remains unknown
+
+The Goods Receipt unit tables provide a more precise lineage than a broad receipt-level join:
+
+`goods_receipt_units.goods_receipt_item_id → goods_receipt_items.id → purchase_order_item_id → purchase_order_items`
+
+For GR `GR-20261117-78177A18`, the exact item/unit links are:
+
+| Product SKU | Goods Receipt Item ID | PO Item ID | IMEI / Unit Code | PO Variant |
+|---|---|---|---|---|
+| HXA-000002 | `633445cf-8629-41a2-a85d-8954ab9c0409` | `0901e39f-7b42-48eb-af56-57b9d47c7b25` | `356938035643809` | NULL |
+| HXA-000003 | `a1a5797b-5f30-4084-af3e-b81396870110` | `b9da2445-56e2-4c7f-8e67-154f206f932d` | `352099001761481` | NULL |
+| HXA-000004 | `68838bac-05b3-4ab2-9961-6fc49c2c0c0c` | `0fd5d717-33f9-4fd0-afb4-6e9205c0566d` | `490154203237518` | NULL |
+
+Each Goods Receipt item has quantity 1 and exactly one Goods Receipt unit identifier. The exact chain confirms which PO line each IMEI came from, but the source PO lines have no Variant ID. Thus the three serialized units are **precisely traced but still Variant-unresolved**.
+
+### 16.2 IPH receipt line retains invalid upstream Variant reference
+
+GR `GR-20261116-C6BB0763` item `bc7c044b-91c4-4d14-9f87-3d631d46f34f` receives quantity 10 at Rp1,250,000 each from PO item `e43edccb-fe79-4cef-a941-bde372d0f75b`. The PO line references Variant SKU `IPH-15-256`, whose parent Product remains `TEST-IPHONE-001`, not `IPH-15-256-WHT`. The exact receipt-item join confirms the bad reference is inherited from the PO; it does not resolve the correct variant.
+
+GR `GR-20261120-2770CA9C` for `TEST-HEXA-001` similarly has a PO item with NULL Variant ID; no Variant can be inferred.
+
+### 16.3 Transfer header/line table discovery
+
+A catalog scan for public base tables with names containing `transfer` returned no rows in this Development database. The inspected transfer history is currently exposed through Product-only `inventory_movements` with `source_reference_type = 'stock_transfer'`, source reference IDs, and movement groups. There is no separate public transfer header/line table available to validate through this catalog query.
+
+This absence is a schema observation, not proof that no transfer record exists in another schema or external service. Any transition design must use the actual current movement provenance and should not invent a transfer-header FK.
+
+### 16.4 Updated source lineage disposition
+
+- HXA-000002/003/004: exact PO/GR/IMEI line lineage confirmed; Variant remains NULL and unresolved.
+- IPH-15-256-WHT: exact GR→PO lineage confirmed; PO's non-null Variant is cross-Product and invalid as a resolver.
+- TEST-HEXA-001: exact GR→PO lineage confirmed; Variant remains NULL.
+- Transfer references: only movement-level source reference and group evidence found in public transfer-named base-table scan.
+
+No records were changed.

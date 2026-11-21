@@ -116,3 +116,19 @@ Sales Orders use soft reservation. Confirming an SO records its outstanding dema
 A Sales Order may remain open with an unavailable quantity; that quantity is shown as outstanding/backorder rather than treated as delivered. Reservation priority and allocation must be deterministic and visible. Because soft reservations are not exclusive locks, the system must revalidate and allocate stock transactionally when a Delivery Order is posted. Concurrent DO postings must not consume the same available quantity or create negative stock. The stock reduction and sales-recognition event for each posted DO must commit atomically.
 
 This decision does not yet define the exact reservation priority/expiry/release rules, warehouse substitution/transfer behavior, credit/payment terms, invoice aggregation, cancellation/reversal, or accounting/tax treatment. These must be designed before implementing their respective workflows. No live schema, database migration, or Production resource is changed by accepting this decision.
+
+
+## ADR-013 — Flexible Sales Invoice grouping from posted Delivery Orders
+
+**Date:** 2026-11-21  
+**Status:** Accepted
+
+The Sales Invoice workflow supports both:
+- creating an invoice for one posted Delivery Order; and
+- combining eligible posted Delivery Orders into one invoice.
+
+The user may choose the grouping at invoice creation. Only posted DO quantities are eligible for billing. Each invoice line must retain its source DO-line reference and the quantity billed against that source. The cumulative invoiced quantity for a DO line must never exceed its valid delivered quantity. Duplicate billing and billing from draft, cancelled, or otherwise ineligible DOs must be prevented by server-side validation and database transaction constraints/locking as appropriate.
+
+If only part of a delivered quantity is invoiced, the remaining delivered-but-unbilled quantity remains available for a later invoice. Invoice posting is a billing/receivable workflow and must not create a second sales-recognition or inventory-reduction event; those events remain tied to DO posting under ADR-010.
+
+This decision establishes invoice grouping and quantity linkage only. Customer/currency/tax grouping constraints, invoice numbering, receivable recognition, payment terms, credit notes, cancellation/reversal, and accounting mappings remain design gates before implementing those postings. No live schema, database migration, or Production resource is changed by accepting this decision.

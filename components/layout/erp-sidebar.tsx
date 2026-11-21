@@ -27,6 +27,7 @@ import LogoutButton from "@/components/layout/logout-button";
 
 type ErpSidebarProps = {
   activePath?: string;
+  persistent?: boolean;
 };
 
 type MenuChild = {
@@ -144,10 +145,16 @@ function isRouteActive(currentPath: string, href: string) {
 
 export default function ErpSidebar({
   activePath = "/",
+  persistent = false,
 }: ErpSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const currentPath = pathname || activePath;
+  const isMasterDataRoute = ["/products", "/customers", "/suppliers", "/warehouses"].some(
+    (base) => currentPath === base || currentPath.startsWith(`${base}/`)
+  );
+
+  if (isMasterDataRoute && !persistent) return null;
 
   // Warm the App Router cache before the user clicks a destination.
   // This changes navigation timing only; server authorization and data

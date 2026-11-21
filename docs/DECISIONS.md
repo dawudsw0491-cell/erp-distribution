@@ -75,3 +75,20 @@ Sales, Returns, Accounting, and Settings are explicitly deferred to a later phas
 The loading indicator must reflect actual work required to render the active view. Server-rendered route data uses Next.js route loading boundaries and Suspense/streaming. Client-side requests that are necessary for the active view use a shared pending-request tracker with concurrency-safe accounting and guaranteed release in `finally`; failures terminate loading and are surfaced through the page's error handling. Cached data should not create a false loading state. Background polling, long-lived realtime subscriptions, and unrelated requests must not hold the global navigation indicator open. Artificial minimum durations are not a substitute for query completion.
 
 The existing loader visual treatment is preserved. No database schema, posting logic, permissions, or production resources are changed as part of this work. Completion is tracked in QA-002 and requires route-by-route fast/slow/parallel/error/cache verification, local lint/build, Preview READY, and authenticated smoke tests.
+
+
+## ADR-010 — Sales recognition at Delivery Order posting
+
+**Date:** 2026-11-21  
+**Status:** Accepted
+
+Sales is recognized when a Delivery Order (DO) is successfully posted. Posting a Sales Invoice is not the event that recognizes the sale.
+
+The Sales module must preserve the distinction between:
+- order commitment (Sales Order),
+- physical goods issue / delivery (posted Delivery Order),
+- billing document (Sales Invoice).
+
+Inventory reduction and the sales-recognition event must be coordinated with the DO posting transaction. Invoice creation/posting must not recognize the same sale a second time. Revenue account mapping, tax treatment, receivable recognition, cost-of-goods-sold accounting, partial delivery, cancellation/reversal, and payment terms remain separate design decisions and must be resolved before implementing their respective postings.
+
+No live schema, database migration, or Production resource is changed by accepting this decision.

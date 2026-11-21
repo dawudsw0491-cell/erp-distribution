@@ -410,7 +410,7 @@ export async function createProduct(formData: FormData) {
   revalidatePath("/products");
   revalidatePath("/products/" + data.product_id);
   revalidatePath("/products/" + data.product_id + "/variants");
-  redirect("/products/" + data.product_id + "?created=1");
+  redirect("/products?created=1&new=" + data.product_id);
 }
 
 /* =========================================================

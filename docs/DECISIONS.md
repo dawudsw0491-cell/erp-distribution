@@ -61,3 +61,17 @@ A task is executed against one backlog ID and one active implementation branch. 
 **Status:** Implemented in source; pending migration validation and application
 
 For products configured with IMEI tracking, Goods Receipt may register zero or more identified units up to the received quantity. Each identified unit is tracked through `product_units` and `product_unit_identifiers`; the untagged remainder is posted as aggregate SKU inventory with a NULL `product_unit_id`. Transfers preserve this distinction: an identified unit transfer supplies its unit ID and quantity one, while aggregate SKU transfers leave the unit ID NULL. Stock opname stores aggregate IMEI count separately from individual unit counts and reconciles their sum. Serial-number products remain fully serialized and mandatory per unit. This is one integrated tracking policy, not a second inventory module.
+
+
+## ADR-009 — Query-aware loading across core ERP modules
+
+**Date:** 2026-11-21  
+**Status:** Accepted; phased implementation pending
+
+The loading experience is standardized across the first implementation phase: Dashboard; Master Data (Product Management and its submodules, Customers, Suppliers, Warehouses); Purchasing (Purchase Order and Goods Receipt); and Inventory (Stock Balance, Movement, IMEI Registry, Transfer, Stock Opname, and existing submodules).
+
+Sales, Returns, Accounting, and Settings are explicitly deferred to a later phase after those modules are implemented.
+
+The loading indicator must reflect actual work required to render the active view. Server-rendered route data uses Next.js route loading boundaries and Suspense/streaming. Client-side requests that are necessary for the active view use a shared pending-request tracker with concurrency-safe accounting and guaranteed release in `finally`; failures terminate loading and are surfaced through the page's error handling. Cached data should not create a false loading state. Background polling, long-lived realtime subscriptions, and unrelated requests must not hold the global navigation indicator open. Artificial minimum durations are not a substitute for query completion.
+
+The existing loader visual treatment is preserved. No database schema, posting logic, permissions, or production resources are changed as part of this work. Completion is tracked in QA-002 and requires route-by-route fast/slow/parallel/error/cache verification, local lint/build, Preview READY, and authenticated smoke tests.

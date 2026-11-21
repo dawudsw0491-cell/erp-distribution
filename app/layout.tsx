@@ -1,5 +1,6 @@
 
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -31,7 +32,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
-        <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
+        <Suspense fallback={null}>
+          <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
+        </Suspense>
       </body>
     </html>
   );

@@ -195,21 +195,12 @@ async function DashboardContent() {
     );
   }
 
-  // Status server ini hanya menyatakan bahwa request Dashboard sedang diproses.
-  // Koneksi database diverifikasi melalui pembacaan profil pengguna yang sedang login.
-  const databaseHealthProbe = await supabase
-    .from("user_profiles")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const databaseConnected =
-    !databaseHealthProbe.error && databaseHealthProbe.data?.id === user.id;
-  const databaseHealthStatus = databaseHealthProbe.error
-    ? "Gagal"
-    : databaseConnected
-      ? "Terhubung"
-      : "Tidak terverifikasi";
+  // getAuthorizationContext sudah membaca user_profiles untuk memvalidasi
+  // pengguna aktif. Gunakan hasil tersebut; jangan mengulang query yang sama.
+  const databaseConnected = Boolean(profile?.is_active);
+  const databaseHealthStatus = databaseConnected
+    ? "Terhubung"
+    : "Tidak terverifikasi";
 
   const systemHealthItems = [
     {
@@ -222,11 +213,7 @@ async function DashboardContent() {
       label: "Koneksi Database",
       icon: "▥",
       value: databaseHealthStatus,
-      tone: databaseConnected
-        ? "ok" as const
-        : databaseHealthProbe.error
-          ? "error" as const
-          : "warning" as const,
+      tone: databaseConnected ? "ok" as const : "warning" as const,
     },
     {
       label: "Backup Terakhir",

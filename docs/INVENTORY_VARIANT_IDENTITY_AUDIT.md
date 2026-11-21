@@ -180,3 +180,27 @@ MD-014 must produce a single identity transition design covering:
 - legacy balance, movement, valuation and unit classification.
 
 No application-side partial fix should switch only one page or action to Variant ID while the corresponding live posting function still writes Product ID.
+
+
+## 10. Trigger event and function ACL verification
+
+The previous information-schema trigger listing repeated rows for multi-event triggers. A direct `pg_trigger` inspection confirms there are **not duplicate trigger objects** for those repeated rows; the same trigger was represented once per event by the earlier catalog view.
+
+Verified active trigger definitions include:
+
+- Warehouse-scope enforcement on balances, movements, product units, Goods Receipts, and Stock Opname records.
+- Inventory movement update/delete guards and posted timestamp trigger.
+- Valuation insert guard, validation trigger, and two distinct update/delete protection triggers (`guard_inventory_valuation_change` and `prevent_inventory_valuation_log_change`). These are separate objects and must both be understood before any cleanup.
+- Product unit tracking validation on insert/update of `product_variant_id`.
+
+Function ACL inspection confirms:
+
+- Authenticated can execute the public-facing movement and transfer creation functions, Goods Receipt posting, Inventory Movement posting wrapper, Inventory Transfer posting wrapper, and Inventory Reversal wrapper.
+- The `*_unlocked` posting functions are not granted to authenticated; their ACL is limited to postgres/service_role in the inspected state.
+- This is materially safer than the earlier generic concern that all SECURITY DEFINER functions may be callable by every role. The exact ACL must be preserved and rechecked after any future function replacement.
+
+## 11. Record-level legacy classification status
+
+The aggregate snapshot is sufficient to prove ambiguity exists but not sufficient to map every record. The next read-only reconciliation query must enumerate the exact primary keys and source-document references for each balance, movement, valuation log, and product unit, then determine whether a trusted upstream PO/GR/identifier/document establishes a Variant ID.
+
+No record-level reassignment is justified from Product ID alone where the Product has multiple variants. No trigger duplication cleanup is indicated by the verified `pg_trigger` catalog.

@@ -534,3 +534,101 @@ This section is a design proposal only. It is not an implementation instruction 
 5. Approve the exact migration/cutover/rollback plan before any schema or data write.
 
 **Current status:** design draft only. No schema/data change has been authorized or executed. MD-014 remains P0 / BLOCKING and SALES-001 remains blocked.
+
+
+## 18. Approved test-data disposition — RESET SELECTED, EXECUTION NOT AUTHORIZED
+
+**Decision recorded 2026-11-21:** The user confirmed that all data currently entered into the application is test data and selected **reset** as the intended disposition for MD-014. This changes the remediation strategy: the project does not need to preserve or individually remap defective test transactions as business history. It does not change the canonical schema target or remove the need to understand dependencies.
+
+**Authorization boundary:** This is a planning decision only. It does not authorize deletion, truncation, table drops, schema changes, migration application, RPC/RLS/trigger changes, or any Production action. No reset has been executed. A separate explicit approval is required after the exact target environment, reset scope, dependency order, backup/restore point, and post-reset seed plan are presented.
+
+### 18.1 Reset principle and preservation boundary
+
+- Rebuild the Development test dataset from a clean, documented baseline after the canonical schema and posting contracts are implemented and validated.
+- Do not carry forward test transaction history merely to repair its invalid Product/Variant references.
+- Do not use a broad schema reset or indiscriminate TRUNCATE as the reset method.
+- Preserve schema objects, migration ledger/provenance, constraints, indexes, RPCs, triggers, RLS policies, grants, and deployment configuration unless a separately reviewed implementation change explicitly modifies them.
+- Preserve required bootstrap/security data and system configuration: owner/admin access path, roles, permissions, role-permission mappings, warehouse access model, and essential reference/configuration rows. Exact table-level classification remains a prerequisite; do not assume every master/config row is safe to preserve.
+- Product/catalog master rows created only for testing may be reset and reseeded from the approved canonical catalog. Do not delete master data until dependencies and required seed records are identified.
+- Keep Development and Production strictly separated. Production is out of scope and must not be queried for reset execution or modified.
+
+### 18.2 Reset scope classification and dependency matrix
+
+The matrix is a planning inventory, not a deletion script. Actual FK graph, cascade behavior, triggers, RPC side effects, and all dependent tables must be re-queried from the current Development schema immediately before an approved reset.
+
+| Domain / data class | Known objects / examples | Intended disposition | Dependency / ordering requirement |
+|---|---|---|---|
+| Purchasing transactions | `purchase_orders`, `purchase_order_items` | Reset test rows | Before GR and inventory descendants only where FK graph requires; inspect status/audit references and child tables |
+| Goods Receipt | `goods_receipts`, `goods_receipt_items`, `goods_receipt_units` | Reset test rows | After dependent inventory movements, valuation and units, or use a verified dependency-safe order |
+| Inventory ledger | `inventory_movements`, `inventory_valuation_logs`, `inventory_balances` | Reset all test rows and rebuild balances from fresh postings | Movements/valuation/unit references must be handled before balances; never independently zero balances while retaining ledger rows |
+| Serialized tracking | `product_units`, GR unit identifiers | Reset test units | Resolve references from GR, movement, transfer and Opname records first; IMEI remains optional in the target model |
+| Stock Opname | `stock_opnames`, `stock_opname_items` and related count rows | Reset test sessions and detail rows | Child count rows before session headers if FK requires; confirm actual table names and FK graph |
+| Transfers | Movement rows with `source_reference_type='stock_transfer'`; no public transfer-named base table was found in the earlier scan | Reset test transfer history as part of inventory ledger | Trace source references and movement groups; do not invent a transfer header table |
+| Sales / returns | No authoritative Sales transaction implementation is currently accepted; Sales remains blocked | No assumed reset target until current schema inventory confirms objects | Must remain blocked until inventory identity contract is complete |
+| Product/catalog master | Products, variants, categories, brands, attributes, attribute values, barcodes, warranty templates | Classify test-created rows for reset; reseed only approved canonical master data | Reset child/association rows before parent masters; preserve required system/reference seeds; validate SKU/variant FK dependencies |
+| Warehouses and locations | Warehouse master and user-warehouse access links | Preserve required canonical warehouses/configuration; remove test-only locations only after access dependencies are mapped | Preserve valid security scope and required default warehouse references |
+| Identity and authorization | Auth users, user profiles, roles, permissions, role assignments, role-permission links | Preserve bootstrap access and security configuration by default | Never bulk-delete auth/security rows as part of transaction reset; validate owner recovery before any account cleanup |
+| System/configuration/reference data | Settings, numbering sequences, templates, feature/config rows | Preserve required system configuration; reset only explicitly classified test fixtures | Identify which values are runtime-critical and which are generated test fixtures |
+| Audit / event / logs | Audit trails, activity events, outbox/notification rows if present | Classify separately; retain security/audit evidence unless approved policy says otherwise | Inspect FK retention and external side effects; deleting source rows may not delete external events |
+| Storage objects | Product/document attachments if present | Classify and clean only with matching DB reference plan | DB row cleanup and object deletion are separate operations; no orphan/bulk storage deletion without inventory |
+
+### 18.3 Required reset dependency discovery
+
+Before writing a reset plan or SQL, perform a read-only, current-state discovery of:
+
+1. All tables in exposed and relevant private schemas, row counts, primary keys, foreign keys, FK delete actions, and dependency graph.
+2. Triggers on candidate tables, including trigger functions and whether they write to other tables or external systems.
+3. RPC/function definitions that create, post, reverse, or delete transactional records; identify side effects and SECURITY DEFINER execution boundaries.
+4. RLS policies and grants affecting reset visibility/execution; do not weaken them to make reset easier.
+5. Storage buckets and object references, if any test transactions own uploaded files.
+6. Current migration ledger versus repository migrations; a data reset must not rewrite or erase migration provenance.
+7. Required bootstrap user and authorization recovery path, including confirmation that an Owner can still log in after the reset.
+8. Canonical seed set for warehouses, product/catalog master, warranty templates, roles, permissions and other required reference data.
+
+### 18.4 Revised MD-014 sequence
+
+**Phase A — Freeze and baseline (read-only)**
+- Re-query current Development row counts and key relationships; previous snapshots are historical evidence and must not be treated as current counts.
+- Capture export/backup or an approved restore point before any reset; record timestamp, environment ref, table coverage and restore verification.
+- Produce an explicit table-by-table KEEP / RESET / RESEED / REVIEW register with reason and dependency order.
+- No writes.
+
+**Phase B — Canonical source/schema contract**
+- Complete Product Variant stock identity across balances, movements, valuation, units, Goods Receipt, transfers, reversals and Stock Opname.
+- Correct PO/GR/Opname and application contracts so all writers validate Product ID against Variant parent Product ID.
+- Preserve permissions, warehouse scope, RLS, SECURITY DEFINER boundaries and exact EXECUTE ACLs.
+- Keep Sales implementation blocked until Inventory identity is stable.
+
+**Phase C — Clean Development baseline design**
+- Define canonical seed data and required bootstrap/security/configuration rows.
+- Build a dependency-ordered reset manifest from the verified FK/trigger/function graph.
+- Prefer a controlled, idempotent reset procedure scoped to approved Development test records; avoid blanket table truncation and CASCADE unless individually justified.
+- Define preconditions, abort conditions, transaction boundaries, expected row counts, and post-reset assertions.
+
+**Phase D — Explicit reset approval gate**
+- Present exact project/environment, table list, KEEP/RESET/RESEED classifications, expected impact, backup/restore plan, and execution sequence.
+- Obtain explicit user approval for the reset operation itself. The prior selection of "reset" is not approval to execute any database write.
+
+**Phase E — Execute only after approval**
+- Execute only against the confirmed Development project.
+- Verify clean transaction tables, retained Owner access/security configuration, preserved migration ledger, canonical master seeds, and zero orphan references.
+- Record exact migration/script commit, execution evidence and before/after counts.
+- Do not touch Production.
+
+**Phase F — Rebuild and validate**
+- Recreate approved master/catalog fixtures, then run controlled PO → GR → Inventory, optional IMEI, transfer, reversal and Stock Opname tests.
+- Verify variant-level quantity/value/average cost by warehouse, parent consistency, RLS, warehouse scope, ACLs and rollback behavior.
+- Only then unblock dependent Sales design/implementation.
+
+### 18.5 Reset stop conditions
+
+Stop without writing if any of the following is true:
+- Environment identity is not conclusively Development.
+- Owner/admin recovery cannot be demonstrated.
+- FK/cascade/trigger side effects are incomplete or unknown.
+- A candidate table mixes system/security records with test fixtures and cannot be safely separated.
+- Backup/restore point is unavailable or unverified.
+- Migration ledger/source provenance is at risk.
+- Reset would affect Production, shared external storage, or external integrations outside the approved scope.
+
+**Current state:** Reset disposition selected; reset manifest and dependency discovery are pending. No data, schema, migration, RPC, RLS, trigger, ACL, or Production changes have been performed.

@@ -47,9 +47,18 @@ BEGIN
                 v_warehouse_id := NULLIF(v_row ->> 'warehouse_id', '')::uuid;
 
             WHEN 'product_units' THEN
-                -- NULL is the existing unassigned/historical unit state.
+                -- Preserve already-unassigned/historical units, but do not let an
+                -- assigned unit shed its warehouse scope through an UPDATE to NULL.
                 v_warehouse_id := NULLIF(v_row ->> 'warehouse_id', '')::uuid;
-                IF v_warehouse_id IS NULL THEN CONTINUE; END IF;
+                IF v_warehouse_id IS NULL THEN
+                    IF TG_OP = 'UPDATE' THEN
+                        IF NULLIF(to_jsonb(OLD) ->> 'warehouse_id', '') IS NOT NULL THEN
+                            RAISE EXCEPTION 'Product Unit warehouse scope cannot be cleared'
+                                USING ERRCODE = '42501';
+                        END IF;
+                    END IF;
+                    CONTINUE;
+                END IF;
 
             WHEN 'purchase_order_items' THEN
                 SELECT po.warehouse_id

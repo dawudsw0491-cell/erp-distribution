@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 
@@ -13,11 +13,8 @@ function isMasterDataPath(path: string) {
 export default function MasterDataNavigationShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isMasterData = isMasterDataPath(pathname || "");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(false);
-  }, [pathname]);
+  const [loadingPath, setLoadingPath] = useState<string | null>(null);
+  const loading = loadingPath === pathname;
 
   function handleNavigation(event: MouseEvent<HTMLDivElement>) {
     const target = event.target;
@@ -31,7 +28,7 @@ export default function MasterDataNavigationShell({ children }: { children: Reac
       isMasterDataPath(destination.pathname) &&
       isMasterDataPath(pathname || "")
     ) {
-      setLoading(true);
+      setLoadingPath(destination.pathname);
     }
   }
 

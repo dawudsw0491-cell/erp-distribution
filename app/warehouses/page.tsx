@@ -349,7 +349,7 @@ export default function WarehousesPage({
   searchParams: Promise<SearchParams>;
 }) {
   return (
-    <Suspense fallback={<div className="p-8">Memuat Master Warehouse...</div>}>
+    <Suspense fallback={null}>
       <WarehousePageContent searchParams={searchParams} />
     </Suspense>
   );

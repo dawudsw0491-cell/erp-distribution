@@ -417,12 +417,10 @@ async function DashboardContent() {
   ).size;
 
   // BUSINESS ACTIVITY FEED
-  // Setiap sumber menggunakan permission modulnya sendiri; baris kemudian
-  // disaring lagi dengan has_warehouse_access agar tidak melewati lingkup gudang.
-  const [purchasingAccess, goodsReceiptAccess] = await Promise.all([
-    getAuthorizationContext("purchasing.view"),
-    getAuthorizationContext("goods_receipt.view"),
-  ]);
+  // Purchase Order dan Goods Receipt menggunakan permission Purchasing yang sama.
+  // Reuse satu authorization context agar tidak melakukan query permission ganda.
+  const purchasingAccess = await getAuthorizationContext("purchasing.view");
+  const goodsReceiptAccess = purchasingAccess;
 
   const purchasingActivityAuthorized = Boolean(
     purchasingAccess.user &&

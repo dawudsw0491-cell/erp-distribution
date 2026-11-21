@@ -233,10 +233,8 @@ async function DashboardContent() {
     ? "Operasional terbatas"
     : "Perlu pemeriksaan";
   const systemConditionNote = databaseConnected
-    ? "Server merespons dan database berhasil diperiksa pada request ini. Backup serta uptime belum memiliki sumber telemetry."
-    : databaseHealthProbe.error
-      ? "Query pemeriksaan database gagal. Periksa koneksi database dan akses tabel profil."
-      : "Baris profil pengguna tidak dapat diverifikasi melalui query database.";
+    ? "Server merespons dan profil pengguna aktif berhasil diverifikasi. Backup serta uptime belum memiliki sumber telemetry."
+    : "Profil pengguna tidak dapat diverifikasi. Periksa status akun dan koneksi autentikasi.";
 
   const displayName =
     profile.full_name?.trim() || user.email || "Pengguna";
@@ -1023,9 +1021,7 @@ async function DashboardContent() {
                     className={`rounded-full border px-3 py-1 text-xs font-semibold ${
                       item.tone === "ok"
                         ? "border-blue-200 bg-blue-50 text-blue-700"
-                        : item.tone === "error"
-                          ? "border-red-200 bg-red-50 text-red-700"
-                          : "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
                     }`}
                   >
                     {item.value}

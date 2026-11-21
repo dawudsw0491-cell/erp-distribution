@@ -4,7 +4,7 @@ export default function MasterDataLoading() {
       role="status"
       aria-live="polite"
       aria-label="Memuat halaman"
-      className="flex min-h-[70vh] w-full items-center justify-center bg-slate-100 px-6"
+      className="flex h-full min-h-[70vh] w-full items-center justify-center bg-slate-100 px-6"
     >
       <div className="w-full max-w-xs">
         <div className="master-data-loader-scene mx-auto w-full max-w-[260px]">

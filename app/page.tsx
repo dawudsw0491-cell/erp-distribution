@@ -84,6 +84,7 @@ function formatCurrency(value: number) {
 
 function formatActivityDateTime(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
     day: "2-digit",
     month: "short",
     year: "numeric",

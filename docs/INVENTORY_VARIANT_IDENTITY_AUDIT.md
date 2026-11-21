@@ -449,3 +449,88 @@ This absence is a schema observation, not proof that no transfer record exists i
 - Transfer references: only movement-level source reference and group evidence found in public transfer-named base-table scan.
 
 No records were changed.
+
+
+## 17. Non-destructive transition proposal — DRAFT, NOT APPROVED
+
+This section is a design proposal only. It is not an implementation instruction and does not authorize DDL, RPC replacement, data updates, migration application, or Production changes.
+
+### 17.1 Target identity contract
+
+- Product Variant is the canonical stock identity.
+- Every inventory balance, movement, valuation entry, Stock Opname item, and serialized unit must resolve to one Product Variant when the business item is variant-managed.
+- Product ID must equal the parent Product ID of the referenced Product Variant.
+- IMEI/unit identifier remains optional for aggregate stock. If present, it identifies an individual serialized unit but does not replace Variant SKU identity.
+- Product-only legacy rows must remain explicitly classified as unresolved until authoritative source evidence determines a mapping. Product ID or descriptive SKU text alone is not sufficient evidence.
+
+### 17.2 Data safety classes
+
+| Class | Current evidence | Proposed handling |
+|---|---|---|
+| Valid Product/Variant parent match | 74/74 variant attribute value rows passed; other valid references must be rechecked by table | Preserve unchanged |
+| Cross-Product non-null Variant | 4 PO lines, 25 posted Opname items, 5 balance rows | Quarantine from automatic mapping; require source-document/business resolution |
+| NULL Variant with active stock/value | 5 product-only balance rows from earlier snapshot; movement/valuation/unit records also NULL | Preserve quantity/value and history; require explicit mapping evidence |
+| NULL Variant with zero balance | 5 balance rows from earlier snapshot | Retain historical rows; no deletion based only on zero balance |
+| Exact IMEI/GR/PO trace but PO Variant NULL | HXA-000002/003/004 | Preserve IMEI trace; Variant remains unresolved until source documents or authorized product master decision are supplied |
+
+### 17.3 Proposed remediation phases
+
+**Phase A — Freeze and baseline**
+1. Capture a timestamped Development snapshot of balances, movements, valuation logs, product units, PO items, GR items/units, and Stock Opname items.
+2. Export primary keys and source-document links into a reconciliation register.
+3. Record row counts, per-warehouse quantity/value totals, and hashes or equivalent immutable evidence.
+4. No data writes in this phase.
+
+**Phase B — Authoritative identity resolution**
+1. Resolve each cross-Product PO reference against the approved product catalogue and source purchase documents.
+2. Resolve the 25 posted Stock Opname references. Their zero quantities do not waive the posted-document audit requirement.
+3. Resolve the five non-null cross-Product balance rows, especially IPH-15-256-WHT's 9 Units / Rp11,250,000.
+4. Resolve Product-only active stock and serialized units from authoritative documents; do not infer from Product labels or IMEI format.
+5. Produce a signed-off mapping register with old identity, intended Product ID, intended Variant ID, evidence, approver, and affected downstream rows. Any unresolved record remains in a legacy/unresolved bucket.
+
+**Phase C — Source contract correction**
+1. Make PO item writes validate Variant parent Product before saving.
+2. Make Goods Receipt inherit the exact PO item identity and reject invalid Product/Variant pairs.
+3. Make Stock Opname creation/posting validate the same parent relationship.
+4. Make all Inventory posting RPCs accept and validate Variant identity for variant-managed stock.
+5. Ensure transfer legs preserve the same Variant ID; serialized unit transfer must preserve the same unit and Variant identity.
+6. Preserve existing permission checks, warehouse-scope enforcement, SECURITY DEFINER boundaries, and exact EXECUTE ACLs.
+7. Align all application reads and writes, including Inventory overview, balances, movements, transfers, units, Stock Opname, GR, and dashboard, in one coordinated release.
+
+**Phase D — Backfill and cutover (only after explicit approval)**
+1. Create reviewed, idempotent migration scripts with preconditions and postconditions.
+2. Apply corrections only from the approved mapping register; no blanket update by Product ID.
+3. Preserve original source references and append an auditable reconciliation record for each changed identity.
+4. Introduce constraints only after invalid existing rows are remediated or explicitly retained in a compatible legacy model.
+5. Replace product-level uniqueness with canonical Variant/Warehouse uniqueness only after all readers and posting writers are ready for the cutover.
+6. Do not merge or discard legacy balance rows until quantity, reserved quantity, status buckets, inventory value, average cost, and valuation chronology reconcile per warehouse and Variant.
+
+**Phase E — Validation**
+- Product/Variant parent mismatch count = 0 for all enforced tables.
+- No active variant-managed stock remains without a resolved Variant ID.
+- No posted movement or valuation row is silently lost or duplicated.
+- Per-warehouse total on-hand, reserved, quarantine, damaged, repair, and inventory value reconcile before/after.
+- Average cost per Variant/Warehouse reconciles to the approved valuation method.
+- Every serialized unit maps to one Product Variant and at most one active warehouse state.
+- GR, transfer, reversal, Stock Opname, and unit tracking business flows pass.
+- RLS, warehouse scope, function ACL, trigger protections, and direct-write restrictions are revalidated.
+- Application pages and dashboard display the same canonical stock totals.
+- Preview deployment READY and smoke tests pass before any Production consideration.
+
+### 17.4 Rollback design requirements
+
+- Preserve a pre-migration snapshot and explicit mapping ledger.
+- Use additive migration steps where possible; do not drop old identity columns or legacy support until the new path has passed a defined observation period.
+- Any rollback must restore the previous read/write contract and reconcile balances from immutable movement/valuation evidence, not merely reverse a column update.
+- Define a stop condition for any mismatch in row counts, stock quantities, values, valuation chronology, or warehouse scope.
+- Production rollback and execution require separate explicit authorization.
+
+### 17.5 Unresolved decisions / approval gates
+
+1. Business owner must confirm the correct Product/Variant identity for all cross-Product PO, Opname, and balance rows.
+2. Decide whether unresolved historical Product-only rows remain in a legacy archive/read-only ledger or are mapped after documentary approval.
+3. Confirm whether the existing Product records are intentionally separate sellable items or should be consolidated into one parent Product with variants. This cannot be inferred from labels alone.
+4. Confirm how historical posted Stock Opname rows with invalid Variant references should be represented without rewriting audit history.
+5. Approve the exact migration/cutover/rollback plan before any schema or data write.
+
+**Current status:** design draft only. No schema/data change has been authorized or executed. MD-014 remains P0 / BLOCKING and SALES-001 remains blocked.

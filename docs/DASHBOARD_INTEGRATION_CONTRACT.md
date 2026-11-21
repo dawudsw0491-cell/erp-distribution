@@ -65,7 +65,7 @@ Do not display fabricated zeros, sample events, or derived estimates for deferre
 
 Use `Asia/Jakarta` explicitly for all display formatting and for any future "today", "this month", aging, and period KPI boundaries. Date-boundary filters must be defined as a half-open interval in the business timezone and converted consistently to the database timestamp type.
 
-**Known alignment gap:** the current activity formatter uses `Intl.DateTimeFormat("id-ID")` without an explicit `timeZone`. The integration contract requires an explicit `Asia/Jakarta` setting. This must be corrected and tested before any date-sensitive Dashboard KPI is enabled. Do not assume the deployment host timezone is Jakarta.
+**Implementation update:** the activity formatter now sets `timeZone: "Asia/Jakarta"` explicitly in commit `2c0384a`. This removes reliance on the deployment host timezone for displayed activity timestamps. Local lint/build and an authenticated browser check with a timestamp close to the UTC/Jakarta date boundary are still required. Future date-bound KPI queries must also calculate their half-open date interval in `Asia/Jakarta`; changing display formatting alone does not define a database query boundary.
 
 ## 6. Required module delivery template
 

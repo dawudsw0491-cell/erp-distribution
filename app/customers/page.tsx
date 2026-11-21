@@ -434,11 +434,7 @@ export default function CustomersPage({
           </div>
 
           <Suspense
-            fallback={
-              <div className="py-10 text-center text-sm text-gray-500">
-                Memuat data pelanggan...
-              </div>
-            }
+            fallback={null}
           >
             <CustomerContent searchParams={searchParams} />
           </Suspense>

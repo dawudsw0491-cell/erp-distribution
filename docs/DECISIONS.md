@@ -104,3 +104,15 @@ A Sales Order may be fulfilled through multiple Delivery Orders. Each successful
 Each DO posting must coordinate the stock reduction and sales-recognition event for its own quantities. The outstanding quantity remains visible as backorder / unfulfilled quantity and must not be recognized as delivered or sold. Invoice documents must reference the relevant delivered quantities and must not duplicate sales recognition.
 
 This decision establishes partial fulfillment behavior only. It does not yet decide stock reservation, availability checks, backorder release, customer credit/payment terms, invoicing aggregation, cancellation/reversal, or accounting/tax treatment. No live schema, database migration, or Production resource is changed by accepting this decision.
+
+
+## ADR-012 — Soft reservation with transactional allocation at DO posting
+
+**Date:** 2026-11-21  
+**Status:** Accepted
+
+Sales Orders use soft reservation. Confirming an SO records its outstanding demand as a reservation indicator but does not physically reduce on-hand inventory or permanently lock stock against other orders. The system exposes On Hand, Reserved, and Available quantities; Available is calculated from on-hand stock less eligible active soft reservations within the applicable warehouse and SKU/variant scope.
+
+A Sales Order may remain open with an unavailable quantity; that quantity is shown as outstanding/backorder rather than treated as delivered. Reservation priority and allocation must be deterministic and visible. Because soft reservations are not exclusive locks, the system must revalidate and allocate stock transactionally when a Delivery Order is posted. Concurrent DO postings must not consume the same available quantity or create negative stock. The stock reduction and sales-recognition event for each posted DO must commit atomically.
+
+This decision does not yet define the exact reservation priority/expiry/release rules, warehouse substitution/transfer behavior, credit/payment terms, invoice aggregation, cancellation/reversal, or accounting/tax treatment. These must be designed before implementing their respective workflows. No live schema, database migration, or Production resource is changed by accepting this decision.

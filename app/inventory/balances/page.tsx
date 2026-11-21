@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -521,99 +522,44 @@ async function StockBalanceContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-slate-900">
-              Pencarian dan Filter
-            </h2>
-
-            <form
-              action="/inventory/balances"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-            >
-              <div>
-                <label
-                  htmlFor="balance-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-
-                <input
-                  id="balance-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="SKU, produk, gudang..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="warehouse-filter"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Gudang
-                </label>
-
-                <select
-                  id="warehouse-filter"
-                  name="warehouse"
-                  defaultValue={effectiveWarehouseFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Gudang</option>
-
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.warehouse_code} - {warehouse.warehouse_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="stock-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status Persediaan
-                </label>
-
-                <select
-                  id="stock-status"
-                  name="status"
-                  defaultValue={statusFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="all">Semua Status</option>
-                  <option value="available">Available</option>
-                  <option value="reserved">Reserved</option>
-                  <option value="damaged">Damaged</option>
-                  <option value="repair">Repair</option>
-                  <option value="zero">Stok Kosong</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/inventory/balances"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <RealtimeFilterBar
+            key={[
+              keyword,
+              effectiveWarehouseFilter,
+              statusFilter,
+            ].join("|")}
+            initialKeyword={keyword}
+            searchLabel="Pencarian Stock Balance"
+            searchPlaceholder="SKU, nama produk, kode gudang, nama gudang..."
+            helperText="Pencarian dan filter gudang serta status persediaan diperbarui otomatis."
+            filters={[
+              {
+                param: "warehouse",
+                label: "Gudang",
+                initialValue: effectiveWarehouseFilter,
+                options: [
+                  { value: "", label: "Semua Gudang" },
+                  ...warehouses.map((warehouse) => ({
+                    value: warehouse.id,
+                    label: warehouse.warehouse_code + " - " + warehouse.warehouse_name,
+                  })),
+                ],
+              },
+              {
+                param: "status",
+                label: "Status Persediaan",
+                initialValue: statusFilter === "all" ? "" : statusFilter,
+                options: [
+                  { value: "", label: "Semua Status" },
+                  { value: "available", label: "Available" },
+                  { value: "reserved", label: "Reserved" },
+                  { value: "damaged", label: "Damaged" },
+                  { value: "repair", label: "Repair" },
+                  { value: "zero", label: "Stok Kosong" },
+                ],
+              },
+            ]}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-4">

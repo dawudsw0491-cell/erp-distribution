@@ -114,7 +114,15 @@ async function CustomerContent({
     );
   }
 
-  const { count, error: countError } = await countQuery;
+  const [
+    { count, error: countError },
+    { count: activeCount },
+    { count: inactiveCount },
+  ] = await Promise.all([
+    countQuery,
+    supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", false),
+  ]);
 
   if (countError) {
     console.error("Customer count error:", countError);
@@ -154,16 +162,6 @@ async function CustomerContent({
   if (customerError) {
     console.error("Customer list error:", customerError);
   }
-
-  const { count: activeCount } = await supabase
-    .from("customers")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", true);
-
-  const { count: inactiveCount } = await supabase
-    .from("customers")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", false);
 
   const buildUrl = (page: number) => {
     const search = new URLSearchParams();
@@ -436,11 +434,7 @@ export default function CustomersPage({
           </div>
 
           <Suspense
-            fallback={
-              <div className="py-10 text-center text-sm text-gray-500">
-                Memuat data pelanggan...
-              </div>
-            }
+            fallback={null}
           >
             <CustomerContent searchParams={searchParams} />
           </Suspense>

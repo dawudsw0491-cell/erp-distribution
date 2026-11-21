@@ -2,12 +2,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { loginWithUserId } from "./actions";
 
 export default function LoginForm() {
-  const router = useRouter();
-
   const [identifier, setIdentifier] = useState("");
   const [pin, setPin] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -32,8 +29,9 @@ export default function LoginForm() {
         return;
       }
 
-      router.replace("/");
-      router.refresh();
+      // Full document navigation waits for the server action response and
+      // its Set-Cookie headers before the protected route is requested.
+      window.location.replace("/");
     } catch {
       setErrorMessage("Terjadi kesalahan koneksi. Silakan coba kembali.");
     } finally {

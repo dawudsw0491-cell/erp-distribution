@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -335,75 +336,27 @@ async function PurchasesContent({
             ))}
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-slate-900">
-              Pencarian dan Filter
-            </h2>
-
-            <form
-              action="/purchases"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-            >
-              <div className="md:col-span-2">
-                <label
-                  htmlFor="po-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Nomor Purchase Order
-                </label>
-
-                <input
-                  id="po-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="Cari nomor PO..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="po-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status
-                </label>
-
-                <select
-                  id="po-status"
-                  name="status"
-                  defaultValue={status}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Status</option>
-                  {allowedStatuses.map((value) => (
-                    <option key={value} value={value}>
-                      {statusLabel(value)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2 md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/purchases"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <RealtimeFilterBar
+            key={[keyword, status].join("|")}
+            initialKeyword={keyword}
+            searchLabel="Nomor Purchase Order"
+            searchPlaceholder="Cari nomor PO..."
+            helperText="Pencarian nomor PO dan filter status diperbarui otomatis."
+            filters={[
+              {
+                param: "status",
+                label: "Status",
+                initialValue: status,
+                options: [
+                  { value: "", label: "Semua Status" },
+                  ...allowedStatuses.map((value) => ({
+                    value,
+                    label: statusLabel(value),
+                  })),
+                ],
+              },
+            ]}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-4">

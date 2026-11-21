@@ -298,7 +298,7 @@ The zero-balance classification applies only to the balance row at the time of i
 - IPH-15-256-WHT: provenance candidate rejected due to PO Product/Variant parent mismatch.
 - HXA-000002/003/004: serialized units and active balances remain ambiguous; upstream PO Variant IDs are NULL.
 - TEST-HEXA-001: remains ambiguous despite test-like naming; no deletion or reassignment.
-- Four product-only balances shown above have zero quantity and zero value; preserve historical references pending dependency analysis.
+- Five product-only balances shown above have zero quantity and zero value; preserve historical references pending dependency analysis.
 - Transfer quantity and valuation arithmetic for the IPH group reconcile, but identity does not.
 - No variant mapping is currently approved by this evidence.
 

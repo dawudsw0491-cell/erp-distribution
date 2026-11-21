@@ -81,7 +81,7 @@ export async function getAuthorizationContext(
       id: user.id,
       email: user.email,
     },
-    profile: profileIsValid
+    profile: profileIsValid && profile
       ? {
           full_name: profile.full_name,
           is_active: profile.is_active,

@@ -155,10 +155,6 @@ export default function ErpSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const currentPath = pathname || activePath;
-  const isMasterDataRoute = ["/products", "/customers", "/suppliers", "/warehouses"].some(
-    (base) => currentPath === base || currentPath.startsWith(`${base}/`)
-  );
-
   // Warm the App Router cache before the user clicks a destination.
   // This changes navigation timing only; server authorization and data
   // fetching still run normally when the destination is requested.

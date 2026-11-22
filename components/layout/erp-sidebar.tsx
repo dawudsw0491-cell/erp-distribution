@@ -129,11 +129,6 @@ const menuGroups: MenuGroup[] = [
     icon: <Wallet size={18} />,
   },
   {
-    label: "Laporan",
-    href: "/reports",
-    icon: <ClipboardList size={18} />,
-  },
-  {
     label: "Pengaturan",
     href: "/settings",
     icon: <Settings size={18} />,

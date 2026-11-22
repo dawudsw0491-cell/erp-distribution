@@ -263,3 +263,8 @@ Migration:
 - Source transformation was checked against the live Development function definition: exact expected blocks each matched once, and the transformed definition retains inventory balance and valuation operations. No function was changed in Development.
 
 The complete migration sequence remains unapplied. Explicit Development approval is still required before any schema/function DDL is executed.
+
+
+## 10.10 Serialized delivery composition refinement
+
+The DO composer now supports multiple rows referencing the same SO line. This is required when a serialized SO quantity is fulfilled by multiple distinct Product Units. Client validation prevents duplicate unit selection and quantities above the SO line's remaining outstanding quantity. The server-side aggregate guard remains authoritative and prevents duplicate SO-line references from bypassing the remaining quantity.

@@ -1039,3 +1039,29 @@ The FK graph and catalog screening are now sufficiently detailed to reject blank
 6. need for canonical Variant-level posting implementation and migration before rebuilding stock.
 
 No data or schema changed. No reset, truncate, migration, restore, branch reset, trigger disablement, ACL modification, or Production operation was performed.
+
+
+## 24. Per-warehouse reset dependency split
+
+A read-only join of each warehouse-bearing transaction/inventory table to the current Warehouse master was completed. The exact current distribution is:
+
+| Table | WH-SOL-001 (GUDANG JAKPUS) | WH-TEST-001 (GUDANG TESTING) | Total |
+|---|---:|---:|---:|
+| Purchase Orders | 7 | 0 | 7 |
+| Goods Receipts | 3 | 0 | 3 |
+| Inventory Balances | 14 | 2 | 16 |
+| Inventory Movements | 7 | 2 | 9 |
+| Inventory Valuation Logs | 7 | 2 | 9 |
+| Product Units | 2 | 1 | 3 |
+| Stock Opname Sessions | 4 | 0 | 4 |
+
+Implications:
+- WH-TEST-001 has no current PO, GR, or Stock Opname Session header rows, but it is not unused: it has 2 balance rows, 2 movement rows, 2 valuation rows, and 1 Product Unit.
+- The 2 movement and 2 valuation rows in WH-TEST-001 must be traced to their source/reference groups before any reset approach is designed.
+- All PO/GR/Opname session headers currently point to WH-SOL-001. The test warehouse must not be deleted until the dependent balance, movement, valuation, and Product Unit references have been handled through a valid approved recovery/reset process.
+- All 3 Goods Receipts are currently associated with WH-SOL-001. This does not mean the received inventory is valid at Variant level; prior audit sections document the Product-only and cross-Product identity defects.
+- The 4 Opname Sessions are all under WH-SOL-001; their 140 item rows and 3 unit-count rows remain child dependencies.
+
+This completes the warehouse-level count split for the seven tables listed. It does not yet prove row-level transaction ancestry or identify a supported way to remove immutable ledger rows. The final manifest must include source-reference/group linkage and exact IDs, not just table counts.
+
+No database changes were performed.

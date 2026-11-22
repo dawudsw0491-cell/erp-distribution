@@ -11,9 +11,11 @@ export default async function EditSalesOrderPage({params,searchParams}:{params:P
   await connection();
   const {id}=await params;
   const notice=await searchParams;
-  const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.create");
+  const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.view");
   if(!user) redirect("/login");
   if(!profile||!authorized) redirect("/sales?error=permission_denied");
+  const {data:canCreate}=await supabase.rpc("has_permission",{required_permission:"sales.create"});
+  if(canCreate!==true) redirect("/sales?error=permission_denied");
 
   const [orderResult,customers,warehouses,products,variants]=await Promise.all([
     supabase.from("sales_orders").select("id,customer_id,warehouse_id,order_date,notes,status").eq("id",id).maybeSingle(),

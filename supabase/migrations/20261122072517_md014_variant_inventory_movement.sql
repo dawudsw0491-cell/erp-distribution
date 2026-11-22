@@ -2268,32 +2268,7 @@ BEGIN
     THEN
         RAISE EXCEPTION
             'Saldo status stok gudang sumber tidak mencukupi.';
-    END IF;CASE v_out.inventory_status
-    WHEN 'available' THEN
-        v_source_status_quantity := v_source.available_quantity;
-
-    WHEN 'reserved' THEN
-        v_source_status_quantity := v_source.reserved_quantity;
-
-    WHEN 'quarantine' THEN
-        v_source_status_quantity := v_source.quarantine_quantity;
-
-    WHEN 'damaged' THEN
-        v_source_status_quantity := v_source.damaged_quantity;
-
-    WHEN 'repair' THEN
-        v_source_status_quantity := v_source.repair_quantity;
-
-    ELSE
-        RAISE EXCEPTION
-            'Status inventory tidak valid: %',
-            v_out.inventory_status;
-END CASE;
-
-IF v_source_status_quantity < v_quantity THEN
-    RAISE EXCEPTION
-        'Saldo status stok gudang sumber tidak mencukupi.';
-END IF;
+    END IF;
 
 
     -- ========================================================

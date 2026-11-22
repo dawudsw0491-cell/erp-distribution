@@ -1132,3 +1132,22 @@ The replay exposed and the source migration was corrected for three issues:
 Post-replay read-only verification confirmed the original Development index `uq_inventory_balance_product_warehouse` still exists, proving the transaction rolled back. The Development migration ledger remains unchanged at eight applied entries through `20261121050458`.
 
 **Validation status:** SQL DDL/function-definition replay passes transactionally. This is not proof of live posting behavior, application compatibility, role/warehouse isolation, valuation reconciliation, or safe rollout. MD-014 remains IN PROGRESS and Sales posting remains blocked.
+
+
+### 13.2 Applied to Development — 2026-11-22
+
+Migration `20261122111715 md014_variant_inventory_movement` was successfully applied to `erp-distribution-dev` after adding a transaction-local `service_role` claim so the existing trusted warehouse-trigger path accepts migration-time updates. The first application attempt was rejected by the warehouse-scope trigger and left no partial schema/data change; the migration ledger remained at eight entries and the old Product-keyed unique index remained present. The corrected migration then applied successfully.
+
+Post-apply read-only verification:
+
+- Migration ledger now has nine entries, latest `20261122111715 md014_variant_inventory_movement`.
+- Row counts were preserved: inventory_balances 16, inventory_movements 9, inventory_valuation_logs 9, product_units 3, purchase_order_items 11, stock_opname_items 140.
+- Historical Product-only NULL Variant rows remain: balances 11, movements 9, valuation logs 9, product_units 3, PO items 7, Stock Opname 115.
+- Variant/Product parent mismatches across the six tables: 0.
+- Duplicate Variant + Warehouse balance groups: 0.
+- Active and legacy partial unique indexes exist for Inventory Balances and Stock Opname.
+- Internal unlocked posting functions are not executable by authenticated or anon; service_role retains execute. Public posting wrappers are executable by authenticated and service_role, not anon.
+
+Security Advisor still reports pre-existing categories of findings (29 authenticated-executable SECURITY DEFINER functions, 4 RLS-enabled tables without policies, and leaked-password protection disabled). These were not changed by MD-014 and require separate function-by-function and policy review. Performance Advisor continues to report FK index recommendations and unused-index findings; no unrelated index cleanup was performed.
+
+**Remaining before MD-014 closure:** authenticated role tests, Goods Receipt posting, generic inventory movement, transfer, reversal, Stock Opname, IMEI/Serial flows, valuation reconciliation, warehouse isolation, and concurrency/rollback. This migration is applied only to Development; Production is untouched. Sales implementation may now proceed against the Variant-keyed contract, but Sales DO posting must remain gated until the functional tests above pass.

@@ -1351,6 +1351,24 @@ BEGIN
         RAISE EXCEPTION 'Goods Receipt tidak memiliki item.';
     END IF;
 
+    -- Fail closed when any receipt line lacks a valid, parent-consistent Variant.
+    IF EXISTS (
+        SELECT 1
+        FROM public.goods_receipt_items gri
+        JOIN public.purchase_order_items poi
+          ON poi.id = gri.purchase_order_item_id
+        LEFT JOIN public.product_variants pv
+          ON pv.id = poi.product_variant_id
+        WHERE gri.goods_receipt_id = p_goods_receipt_id
+          AND (
+              pv.id IS NULL
+              OR poi.product_id IS DISTINCT FROM pv.product_id
+          )
+    ) THEN
+        RAISE EXCEPTION
+            'Goods Receipt contains a PO item without a valid matching Product Variant.';
+    END IF;
+
     -- Shipping allocation denominator excludes recoverable tax.
     v_po_net := v_po.subtotal - v_po.discount_amount;
 

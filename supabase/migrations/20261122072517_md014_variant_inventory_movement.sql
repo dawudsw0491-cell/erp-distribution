@@ -90,9 +90,7 @@ ALTER TABLE public.inventory_balances
   ADD CONSTRAINT uq_inventory_balance_variant_warehouse
   UNIQUE (product_variant_id, warehouse_id);
 
--- Enforce denormalized Product/Variant parent agreement whenever Product ID is supplied.
-ALTER TABLE public.product_variants
-  ADD CONSTRAINT uq_product_variants_id_product UNIQUE (id, product_id);
+-- Reuse existing uq_product_variants_id_product (verified in Development).
 
 ALTER TABLE public.inventory_balances
   ADD CONSTRAINT fk_inventory_balances_variant_product

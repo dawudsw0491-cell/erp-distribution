@@ -940,3 +940,102 @@ This is only a label-based screening signal. It does not establish that a row is
 - Supplier and Customer names/codes do not contain TEST, but their business legitimacy has not been independently established.
 
 Therefore no catalog or warehouse row is reclassified from REVIEW to RESET solely by this heuristic. The canonical catalog and warehouse seed list remains a required business decision before final manifest approval.
+
+
+## 23. FK edge usage and catalog/warehouse record-level classification
+
+A fresh read-only inspection retrieved public table definitions, FK constraints, and row usage for the major reset parent entities. The schema has 90 public FK constraints; the following usage counts show why catalog and warehouse rows cannot be classified only by their labels.
+
+### 23.1 Current child-row usage by parent domain
+
+| Parent relationship | Referencing rows | Reset implication |
+|---|---:|---|
+| Products → Product Variants | 23 | Variants are dependent master rows |
+| Products → Product Attribute Assignments | 70 | Assignment rows must be handled before Products |
+| Products → Inventory Balances | 16 | Balance rows must be rebuilt/reset before Product reset |
+| Products → Inventory Movements | 9 | Ledger guard prevents direct deletion |
+| Products → Inventory Valuation Logs | 9 | Immutable valuation guard prevents direct deletion |
+| Products → Product Units | 3 | Unit identifier and Opname dependencies must be cleared first |
+| Products → Purchase Order Items | 11 | PO detail dependencies |
+| Products → Stock Opname Items | 140 | Opname detail dependencies |
+| Variants → Product Variant Attribute Values | 74 | Variant attribute rows are FK-restricted |
+| Variants → Product Units with non-NULL Variant | 0 | Current Product Units have no Variant identity |
+| Variants → Purchase Order Items with non-NULL Variant | 4 | Four invalid cross-Product references found in prior audit |
+| Variants → Stock Opname Items with non-NULL Variant | 25 | 25 invalid cross-Product references found in prior audit |
+| Warehouses → Purchase Orders | 7 | Both warehouse IDs may be referenced by PO |
+| Warehouses → Goods Receipts | 3 | GR references must be cleared before warehouse reset |
+| Warehouses → Inventory Balances | 16 | Inventory state references warehouses |
+| Warehouses → Inventory Movements | 9 | Movement ledger references warehouses |
+| Warehouses → Inventory Valuation Logs | 9 | Valuation ledger references warehouses |
+| Warehouses → Product Units | 3 | Serialized units reference warehouses |
+| Warehouses → Stock Opname Sessions | 4 | Opname sessions reference warehouses |
+| Suppliers → Purchase Orders | 7 | Supplier records are transaction parents |
+| Suppliers → Goods Receipts | 3 | Supplier records are transaction parents |
+| Suppliers → Supplier Addresses | 2 | Supplier address child rows |
+| Suppliers → Supplier Contacts / Bank Accounts / Product Suppliers | 0 / 0 / 0 | Empty child tables in this snapshot |
+| Categories → Products (category or subcategory populated) | 30 | Category hierarchy is referenced by 30 Products |
+| Models → Products | 1 | Model master is referenced |
+| Brands → Products / Product Models | 33 | Brand master is referenced |
+| Attributes → Product Attribute Assignments | 70 | Attribute master is referenced |
+| Assignments/Values → Product Variant Attribute Values | 74 | Attribute assignments and values are referenced |
+| Auth user references in PO, Opname and Supplier records | 145 | Keep bootstrap Auth user; transaction rows depend on it |
+
+Counts above are child-table row counts for the listed relationship. Where multiple FK paths exist between the same pair of tables, a row may satisfy more than one relationship; do not sum these figures as unique records.
+
+### 23.2 Current catalog record names and classification
+
+The current Product set includes:
+- Operational-looking HXA SKU records HXA-000001 through HXA-000021.
+- Explicitly test-labelled Products TEST-HEXA-001 and TEST-IPHONE-001.
+- Separate IPH- and SS-FOLD-prefixed product records.
+- Multiple distinct Product IDs with repeated descriptions, including repeated Samsung S20 Ultra entries and two iPhone 18 Pro entries.
+
+The current Product Variant table contains 23 rows, and none has TEST in variant_sku under the screening expression. This does not establish that the variants are canonical; prior audit findings show several cross-Product links in PO, Opname and balances.
+
+Brands currently include Apple, HEXA GROUP, Infinix, Xiaomi, Nubia, Oppo, Samsung and Vivo. Categories include accessories, electronic components, computer/laptop, networking, smartphones/tablets and secondhand categories. Two model rows are SAM-FOLD / Galaxy Z Fold and SS-FOLD / SAMSUNG FOLD.
+
+The Product names/descriptions and SKU patterns indicate that the 31 Products are not safely classifiable as all-test or all-canonical. In particular, HXA-000001 through HXA-000004 are connected to the earlier Goods Receipt/IMEI/Inventory evidence. The current test decision authorizes eventual reset of application-entered test transactions, but does not independently prove which master rows should be retained or reseeded.
+
+**Disposition:** Products, Product Variants, Product Attribute Assignments/Values, Brands, Categories and Models remain REVIEW / RESEED. No catalog record is individually approved for deletion in this audit.
+
+### 23.3 Warehouse classification — explicit test record is referenced
+
+Two warehouses currently exist:
+- WH-SOL-001 — GUDANG JAKPUS.
+- WH-TEST-001 — GUDANG TESTING.
+
+The test-labelled warehouse is not orphaned: warehouse FK usage includes 7 PO, 3 GR, 16 balance, 9 movement, 9 valuation, 3 Product Unit and 4 Stock Opname Session rows across the two warehouse IDs. The inspection did not yet split every one of those counts by warehouse ID in this pass.
+
+**Disposition:** Keep both warehouse master rows for now. The final transaction reset manifest must remove the dependent test transactions and balances first; only after a separate canonical warehouse decision may WH-TEST-001 be considered for removal. Preserve the operational warehouse and its ID/access relationships.
+
+### 23.4 Supplier and Customer classification
+
+Current Suppliers:
+- SUP-000002 — ASIA PHONE.
+- SUP-000003 — CV. STG.
+- SUP-001 — PT. SSB.
+
+The three Supplier records are referenced by 7 Purchase Orders, 3 Goods Receipts and 2 Supplier Addresses in total. Supplier master deletion is therefore not a safe shortcut for transaction cleanup. Preserve supplier master rows pending confirmation of canonical vendor set; Supplier Addresses require their own classification.
+
+Current Customer:
+- CUST-00001 — wahyu anggara.
+
+No Sales/Customer transaction FK was identified in the reviewed reset graph, but the Customer row is not proven disposable. Keep pending business classification; do not delete solely because it is the only row.
+
+### 23.5 Supabase project and recovery control status
+
+A current project metadata read confirms Development project status ACTIVE_HEALTHY on PostgreSQL 17.11. The Supabase project branch listing returned no development branches.
+
+No backup listing, restorable backup identifier, PITR point selector, or restore drill result was available from the inspected Supabase tools. WAL archive statistics remain evidence of WAL archiving only, not a verified complete backup. Do not invoke project restore or branch reset as an alternative: those operations can replace or lose untracked data and are not authorized by the current scope.
+
+### 23.6 Remaining gates before exact reset manifest
+
+The FK graph and catalog screening are now sufficiently detailed to reject blanket catalog/warehouse deletion, but an executable reset manifest is still blocked by:
+1. no verified backup/PITR restore point and no tested recovery path;
+2. no canonical Product/Variant seed list or confirmation of which current master IDs are retained;
+3. no canonical warehouse set confirmation;
+4. movement/valuation immutability guards, which rule out direct DELETE;
+5. incomplete per-warehouse transaction dependency split and final per-row reset manifest;
+6. need for canonical Variant-level posting implementation and migration before rebuilding stock.
+
+No data or schema changed. No reset, truncate, migration, restore, branch reset, trigger disablement, ACL modification, or Production operation was performed.

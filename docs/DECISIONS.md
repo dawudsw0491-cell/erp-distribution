@@ -150,3 +150,20 @@ To implement the accepted Sales Order → partial Delivery Order flow without ad
 - Phase 1 is limited to Sales Order and Delivery Order. Sales Invoice is Phase 2 and is not implemented as a partial financial ledger. Accounts Receivable, payments, tax, revenue/COGS journal, credit-limit enforcement, returns/credit notes, and reversal UI remain excluded until their own accounting and lifecycle decisions are accepted.
 
 These defaults are chosen to make stock allocation deterministic while keeping warehouse operations explicit and avoiding duplicate modules. They do not authorize any Production or live database changes.
+
+
+## ADR-015 — Parallel module delivery with explicit transaction gates
+
+**Date:** 2026-11-22  
+**Status:** Accepted as implementation execution policy
+
+The ERP may develop independent module foundations in parallel; Master Data and Inventory do not need to be 100% complete before every other module can start. However, a module may not post or mutate a dependent business resource until its authoritative source contract is validated.
+
+- Settings may reuse existing user, role, permission, master-data, and warehouse administration capabilities. It must not create duplicate master CRUD or unvalidated configuration tables.
+- Sales transaction posting remains gated by MD-014 because current Development balances and posting paths are not consistently keyed by Product Variant.
+- Returns depend on posted source documents, Inventory disposition/valuation, and accepted financial treatment. No return posting may be introduced before those contracts exist.
+- Accounting requires an authoritative double-entry ledger, chart of accounts, source-event mapping, period controls, tax/rounding rules, and reversal semantics. Finance permissions alone do not establish a ledger.
+- Reports are read-only consumers of authoritative module sources. They must not invent or persist shadow totals; Sales/Returns/Finance reports are unavailable until their source modules exist.
+- GitHub remains the implementation and migration source; Supabase remains the live schema and data source; Vercel Preview is the build/deployment verification source. All work stays on the active implementation branch and one shared backlog.
+
+This policy permits parallel engineering while preventing incomplete workflows from appearing operational. No Development schema or Production resource is changed by accepting this decision.

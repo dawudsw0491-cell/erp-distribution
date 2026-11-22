@@ -1,0 +1,43 @@
+import Link from "next/link";
+import {notFound,redirect} from "next/navigation";
+import {connection} from "next/server";
+import ErpSidebar from "@/components/layout/erp-sidebar";
+import {getAuthorizationContext} from "@/lib/auth/authorization";
+import {confirmSalesOrderAction,cancelSalesOrderAction,createDeliveryOrderAction,postDeliveryOrderAction} from "../actions";
+import DeliveryOrderComposer from "./delivery-order-composer";
+
+export const metadata={title:"Detail Penjualan | HEXA CORE ERP"};
+export default async function SalesDetailPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{error?:string;created?:string;confirmed?:string;cancelled?:string;posted?:string}>}) {
+ await connection();
+ const {id}=await params, notice=await searchParams;
+ const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.view");
+ if(!user) redirect("/login");
+ if(!profile||!authorized) redirect("/sales?error=permission_denied");
+ const {data:order,error}=await supabase.from("sales_orders").select("id,sales_order_number,order_date,status,notes,subtotal,customer_id,warehouse_id,customers(customer_code,customer_name),warehouses(warehouse_code,warehouse_name)").eq("id",id).maybeSingle();
+ if(error){console.error("Sales detail query failed",error);return <div className="p-8">Gagal memuat detail penjualan.</div>;}
+ if(!order) notFound();
+ const [linesResult,fulfillmentResult,deliveriesResult,unitsResult,createPermission]=await Promise.all([
+  supabase.from("sales_order_items").select("id,product_id,product_variant_id,quantity,unit_price,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("sales_order_id",id).order("created_at"),
+  supabase.from("sales_order_line_fulfillment").select("sales_order_item_id,ordered_quantity,delivered_quantity,outstanding_quantity").eq("sales_order_id",id),
+  supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,status,posted_at,delivery_order_items(id,sales_order_item_id,quantity,product_unit_id,inventory_movement_id,products:product_id(product_name),product_variants:product_variant_id(variant_sku,variant_name))").eq("sales_order_id",id).order("created_at",{ascending:false}),
+  supabase.from("product_units").select("id,product_variant_id,unit_code,unit_status").eq("warehouse_id",order.warehouse_id).eq("unit_status","available"),
+  supabase.rpc("has_permission",{required_permission:"sales.create"})
+ ]);
+ const lines=linesResult.data??[], fulfillment=fulfillmentResult.data??[];
+ const outstanding=new Map(fulfillment.map((f:any)=>[f.sales_order_item_id,Number(f.outstanding_quantity)]));
+ const units=(unitsResult.data??[]).map((u:any)=>({id:u.id,product_variant_id:u.product_variant_id,unit_code:u.unit_code??u.id.slice(0,8)}));
+ const doItems=(deliveriesResult.data??[]).flatMap((d:any)=>d.delivery_order_items??[]);
+ const lineModels=lines.map((line:any)=>({id:line.id,product_variant_id:line.product_variant_id,product_name:line.products?.product_name??"Produk",variant_sku:line.product_variants?.variant_sku??"—",variant_name:line.product_variants?.variant_name??"",tracking_type:line.products?.tracking_type??"quantity",ordered:Number(line.quantity),delivered:Number(fulfillment.find((f:any)=>f.sales_order_item_id===line.id)?.delivered_quantity??0),outstanding:Number(outstanding.get(line.id)??0),unit_price:Number(line.unit_price)}));
+ const canCreate=createPermission.data===true;
+ const money=(v:number)=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(v);
+ return <div className="min-h-screen bg-slate-100 md:flex"><ErpSidebar activePath="/sales"/><main className="min-w-0 flex-1 p-4 md:p-8"><div className="mx-auto max-w-7xl space-y-6">
+ <Link href="/sales" className="text-sm font-semibold text-blue-700">← Kembali ke Penjualan</Link>
+ <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">{order.sales_order_number}</h1><p className="mt-1 text-sm text-slate-600">{order.customers?.customer_name??"—"} · {order.warehouses?.warehouse_name??"—"} · {new Date(order.order_date).toLocaleDateString("id-ID")}</p></div><span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-semibold">{order.status}</span></header>
+ {notice.error&&<p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Aksi gagal: {notice.error}. Periksa status transaksi, izin, dan stok.</p>}
+ {(notice.created||notice.confirmed||notice.cancelled||notice.posted)&&<p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">Perubahan berhasil disimpan.</p>}
+ <section className="rounded-xl border bg-white p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Detail Penjualan</h2><strong>{money(Number(order.subtotal??0))}</strong></div><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Produk</th><th className="p-3">SKU</th><th className="p-3">Tracking</th><th className="p-3">Dipesan</th><th className="p-3">Terkirim</th><th className="p-3">Sisa</th><th className="p-3">Harga</th></tr></thead><tbody className="divide-y">{lineModels.map((l:any)=><tr key={l.id}><td className="p-3">{l.product_name} {l.variant_name}</td><td className="p-3">{l.variant_sku}</td><td className="p-3">{l.tracking_type}</td><td className="p-3">{l.ordered}</td><td className="p-3">{l.delivered}</td><td className="p-3 font-semibold">{l.outstanding}</td><td className="p-3">{money(l.unit_price)}</td></tr>)}</tbody></table></div>{order.notes&&<p className="mt-4 text-sm text-slate-600">Catatan: {order.notes}</p>}</section>
+ {canCreate&&<div className="flex flex-wrap gap-2">{order.status==="draft"&&<><form action={confirmSalesOrderAction}><input type="hidden" name="sales_order_id" value={id}/><button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">Konfirmasi SO</button></form><form action={cancelSalesOrderAction}><input type="hidden" name="sales_order_id" value={id}/><button className="rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-700">Batalkan SO</button></form></>}</div>}
+ {canCreate&&["confirmed","partially_delivered"].includes(order.status)&&lineModels.some((l:any)=>l.outstanding>0)&&<DeliveryOrderComposer salesOrderId={id} lines={lineModels.filter((l:any)=>l.outstanding>0)} units={units}/>}
+ <section className="rounded-xl border bg-white p-5"><h2 className="font-semibold">Delivery Order</h2>{!deliveriesResult.data?.length?<p className="mt-3 text-sm text-slate-500">Belum ada Delivery Order.</p>:<div className="mt-3 space-y-3">{deliveriesResult.data.map((d:any)=><div key={d.id} className="rounded-lg border p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{d.delivery_order_number}</p><p className="text-xs text-slate-500">{d.delivery_date} · {d.status}</p></div>{d.status==="draft"&&canCreate?<form action={postDeliveryOrderAction}><input type="hidden" name="delivery_order_id" value={d.id}/><input type="hidden" name="sales_order_id" value={id}/><button className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Posting DO</button></form>:d.status==="posted"?<span className="text-xs font-semibold text-emerald-700">Terposting</span>:null}</div><ul className="mt-3 space-y-1 text-sm">{(d.delivery_order_items??[]).map((item:any)=><li key={item.id}>{item.products?.product_name??"Produk"} · {item.product_variants?.variant_sku??"—"} · Qty {item.quantity}</li>)}</ul></div>)}</div>}</section>
+ </div></main></div>;
+}

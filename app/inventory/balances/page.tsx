@@ -22,6 +22,7 @@ type SearchParams = Promise<{
 
 type BalanceRow = {
   product_id: string | null;
+  product_variant_id: string | null;
   warehouse_id: string;
   available_quantity: number;
   reserved_quantity: number;
@@ -274,7 +275,7 @@ async function StockBalanceContent({
       ? parsedPage
       : 1;
 
-  const [productResult, warehouseResult, balanceResult] =
+  const [productResult, warehouseResult, balanceResult, variantResult] =
     await Promise.all([
       fetchAllRows<ProductRow>(
         supabase
@@ -299,6 +300,7 @@ async function StockBalanceContent({
           .from("inventory_balances")
           .select(`
             product_id,
+            product_variant_id,
             warehouse_id,
             available_quantity,
             reserved_quantity,
@@ -309,9 +311,22 @@ async function StockBalanceContent({
             inventory_value,
             average_unit_cost
           `)
-          .not("product_id", "is", null)
-          .order("product_id", { ascending: true })
+          .not("product_variant_id", "is", null)
+          .order("product_variant_id", { ascending: true })
           .order("warehouse_id", { ascending: true })
+      ),
+
+      fetchAllRows<{
+        id: string;
+        product_id: string;
+        variant_sku: string;
+        variant_name: string;
+      }>(
+        supabase
+          .from("product_variants")
+          .select("id, product_id, variant_sku, variant_name")
+          .eq("is_active", true)
+          .order("variant_sku", { ascending: true })
       ),
     ]);
 
@@ -327,13 +342,28 @@ async function StockBalanceContent({
     return <StockBalanceError message={balanceResult.error.message} />;
   }
 
+  if (variantResult.error) {
+    return <StockBalanceError message={variantResult.error.message} />;
+  }
+
   const products = productResult.data;
   const warehouses = warehouseResult.data;
   const balances = balanceResult.data;
 
-  const productMap = new Map(
+  const parentProductMap = new Map(
     products.map((product) => [product.id, product])
   );
+  const productMap = new Map<string, ProductRow>();
+  for (const variant of variantResult.data) {
+    const parent = parentProductMap.get(variant.product_id);
+    if (!parent) continue;
+    productMap.set(variant.id, {
+      ...parent,
+      id: variant.id,
+      sku: variant.variant_sku,
+      product_name: parent.product_name + " · " + variant.variant_name,
+    });
+  }
 
   const warehouseMap = new Map(
     warehouses.map((warehouse) => [warehouse.id, warehouse])
@@ -350,10 +380,10 @@ async function StockBalanceContent({
   const balanceMap = new Map<string, BalanceRow>();
 
   for (const balance of balances) {
-    if (!balance.product_id) continue;
+    if (!balance.product_variant_id) continue;
 
     balanceMap.set(
-      `${balance.product_id}:${balance.warehouse_id}`,
+      `${balance.product_variant_id}:${balance.warehouse_id}`,
       balance
     );
   }
@@ -363,9 +393,9 @@ async function StockBalanceContent({
   // Stock Balance hanya dibentuk dari kombinasi produk-gudang
   // yang benar-benar mempunyai record inventory_balances.
   let rows: StockDisplayRow[] = balances.flatMap((balance) => {
-    if (!balance.product_id) return [];
+    if (!balance.product_variant_id) return [];
 
-    const product = productMap.get(balance.product_id);
+    const product = productMap.get(balance.product_variant_id);
     const warehouse = warehouseMap.get(balance.warehouse_id);
 
     if (!product || !warehouse) return [];

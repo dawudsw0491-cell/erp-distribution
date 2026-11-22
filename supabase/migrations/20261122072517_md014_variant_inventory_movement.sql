@@ -9,16 +9,9 @@ DO $preflight$
 DECLARE
   v_detail text;
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.inventory_balances WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.inventory_movements WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.inventory_valuation_logs WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.product_units WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.stock_opname_items WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.purchase_order_items WHERE product_variant_id IS NULL) THEN
-    RAISE EXCEPTION USING
-      MESSAGE = 'MD-014 blocked: Product-only inventory identities remain.',
-      DETAIL = 'Resolve/reset legacy Product-only balances, movements, valuation logs, and product units through the separately approved disposition. No automatic Variant inference is allowed.';
-  END IF;
+  -- Historical Product-only rows are preserved as unresolved legacy records.
+  -- All new/active posting functions below write by Product Variant only.
+  -- Never infer a Variant for historical rows from Product ID alone.
 
   IF EXISTS (
     SELECT 1 FROM public.inventory_balances b
@@ -88,23 +81,24 @@ FROM public.product_variants pv
 WHERE pv.id = u.product_variant_id
   AND u.product_id IS DISTINCT FROM pv.product_id;
 
-ALTER TABLE public.inventory_balances
-  ALTER COLUMN product_variant_id SET NOT NULL;
-ALTER TABLE public.inventory_movements
-  ALTER COLUMN product_variant_id SET NOT NULL;
-ALTER TABLE public.inventory_valuation_logs
-  ALTER COLUMN product_variant_id SET NOT NULL;
-ALTER TABLE public.product_units
-  ALTER COLUMN product_variant_id SET NOT NULL;
+-- Keep product_variant_id nullable for immutable historical Product-only rows.
+-- New transactional paths are Variant-keyed and validate the Variant before writing.
 
 -- Replace Product + Warehouse uniqueness with canonical Variant + Warehouse uniqueness.
 ALTER TABLE public.inventory_balances
   DROP CONSTRAINT IF EXISTS uq_inventory_balance_product_warehouse;
 ALTER TABLE public.inventory_balances
   DROP CONSTRAINT IF EXISTS uq_inventory_balance_variant_warehouse;
-ALTER TABLE public.inventory_balances
-  ADD CONSTRAINT uq_inventory_balance_variant_warehouse
-  UNIQUE (product_variant_id, warehouse_id);
+
+-- Active balances are unique per Variant + Warehouse.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_balance_variant_warehouse
+  ON public.inventory_balances (product_variant_id, warehouse_id)
+  WHERE product_variant_id IS NOT NULL;
+
+-- Preserve uniqueness for unresolved legacy Product-only balance rows.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_balance_legacy_product_warehouse
+  ON public.inventory_balances (product_id, warehouse_id)
+  WHERE product_variant_id IS NULL AND product_id IS NOT NULL;
 
 -- Reuse existing uq_product_variants_id_product (verified in Development).
 
@@ -391,7 +385,7 @@ BEGIN
         v_product_id,
         v_movement.warehouse_id
     )
-    ON CONFLICT (product_variant_id, warehouse_id)
+    ON CONFLICT (product_variant_id, warehouse_id) WHERE product_variant_id IS NOT NULL
     DO NOTHING;
 
     SELECT *
@@ -2234,7 +2228,7 @@ BEGIN
     VALUES
         (v_out.product_variant_id, v_product_id, v_out.warehouse_id),
         (v_in.product_variant_id, v_product_id, v_in.warehouse_id)
-    ON CONFLICT (product_variant_id, warehouse_id)
+    ON CONFLICT (product_variant_id, warehouse_id) WHERE product_variant_id IS NOT NULL
     DO NOTHING;
 
 
@@ -4317,7 +4311,7 @@ BEGIN
     JOIN public.product_variants pv ON pv.id = i.product_variant_id
     WHERE i.session_id = p_session_id
       AND i.is_required = TRUE
-    ON CONFLICT (product_variant_id, warehouse_id)
+    ON CONFLICT (product_variant_id, warehouse_id) WHERE product_variant_id IS NOT NULL
     DO NOTHING;
 
     PERFORM b.id

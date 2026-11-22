@@ -49,6 +49,16 @@ Do not use vague statuses such as “audited”, “checked”, or “almost don
 
 Product, category, model, attributes, and attribute values are maintained through the single Product Management workspace at `/products`. Legacy standalone pages redirect there. Existing database structures remain until a dependency-safe retirement plan is proven.
 
+## Build-first delivery mode — project owner instruction (2026-11-22)
+
+- Complete the remaining functional modules before broad system-wide polishing: Sales, Returns, Accounting, Reports, and Settings.
+- At module start, perform a bounded alignment check (approximately 20–30% of relevant scope) across table contracts, business logic, frontend/backend integration, permissions, and UI/UX. Expand only when a concrete blocker or safety risk is found.
+- Do not repeat full audits or polish completed modules at every module handoff. Reuse accepted evidence and inspect only changed scope.
+- Classify findings as blockers or later improvements. A blocker prevents safe implementation or causes incorrect transactions, authorization exposure, or data corruption. Noncritical cleanup, cosmetic refinement, and speculative SKU normalization remain in the shared backlog for the overall audit milestone.
+- Application records in the current Development project are test data. Do not let demo-data cleanup or repeated SKU consistency checks displace module implementation. This does not authorize destructive reset or deletion; obtain explicit owner approval before any such action.
+- After the core modules exist, run one cross-module audit and integration pass, then perform the larger refinement and regression cycle.
+- Continue to use Preview deployments for coherent implementation batches. A READY build is not proof of an authenticated end-to-end workflow.
+
 ## Required task closeout record
 
 For each backlog item, record:

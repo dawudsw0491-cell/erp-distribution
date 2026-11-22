@@ -226,6 +226,10 @@ export default async function PurchaseOrderDetailPage({
         product:products!fk_purchase_order_items_product_id (
           sku,
           product_name
+        ),
+        variant:product_variants!purchase_order_items_product_variant_id_fkey (
+          variant_sku,
+          variant_name
         )
       )
     `)
@@ -669,8 +673,13 @@ export default async function PurchaseOrderDetailPage({
                           {item.product?.product_name || "-"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          SKU: {item.product?.sku || "-"}
+                          SKU Variant: {item.variant?.variant_sku ?? (item.product?.sku ? `${item.product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                         </p>
+                        {item.variant?.variant_name && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            {item.variant.variant_name}
+                          </p>
+                        )}
                       </td>
 
                       <td className="px-4 py-4 text-right tabular-nums">

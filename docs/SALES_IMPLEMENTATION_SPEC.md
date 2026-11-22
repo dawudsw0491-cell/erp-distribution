@@ -194,3 +194,17 @@ Source migration committed on the Sales feature branch:
 - `sales_order_line_fulfillment` is a derived read model; it calculates delivered and outstanding quantities from posted DOs only. No separate reservation ledger is introduced.
 
 Not yet implemented: write RPCs, SO confirmation/cancellation, DO creation/posting, narrow inventory posting permission bridge, server actions, pages, and automated tests. The migration remains source-only and has not been applied to Development or Production.
+
+
+## 10.5 Sales Order and draft Delivery Order RPCs — source committed
+
+The source migration now also defines:
+- `sales_create_order`: permission and warehouse-scope checks, active customer and active Product Variant validation, quantity/price validation, and integer quantities for IMEI/serial products.
+- `sales_confirm_order`: row lock, non-empty draft validation, confirmation metadata, and subtotal calculation.
+- `sales_cancel_order`: only draft/confirmed orders with no posted delivery can be cancelled; cancellation releases the derived soft reservation by changing SO status.
+- `sales_create_delivery_order`: row lock, warehouse lock, partial quantity checks against posted fulfillment, FIFO soft-reservation priority by confirmed timestamp / SO number / ID, and serialized Product Unit validation.
+- Optional Product Unit reference on DO lines to support unit-level serial/IMEI capture.
+
+Still outstanding before this migration is executable: implement and review the narrow permission bridge in `post_inventory_movement_unlocked`, then implement atomic DO posting that creates a `sale` movement, invokes the existing valuation/posting algorithm, and commits movement + unit location/status + DO/SO fulfillment in one transaction. Do not bypass the existing movement algorithm or grant Sales users `inventory.update`.
+
+No SQL from this source migration has been applied to Development or Production. No build, SQL parser, or integration test has been run yet.

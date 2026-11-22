@@ -16,7 +16,7 @@ export default async function SalesDetailPage({params,searchParams}:{params:Prom
  const {data:order,error}=await supabase.from("sales_orders").select("id,sales_order_number,order_date,status,notes,subtotal,customer_id,warehouse_id,customers(customer_code,customer_name),warehouses(warehouse_code,warehouse_name)").eq("id",id).maybeSingle();
  if(error){console.error("Sales detail query failed",error);return <div className="p-8">Gagal memuat detail penjualan.</div>;}
  if(!order) notFound();
- const [linesResult,fulfillmentResult,deliveriesResult,unitsResult,createPermission]=await Promise.all([
+ const [linesResult,fulfillmentResult,deliveriesResult,createPermission,unitsPermission]=await Promise.all([
   supabase.from("sales_order_items").select("id,product_id,product_variant_id,quantity,unit_price,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("sales_order_id",id).order("created_at"),
   supabase.from("sales_order_line_fulfillment").select("sales_order_item_id,ordered_quantity,delivered_quantity,outstanding_quantity").eq("sales_order_id",id),
   supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,status,posted_at,delivery_order_items(id,sales_order_item_id,quantity,product_unit_id,inventory_movement_id)").eq("sales_order_id",id).order("created_at",{ascending:false}),

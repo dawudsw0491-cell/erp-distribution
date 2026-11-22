@@ -95,16 +95,6 @@ export default async function SettingsPage() {
     });
   }
 
-  if (auditAccess.authorized) {
-    availableItems.push({
-      title: "Audit dan Aktivitas",
-      description:
-        "Permission audit.view tersedia pada database. Halaman penelusuran audit terpusat belum tersedia.",
-      href: "/settings",
-      permissionLabel: "audit.view",
-    });
-  }
-
   if (!profile || availableItems.length === 0) {
     return (
       <div className="flex min-h-screen bg-slate-100">
@@ -155,6 +145,15 @@ export default async function SettingsPage() {
               ))}
             </div>
           </section>
+
+          {auditAccess.authorized && (
+            <section className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="font-semibold text-slate-900">Audit trail</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Permission audit.view tersedia, tetapi halaman penelusuran audit terpusat belum tersedia. Catatan audit yang sudah ada tetap dikelola melalui modul sumbernya.
+              </p>
+            </section>
+          )}
 
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
             <h2 className="font-semibold text-amber-900">Konfigurasi sistem lanjutan belum tersedia</h2>

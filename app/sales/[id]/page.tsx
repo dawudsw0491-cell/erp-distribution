@@ -3,7 +3,7 @@ import {notFound,redirect} from "next/navigation";
 import {connection} from "next/server";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import {getAuthorizationContext} from "@/lib/auth/authorization";
-import {confirmSalesOrderAction,cancelSalesOrderAction,createDeliveryOrderAction,postDeliveryOrderAction} from "../actions";
+import {confirmSalesOrderAction,cancelSalesOrderAction,postDeliveryOrderAction} from "../actions";
 import DeliveryOrderComposer from "./delivery-order-composer";
 
 export const metadata={title:"Detail Penjualan | HEXA CORE ERP"};
@@ -29,7 +29,6 @@ export default async function SalesDetailPage({params,searchParams}:{params:Prom
  const outstanding=new Map(fulfillment.map((f:any)=>[f.sales_order_item_id,Number(f.outstanding_quantity)]));
  const unitsResult=unitsPermission.data===true?await supabase.from("product_units").select("id,product_variant_id,unit_code,unit_status").eq("warehouse_id",order.warehouse_id).eq("unit_status","available"):{data:[]};
  const units=(unitsResult.data??[]).map((u:any)=>({id:u.id,product_variant_id:u.product_variant_id,unit_code:u.unit_code??u.id.slice(0,8)}));
- const doItems=(deliveriesResult.data??[]).flatMap((d:any)=>d.delivery_order_items??[]);
  const lineModels=lines.map((line:any)=>({id:line.id,product_variant_id:line.product_variant_id,product_name:(Array.isArray(line.products)?line.products[0]:line.products)?.product_name??"Produk",variant_sku:(Array.isArray(line.product_variants)?line.product_variants[0]:line.product_variants)?.variant_sku??"—",variant_name:(Array.isArray(line.product_variants)?line.product_variants[0]:line.product_variants)?.variant_name??"",tracking_type:(Array.isArray(line.products)?line.products[0]:line.products)?.tracking_type??"quantity",ordered:Number(line.quantity),delivered:Number(fulfillment.find((f:any)=>f.sales_order_item_id===line.id)?.delivered_quantity??0),outstanding:Number(outstanding.get(line.id)??0),unit_price:Number(line.unit_price)}));
  const canCreate=createPermission.data===true;
  const money=(v:number)=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(v);

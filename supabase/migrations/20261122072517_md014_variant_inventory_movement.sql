@@ -14,7 +14,7 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.inventory_valuation_logs WHERE product_variant_id IS NULL)
      OR EXISTS (SELECT 1 FROM public.product_units WHERE product_variant_id IS NULL)
      OR EXISTS (SELECT 1 FROM public.stock_opname_items WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.purchase_order_items WHERE product_variant_id IS NULL OR product_id IS NULL) THEN
+     OR EXISTS (SELECT 1 FROM public.purchase_order_items WHERE product_variant_id IS NULL) THEN
     RAISE EXCEPTION USING
       MESSAGE = 'MD-014 blocked: Product-only inventory identities remain.',
       DETAIL = 'Resolve/reset legacy Product-only balances, movements, valuation logs, and product units through the separately approved disposition. No automatic Variant inference is allowed.';

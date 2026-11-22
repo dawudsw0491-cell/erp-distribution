@@ -401,13 +401,16 @@ async function DashboardContent() {
     }
   );
 
-  // Live inventory_balances menyimpan identitas produk pada product_id.
-  // product_variant_id tetap dibaca sebagai fallback untuk baris historis.
+  // Canonical stock identity is Product Variant. Product-only legacy rows
+  // remain visible as unresolved balances and are never counted as a SKU.
   const totalInventorySku = new Set(
     balances
-      .map((row) => row.product_id ?? row.product_variant_id)
+      .map((row) => row.product_variant_id)
       .filter((id): id is string => Boolean(id))
   ).size;
+  const unresolvedVariantBalanceRows = balances.filter(
+    (row) => row.product_variant_id === null
+  ).length;
 
   // BUSINESS ACTIVITY FEED
   // Purchase Order dan Goods Receipt menggunakan permission Purchasing yang sama.
@@ -692,7 +695,7 @@ async function DashboardContent() {
           </section>
 
           {/* EXISTING ERP SUMMARY */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {summaryCards.map((card) => (
               <div
                 key={card.title}
@@ -745,9 +748,15 @@ async function DashboardContent() {
                 <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   {[
                     {
-                      label: "Total SKU",
+                      label: "Variant SKU Teridentifikasi",
                       value: formatNumber(totalInventorySku),
-                      note: "Produk unik yang memiliki saldo",
+                      note: "SKU Variant unik dengan saldo tercatat",
+                      href: "/inventory/balances",
+                    },
+                    {
+                      label: "Saldo Legacy tanpa Variant",
+                      value: formatNumber(unresolvedVariantBalanceRows),
+                      note: "Baris saldo Product-only yang belum direkonsiliasi",
                       href: "/inventory/balances",
                     },
                     {

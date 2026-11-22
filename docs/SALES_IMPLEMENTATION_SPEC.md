@@ -299,3 +299,8 @@ Source additions:
 - SO/DO RPCs now reject NULL `p_items` explicitly; SQL three-valued logic must not allow NULL JSON payloads to pass an array guard.
 
 These are source-only changes. No Sales migration has been applied to Development or Production. Required verification remains isolated migration replay, function ACL/RLS review, transaction/rollback and concurrency tests, TypeScript/lint/build, and authenticated end-to-end testing.
+
+
+## 10.13 RPC input-boundary limits — 2026-11-22
+
+Server-side validation now enforces a maximum of 2,000 characters for SO and DO notes in the create/edit RPC paths. The 100-row limit is enforced in the SO create, DO create, and SO draft-edit RPCs; these limits are not dependent solely on browser/server-action validation. Matching client actions already apply the same note length limit.

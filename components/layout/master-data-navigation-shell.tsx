@@ -4,10 +4,10 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 
-const MASTER_DATA_PATHS = ["/products", "/customers", "/suppliers", "/warehouses"];
+const STANDALONE_PATHS = ["/login", "/change-password"];
 
-function isMasterDataPath(path: string) {
-  return MASTER_DATA_PATHS.some(
+function isStandalonePath(path: string) {
+  return STANDALONE_PATHS.some(
     (base) => path === base || path.startsWith(`${base}/`)
   );
 }
@@ -19,7 +19,7 @@ export default function MasterDataNavigationShell({
 }) {
   const pathname = usePathname() || "";
 
-  if (!isMasterDataPath(pathname)) return <>{children}</>;
+  if (isStandalonePath(pathname)) return <>{children}</>;
 
   return (
     <div className="flex min-h-screen w-full bg-slate-100">

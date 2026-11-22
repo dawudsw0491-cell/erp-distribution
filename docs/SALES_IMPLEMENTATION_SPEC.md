@@ -219,7 +219,7 @@ Source migration committed:
 - A `sale` movement is accepted only when it has `source_reference_type='delivery_order'`, its source reference resolves to a DO line whose `inventory_movement_id` points back to that movement, the parent DO remains draft, and Product/Variant/Unit/quantity/Warehouse all match. Caller must have `sales.create` and warehouse access.
 - Every non-sale movement continues to require `inventory.update`. The manual `create_inventory_movement` RPC remains unchanged and still requires `inventory.update`.
 
-This is source-only. The bridge migration has not been applied to Development or Production. It is not yet usable until the Sales schema is applied and the atomic DO posting RPC creates and links the movement row in the same transaction. DO posting, duplicate-line aggregation validation, UI, SQL execution tests, and role/warehouse/concurrency tests remain outstanding.
+The bridge migration is source-only and has not been applied to Development or Production. Its source transformation was checked against the live canonical function definition: the reviewed permission gate and movement-read block each matched exactly once, and the generated definition retains the inventory balance and valuation sections. This is a source-level check only, not a database execution test. The bridge is designed to accept only a source-linked draft DO sale movement with `sales.create` and warehouse access; all other movement types retain `inventory.update`. The atomic DO RPC and initial UI are now committed. SQL execution, role/warehouse/concurrency/rollback, build, and browser tests remain outstanding.
 
 
 ## 10.7 Atomic Delivery Order posting — source committed
@@ -235,7 +235,7 @@ Source migration committed:
 Source-only limitations:
 - This migration has not been applied to Development or Production.
 - No SQL execution, parser, role/warehouse test, concurrency test, rollback test, build or browser test has been run.
-- The Sales UI and action layer remain outstanding.
+- The initial single-entry Sales UI and server action layer are now committed; see §10.8.
 - Sales Invoice remains excluded from Phase 1; no invoice/AR/GL logic is added.
 
 
@@ -251,3 +251,15 @@ The first UI slice now exists under one `/sales` entry:
 This is intentionally a single Sales module entry, not a collection of independent sales submodules. The UI is an initial source slice and still requires TypeScript/build, authenticated role and warehouse checks, and browser validation. Serialized-unit selection depends on the caller's existing `inventory.view` permission and warehouse-scoped Product Unit read policy; this implementation does not broaden that permission.
 
 Sales Invoice remains outside this Phase 1 slice. No invoice, payment, tax, AR, or GL behavior has been introduced.
+
+
+## 10.9 Narrow inventory permission bridge — source committed
+
+Migration:
+- `supabase/migrations/20261122233000_inventory_sales_posting_permission_bridge.sql`
+- Reads the canonical `post_inventory_movement_unlocked(uuid,numeric)` definition using `pg_get_functiondef`, verifies the exact expected original permission gate and movement-lock/read block, then changes only the authorization gate.
+- The `sale` exception requires `source_reference_type='delivery_order'`, a source DO line linked back to the same movement ID, matching product, variant, DO warehouse and SO relationship, a draft DO, current user's `sales.create`, warehouse access, and movement creator identity.
+- Non-sale movements retain the existing `inventory.update` requirement. Manual movement creation and the public wrapper were not changed. The internal unlocked function ACL remains unchanged; authenticated callers do not receive direct execute access.
+- Source transformation was checked against the live Development function definition: exact expected blocks each matched once, and the transformed definition retains inventory balance and valuation operations. No function was changed in Development.
+
+The complete migration sequence remains unapplied. Explicit Development approval is still required before any schema/function DDL is executed.

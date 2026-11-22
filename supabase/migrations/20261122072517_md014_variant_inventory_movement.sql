@@ -3053,6 +3053,8 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.create_inventory_movement_by_product(uuid, uuid, character varying, numeric, character varying, uuid, character varying, character varying, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.create_inventory_movement(uuid, uuid, character varying, numeric, character varying, uuid, character varying, character varying, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_inventory_movement(uuid, uuid, character varying, numeric, character varying, uuid, character varying, character varying, text) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.create_inventory_transfer_by_product(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) TO authenticated, service_role;

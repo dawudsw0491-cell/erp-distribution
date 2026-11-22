@@ -56,7 +56,8 @@ begin
   if p_order_date is null then
     raise exception 'Tanggal Sales Order wajib diisi.';
   end if;
-  if jsonb_typeof(p_items) <> 'array'
+  if p_items is null
+     or jsonb_typeof(p_items) is distinct from 'array'
      or jsonb_array_length(p_items) = 0
      or jsonb_array_length(p_items) > 100 then
     raise exception 'Sales Order wajib memiliki 1 sampai 100 baris.';

@@ -44,6 +44,7 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM public.inventory_balances
+    WHERE product_variant_id IS NOT NULL
     GROUP BY product_variant_id, warehouse_id HAVING count(*) > 1
   ) THEN
     RAISE EXCEPTION 'MD-014 blocked: duplicate Variant + Warehouse balance keys exist.';

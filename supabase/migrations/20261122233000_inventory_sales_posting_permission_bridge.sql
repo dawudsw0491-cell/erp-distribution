@@ -12,7 +12,7 @@ declare
 $old$;
   v_new_gate text := $new$
     IF v_movement.movement_type = 'sale' THEN
-        IF v_movement.source_reference_type <> 'delivery_order'
+        IF v_movement.source_reference_type IS DISTINCT FROM 'delivery_order'
            OR v_movement.source_reference_id IS NULL
            OR v_movement.quantity_delta >= 0
            OR v_movement.inventory_status <> 'available'
@@ -32,6 +32,8 @@ $old$;
                  AND doi.product_variant_id = v_movement.product_variant_id
                  AND soi.product_id = doi.product_id
                  AND soi.product_variant_id = doi.product_variant_id
+                 AND d.sales_order_id = soi.sales_order_id
+                 AND v_movement.created_by = v_user_id
            ) THEN
             RAISE EXCEPTION
                 'Movement sale hanya dapat diposting melalui Delivery Order yang valid.';

@@ -76,20 +76,18 @@ async function PurchaseOrderPageContent() {
   const productMap = new Map(
     (productResult.data ?? []).map((product) => [product.id, product])
   );
-  const variants = (variantResult.data ?? [])
-    .map((variant) => {
-      const product = productMap.get(variant.product_id);
-      if (!product) return null;
-      return {
-        id: variant.id,
-        variant_sku: variant.variant_sku,
-        variant_name: variant.variant_name,
-        product_id: variant.product_id,
-        product_name: product.product_name,
-        tracking_type: product.tracking_type,
-      };
-    })
-    .filter((variant) => variant !== null);
+  const variants = (variantResult.data ?? []).flatMap((variant) => {
+    const product = productMap.get(variant.product_id);
+    if (!product) return [];
+    return [{
+      id: variant.id,
+      variant_sku: variant.variant_sku,
+      variant_name: variant.variant_name,
+      product_id: variant.product_id,
+      product_name: product.product_name,
+      tracking_type: product.tracking_type,
+    }];
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

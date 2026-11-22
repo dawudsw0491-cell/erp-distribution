@@ -66,7 +66,7 @@ type OpnameItemRow = {
   id: string;
   session_id: string;
   product_id: string | null;
-  product_variant_id: string;
+  product_variant_id: string | null;
   inventory_status: string;
   snapshot_quantity: number;
   snapshot_aggregate_quantity: number;
@@ -408,7 +408,7 @@ async function StockOpnameDetailContent({
     (itemResult.data ?? []) as OpnameItemRow[];
 
   // Stock Opname identity is resolved from Variant, then its parent Product.
-  const variantIds = [...new Set(items.map((item) => item.product_variant_id))];
+  const variantIds = [...new Set(items.map((item) => item.product_variant_id).filter((value): value is string => !!value))];
   const variantResult =
     variantIds.length > 0
       ? await supabase
@@ -472,7 +472,7 @@ async function StockOpnameDetailContent({
   const bulkQuantityItems = items
     .filter((item) => {
       const product = item.product_id
-        ? productMap.get(item.product_variant_id)
+        ? item.product_variant_id ? productMap.get(item.product_variant_id) : undefined
         : undefined;
 
       return product?.tracking_type === "quantity" || product?.tracking_type === "imei";
@@ -611,7 +611,7 @@ async function StockOpnameDetailContent({
 
   const itemUnits = units.filter(
     (unit) =>
-      unit.product_variant_id === item.product_variant_id &&
+      !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
       unit.unit_status === item.inventory_status
   );
 

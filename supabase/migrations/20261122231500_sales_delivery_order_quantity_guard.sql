@@ -38,7 +38,7 @@ begin
   end if;
   perform public.lock_inventory_warehouse(v_order.warehouse_id);
 
-  if p_items is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items)=0 then
+  if p_items is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items)=0 or jsonb_array_length(p_items)>100 then
     raise exception 'Delivery Order wajib memiliki minimal satu baris.';
   end if;
 

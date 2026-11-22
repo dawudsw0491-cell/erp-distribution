@@ -39,6 +39,10 @@ BEGIN
     SELECT 1 FROM public.stock_opname_items i
     JOIN public.product_variants pv ON pv.id = i.product_variant_id
     WHERE i.product_id IS NOT NULL AND i.product_id IS DISTINCT FROM pv.product_id
+  ) OR EXISTS (
+    SELECT 1 FROM public.purchase_order_items poi
+    JOIN public.product_variants pv ON pv.id = poi.product_variant_id
+    WHERE poi.product_id IS NOT NULL AND poi.product_id IS DISTINCT FROM pv.product_id
   ) THEN
     RAISE EXCEPTION 'MD-014 blocked: denormalized Product ID conflicts with its Product Variant parent.';
   END IF;
@@ -53,6 +57,12 @@ END;
 $preflight$;
 
 -- Product ID is retained only as a validated denormalized parent reference.
+UPDATE public.purchase_order_items poi
+SET product_id = pv.product_id
+FROM public.product_variants pv
+WHERE pv.id = poi.product_variant_id
+  AND poi.product_id IS DISTINCT FROM pv.product_id;
+
 UPDATE public.inventory_balances b
 SET product_id = pv.product_id
 FROM public.product_variants pv
@@ -3055,6 +3065,274 @@ GRANT EXECUTE ON FUNCTION public.post_inventory_reversal_unlocked(uuid, uuid) TO
 REVOKE ALL ON FUNCTION public.post_inventory_reversal(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.post_inventory_reversal(uuid, uuid) TO authenticated, service_role;
 
+
+
+-- Purchase Order lines persist Product ID only as a validated Variant parent.
+UPDATE public.purchase_order_items poi
+SET product_id = pv.product_id
+FROM public.product_variants pv
+WHERE pv.id = poi.product_variant_id
+  AND poi.product_id IS DISTINCT FROM pv.product_id;
+
+ALTER TABLE public.purchase_order_items
+    ADD CONSTRAINT fk_purchase_order_items_variant_product
+    FOREIGN KEY (product_variant_id, product_id)
+    REFERENCES public.product_variants(id, product_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+CREATE OR REPLACE FUNCTION public.create_purchase_order(p_supplier_id uuid, p_warehouse_id uuid, p_order_date date, p_expected_date date, p_notes text, p_items jsonb, p_shipping_cost numeric DEFAULT 0)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_po_id UUID;
+    v_po_number TEXT;
+    v_currency VARCHAR(10);
+
+    v_item JSONB;
+    v_variant_id UUID;
+    v_product_id UUID;
+    v_quantity NUMERIC(18,3);
+    v_unit_cost NUMERIC(18,2);
+    v_discount NUMERIC(18,2);
+    v_tax NUMERIC(18,2);
+    v_gross NUMERIC(18,2);
+    v_line_total NUMERIC(18,2);
+
+    v_subtotal NUMERIC(18,2) := 0;
+    v_total_discount NUMERIC(18,2) := 0;
+    v_total_tax NUMERIC(18,2) := 0;
+    v_grand_total NUMERIC(18,2) := 0;
+BEGIN
+    -- 1. Validasi pengguna dan permission
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required';
+    END IF;
+
+    IF NOT public.has_permission('purchasing.create') THEN
+        RAISE EXCEPTION 'Permission denied: purchasing.create';
+    END IF;
+
+    -- 2. Validasi parameter utama
+    IF p_supplier_id IS NULL OR p_warehouse_id IS NULL THEN
+        RAISE EXCEPTION 'Supplier and warehouse are required';
+    END IF;
+
+    IF p_order_date IS NULL THEN
+        RAISE EXCEPTION 'Order date is required';
+    END IF;
+
+    IF p_expected_date IS NOT NULL
+       AND p_expected_date < p_order_date THEN
+        RAISE EXCEPTION 'Expected date cannot be earlier than order date';
+    END IF;
+
+    IF p_shipping_cost IS NULL OR p_shipping_cost < 0 THEN
+        RAISE EXCEPTION 'Shipping cost must be zero or greater';
+    END IF;
+
+    IF p_items IS NULL
+       OR jsonb_typeof(p_items) <> 'array'
+       OR jsonb_array_length(p_items) = 0 THEN
+        RAISE EXCEPTION 'At least one purchase item is required';
+    END IF;
+
+    -- 3. Validasi supplier aktif dan ambil mata uang
+    SELECT s.currency_code
+    INTO v_currency
+    FROM public.suppliers s
+    WHERE s.id = p_supplier_id
+      AND s.is_active = TRUE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Supplier not found or inactive';
+    END IF;
+
+    -- 4. Validasi warehouse aktif
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.warehouses w
+        WHERE w.id = p_warehouse_id
+          AND w.is_active = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Warehouse not found or inactive';
+    END IF;
+
+    -- 5. Validasi seluruh item dan hitung total
+    FOR v_item IN
+        SELECT value
+        FROM jsonb_array_elements(p_items)
+    LOOP
+        v_variant_id := (v_item->>'product_variant_id')::UUID;
+        SELECT pv.product_id
+        INTO v_product_id
+        FROM public.product_variants pv
+        WHERE pv.id = v_variant_id;
+
+        v_quantity := (v_item->>'quantity')::NUMERIC;
+        v_unit_cost := (v_item->>'unit_cost')::NUMERIC;
+        v_discount := COALESCE(
+            (v_item->>'discount_amount')::NUMERIC, 0
+        );
+        v_tax := COALESCE(
+            (v_item->>'tax_amount')::NUMERIC, 0
+        );
+
+        IF v_variant_id IS NULL THEN
+            RAISE EXCEPTION 'Product variant is required';
+        END IF;
+
+        IF v_quantity IS NULL OR v_quantity <= 0 THEN
+            RAISE EXCEPTION 'Item quantity must be greater than zero';
+        END IF;
+
+        IF v_unit_cost IS NULL OR v_unit_cost < 0 THEN
+            RAISE EXCEPTION 'Unit cost must be zero or greater';
+        END IF;
+
+        IF v_discount < 0 OR v_tax < 0 THEN
+            RAISE EXCEPTION 'Discount and tax cannot be negative';
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM public.product_variants pv
+            JOIN public.products p
+              ON p.id = pv.product_id
+            WHERE pv.id = v_variant_id
+              AND pv.is_active = TRUE
+              AND p.is_active = TRUE
+        ) THEN
+            RAISE EXCEPTION
+                'Product variant % not found or inactive',
+                v_variant_id;
+        END IF;
+
+        v_gross := ROUND(v_quantity * v_unit_cost, 2);
+
+        IF v_discount > v_gross THEN
+            RAISE EXCEPTION
+                'Discount cannot exceed gross item amount';
+        END IF;
+
+        v_line_total := v_gross - v_discount + v_tax;
+
+        v_subtotal := v_subtotal + v_gross;
+        v_total_discount := v_total_discount + v_discount;
+        v_total_tax := v_total_tax + v_tax;
+    END LOOP;
+
+    -- 6. Hitung grand total
+    v_grand_total :=
+        v_subtotal
+        - v_total_discount
+        + v_total_tax
+        + p_shipping_cost;
+
+    -- 7. Generate nomor PO unik
+    v_po_number :=
+        'PO-' ||
+        TO_CHAR(CURRENT_DATE, 'YYYYMMDD') ||
+        '-' ||
+        UPPER(SUBSTRING(REPLACE(gen_random_uuid()::TEXT, '-', '') FROM 1 FOR 8));
+
+    -- 8. Simpan header PO
+    INSERT INTO public.purchase_orders (
+        po_number,
+        supplier_id,
+        warehouse_id,
+        order_date,
+        expected_date,
+        status,
+        currency,
+        subtotal,
+        discount_amount,
+        tax_amount,
+        shipping_cost,
+        grand_total,
+        notes,
+        created_by
+    )
+    VALUES (
+        v_po_number,
+        p_supplier_id,
+        p_warehouse_id,
+        p_order_date,
+        p_expected_date,
+        'draft',
+        v_currency,
+        v_subtotal,
+        v_total_discount,
+        v_total_tax,
+        p_shipping_cost,
+        v_grand_total,
+        p_notes,
+        v_user_id
+    )
+    RETURNING id INTO v_po_id;
+
+    -- 9. Simpan seluruh item PO
+    FOR v_item IN
+        SELECT value
+        FROM jsonb_array_elements(p_items)
+    LOOP
+        v_variant_id := (v_item->>'product_variant_id')::UUID;
+        SELECT pv.product_id
+        INTO v_product_id
+        FROM public.product_variants pv
+        WHERE pv.id = v_variant_id;
+
+        v_quantity := (v_item->>'quantity')::NUMERIC;
+        v_unit_cost := (v_item->>'unit_cost')::NUMERIC;
+        v_discount := COALESCE(
+            (v_item->>'discount_amount')::NUMERIC, 0
+        );
+        v_tax := COALESCE(
+            (v_item->>'tax_amount')::NUMERIC, 0
+        );
+
+        v_gross := ROUND(v_quantity * v_unit_cost, 2);
+        v_line_total := v_gross - v_discount + v_tax;
+
+        INSERT INTO public.purchase_order_items (
+            purchase_order_id,
+            product_variant_id,
+            product_id,
+            quantity,
+            received_quantity,
+            unit_cost,
+            discount_amount,
+            tax_amount,
+            line_total,
+            notes
+        )
+        VALUES (
+            v_po_id,
+            v_variant_id,
+            v_product_id,
+            v_quantity,
+            0,
+            v_unit_cost,
+            v_discount,
+            v_tax,
+            v_line_total,
+            NULLIF(v_item->>'notes', '')
+        );
+    END LOOP;
+
+    RETURN v_po_id;
+END;
+$function$
+
+
+REVOKE ALL ON FUNCTION public.create_purchase_order_by_product(uuid, uuid, date, date, text, jsonb, numeric) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.create_purchase_order(uuid, uuid, date, date, text, jsonb, numeric) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_purchase_order(uuid, uuid, date, date, text, jsonb, numeric) TO authenticated, service_role;
 
 -- Stock Opname identity is one row per Variant + Warehouse status bucket.
 ALTER TABLE public.stock_opname_items

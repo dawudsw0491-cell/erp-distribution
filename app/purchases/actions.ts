@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
 
 type PurchaseOrderItemInput = {
-  product_id: string;
+  product_variant_id: string;
   quantity: string | number;
   unit_cost: string | number;
   discount_amount?: string | number;
@@ -174,15 +174,15 @@ export async function createPurchaseOrderAction(
       redirect("/purchases/new?error=invalid_item_data");
     }
 
-    const productId = item.product_id;
+    const productVariantId = item.product_variant_id;
     const quantity = item.quantity;
     const unitCost = item.unit_cost;
     const discountAmount = item.discount_amount ?? "0";
     const taxAmount = item.tax_amount ?? "0";
 
     if (
-      typeof productId !== "string" ||
-      !isValidUUID(productId) ||
+      typeof productVariantId !== "string" ||
+      !isValidUUID(productVariantId) ||
       !isValidAmount(quantity, 3) ||
       !isValidAmount(unitCost, 2) ||
       !isValidAmount(discountAmount, 2) ||
@@ -205,7 +205,7 @@ export async function createPurchaseOrderAction(
     }
 
     items.push({
-      product_id: productId,
+      product_variant_id: productVariantId,
       quantity: String(quantity),
       unit_cost: String(unitCost),
       discount_amount: String(discountAmount),
@@ -215,7 +215,7 @@ export async function createPurchaseOrderAction(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_purchase_order_by_product",
+    "create_purchase_order",
     {
       p_supplier_id: supplierId,
       p_warehouse_id: warehouseId,
@@ -630,7 +630,7 @@ export async function createGoodsReceiptAction(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_goods_receipt_by_product",
+    "create_goods_receipt",
     {
       p_purchase_order_id: purchaseOrderId,
       p_receipt_date: receiptDate,
@@ -694,7 +694,7 @@ export async function postGoodsReceiptAction(
   }
 
   const { error } = await supabase.rpc(
-    "post_goods_receipt_by_product",
+    "post_goods_receipt",
     {
       p_goods_receipt_id: goodsReceiptId,
     }

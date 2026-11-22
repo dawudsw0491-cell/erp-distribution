@@ -22,7 +22,7 @@ type Warehouse = {
 
 type ProductVariant = {
   id: string;
-  product_variant_id: string;
+  product_id: string;
   variant_sku: string;
   variant_name: string;
   product_name: string;
@@ -30,7 +30,7 @@ type ProductVariant = {
 };
 
 type PurchaseItem = {
-  product_id: string;
+  product_variant_id: string;
   quantity: string;
   unit_cost: string;
   discount_amount: string;

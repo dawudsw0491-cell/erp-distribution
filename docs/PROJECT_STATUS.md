@@ -27,11 +27,11 @@
 | Inventory Transfer | PARTIAL | Source and live RPCs exist; runtime transfer/rollback tests absent |
 | Inventory Balances / Valuation | PARTIAL | Balance and valuation tables/logs exist; reconciliation and valuation tests absent |
 | Stock Opname | PARTIAL | Session/item/unit count workflows and RPCs exist; approval/posting tests absent |
-| Sales | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Returns | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Accounting | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Settings | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Reporting / Analytics | NOT IMPLEMENTED / SCOPE UNKNOWN | No dedicated module identified in current route tree |
+| Sales | BLOCKED — NOT IMPLEMENTED | Sidebar entry exists, but no Sales transaction tables or route. SALES-001 design defines SO → partial DO; DO posting is blocked until MD-014 variant-level Inventory is validated in Development. |
+| Returns | BLOCKED — NOT IMPLEMENTED | No return transaction tables or posting RPCs. Requires source-document linkage, stock disposition, valuation, approval, and accounting rules. |
+| Accounting | BLOCKED — NOT IMPLEMENTED | Finance permissions exist, but no chart-of-accounts, journal, fiscal-period, receivable/payable, or ledger tables were found in live Development. |
+| Settings | PARTIAL — SOURCE IMPLEMENTED | `/settings` now provides a permission-aware administration hub to existing User Management, Master Data, and Warehouse routes. Company/system configuration and central audit viewer are not implemented. |
+| Reporting / Analytics | NOT IMPLEMENTED | `reports.view` and `reports.export` permissions exist, but no dedicated reports route or validated reporting contracts are implemented. |
 
 ## Live database snapshot
 

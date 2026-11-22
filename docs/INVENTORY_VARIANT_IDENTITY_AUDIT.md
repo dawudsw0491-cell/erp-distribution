@@ -1096,3 +1096,24 @@ Both groups are complete in movement row count and quantity arithmetic. Both rem
 All movement rows are posted and protected by the immutable movement lifecycle/delete guard. Reversing these movements would create additional ledger history rather than remove test data, and would not satisfy the user's selected reset disposition. The valuation rows are separately immutable. A reset that claims to clear all test transaction history therefore requires a supported Development restore/reseed or a separately engineered, explicitly approved administrative reset mechanism with verified recovery and a documented audit boundary. Neither is currently confirmed or authorized.
 
 No movement, transfer, valuation, or balance row was modified.
+
+
+## 13. MD-014 source remediation — preserve unresolved history
+
+Implementation commit: `b9a8bfa` (followed by migration header clarification).
+
+The original MD-014 migration preflight rejected every NULL `product_variant_id`, which made the migration impossible to apply without resetting or fabricating identity for historical rows. This was not an acceptable default because Development contains Product-only rows with non-zero stock and valuation.
+
+The source migration is now adjusted to preserve historical rows:
+
+- Removed the blanket preflight rejection of NULL Variant IDs.
+- Removed `NOT NULL` alterations on inventory balances, movements, valuation logs, and product units. Historical Product-only rows remain explicitly unresolved.
+- Replaced the single Product + Warehouse balance constraint with a partial unique index for active Variant + Warehouse balances.
+- Added a separate partial unique index to preserve uniqueness of legacy Product-only balance rows.
+- Updated all three Variant balance upsert clauses to infer the partial unique index explicitly.
+- Existing cross-column Product/Variant consistency checks remain for rows that already have a Variant ID.
+- No historical quantity, valuation, movement, unit, or Stock Opname row is reassigned or deleted by this change.
+
+A read-only Development check on 2026-11-22 reconfirmed unresolved rows: balances 11/16, movements 9/9, valuation logs 9/9, product units 3/3, Stock Opname items 115/140, and Purchase Order items 7/11. Among the 11 unresolved balance rows, several have positive quantities and non-zero inventory value. Duplicate checks returned zero duplicate groups for both legacy Product + Warehouse keys and existing Variant + Warehouse keys.
+
+**Not yet proven:** clean-baseline migration replay, function dependency completeness, Goods Receipt/transfer/reversal/Stock Opname integration, RLS/warehouse role tests, rollback, valuation reconciliation, and application runtime. The migration has NOT been applied to Development or Production. Do not treat MD-014 as unblocked until those tests pass.

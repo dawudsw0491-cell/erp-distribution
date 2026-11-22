@@ -3073,8 +3073,8 @@ FROM public.product_variants pv
 WHERE pv.id = poi.product_variant_id
   AND poi.product_id IS DISTINCT FROM pv.product_id;
 
+-- Preserve Product-only historical PO lines; new PO creation validates Variant IDs.
 ALTER TABLE public.purchase_order_items
-    ALTER COLUMN product_variant_id SET NOT NULL,
     ALTER COLUMN product_id SET NOT NULL;
 
 ALTER TABLE public.purchase_order_items
@@ -3349,17 +3349,22 @@ FROM public.product_variants pv
 WHERE pv.id = i.product_variant_id
   AND i.product_id IS DISTINCT FROM pv.product_id;
 
+-- Keep Product-only historical opname rows immutable and unresolved.
 ALTER TABLE public.stock_opname_items
-    ALTER COLUMN product_variant_id SET NOT NULL,
     ALTER COLUMN product_id SET NOT NULL;
 
 ALTER TABLE public.stock_opname_items
     DROP CONSTRAINT IF EXISTS uq_stock_opname_product;
 ALTER TABLE public.stock_opname_items
     DROP CONSTRAINT IF EXISTS uq_stock_opname_variant;
-ALTER TABLE public.stock_opname_items
-    ADD CONSTRAINT uq_stock_opname_variant
-    UNIQUE (session_id, product_variant_id, inventory_status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_opname_variant
+    ON public.stock_opname_items (session_id, product_variant_id, inventory_status)
+    WHERE product_variant_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_opname_legacy_product
+    ON public.stock_opname_items (session_id, product_id, inventory_status)
+    WHERE product_variant_id IS NULL AND product_id IS NOT NULL;
 
 ALTER TABLE public.stock_opname_items
     ADD CONSTRAINT fk_stock_opname_items_variant_product

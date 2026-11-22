@@ -4,7 +4,7 @@
 **Branch base:** `work/master-data-baseline-20261119` at `bb2d212bf375a9941d695486137301712f4ddd40`  
 **Protected baseline:** `master` at `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`  
 **Supabase:** `erp-distribution-dev`, PostgreSQL 17.11, ACTIVE_HEALTHY  
-**Last live inspection:** 2026-11-20
+**Last live inspection:** 2026-11-22 (see `docs/PROJECT_AUDIT_2026-11-22.md` for reconciled current snapshot)
 
 ## Module status (current evidence)
 
@@ -143,3 +143,8 @@ Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
 - Vercel Preview deployment `dpl_AR5uxZFnhgdUK87FsPJK56yKwNDN` is READY on commit `04e73bab6c4b951853415f556b127d99b1117749`. Next.js compilation, TypeScript, and 58/58 static page generation passed. ESLint and authenticated runtime role/warehouse tests remain open.
 - Development preflight still reports NULL Variant identity: inventory_balances 11/16, inventory_movements 9/9, inventory_valuation_logs 9/9, product_units 3/3, purchase_order_items 7/11, stock_opname_items 115/140. No Development or Production schema/data changes were made during this implementation pass.
 - Sales, Returns, and Accounting remain blocked from operational posting until their Inventory and ledger dependencies are validated. No speculative transaction tables or fake dashboard KPIs were introduced.
+
+
+## Current audit reconciliation — 2026-11-22
+
+The historical status sections above preserve prior implementation evidence and earlier snapshots. The current consolidated audit is now recorded in `docs/PROJECT_AUDIT_2026-11-22.md`. The live Development catalog was re-read on 2026-11-22: 47 public tables (all RLS-enabled), 77 public functions, 44 SECURITY DEFINER functions, 33 non-internal triggers, 103 RLS policies, and 189 indexes. The applied migration ledger has eight entries through `20261121050458 rbac_warehouse_scope_alignment`. MD-014 remains unapplied and blocked by 154/188 NULL Variant IDs across six tables. Latest Vercel Preview is READY on commit `9dc9df91456a57b62b69318ea8d59c61ee79b6f0`. The audit is read-only; no database or Production mutation occurred.

@@ -546,7 +546,7 @@ async function StockTransferContent({
                 Transfer memerlukan minimal dua gudang aktif.
                 Tambahkan gudang melalui Master Data terlebih dahulu.
               </div>
-            ) : variants.length === 0 ? (
+            ) : activeVariants.length === 0 ? (
               <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 Belum tersedia produk aktif untuk ditransfer.
               </div>

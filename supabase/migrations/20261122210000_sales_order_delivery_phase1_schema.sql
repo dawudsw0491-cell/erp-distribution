@@ -146,3 +146,32 @@ comment on table public.delivery_orders is
   'Sales Phase 1: delivery header. Posting is the only sales inventory recognition boundary.';
 comment on table public.delivery_order_items is
   'Sales Phase 1: partial delivery quantities against original Sales Order lines.';
+
+
+-- Read model for deterministic soft reservation and partial fulfillment.
+-- Reservation is not a separate ledger: it is derived from confirmed SO
+-- lines and quantities in posted delivery notes.
+create or replace view public.sales_order_line_fulfillment
+with (security_invoker = true)
+as
+select
+  soi.id as sales_order_item_id,
+  soi.sales_order_id,
+  soi.product_id,
+  soi.product_variant_id,
+  soi.quantity as ordered_quantity,
+  coalesce(sum(case when d.status = 'posted' then doi.quantity else 0 end), 0)::numeric(18,3)
+    as delivered_quantity,
+  greatest(
+    soi.quantity - coalesce(sum(case when d.status = 'posted' then doi.quantity else 0 end), 0),
+    0
+  )::numeric(18,3) as outstanding_quantity
+from public.sales_order_items soi
+join public.sales_orders so on so.id = soi.sales_order_id
+left join public.delivery_order_items doi on doi.sales_order_item_id = soi.id
+left join public.delivery_orders d on d.id = doi.delivery_order_id
+group by soi.id, soi.sales_order_id, soi.product_id, soi.product_variant_id, soi.quantity;
+
+revoke all on public.sales_order_line_fulfillment from anon, authenticated;
+grant select on public.sales_order_line_fulfillment to authenticated;
+

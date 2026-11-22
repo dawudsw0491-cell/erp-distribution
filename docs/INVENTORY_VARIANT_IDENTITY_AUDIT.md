@@ -1117,3 +1117,18 @@ The source migration is now adjusted to preserve historical rows:
 A read-only Development check on 2026-11-22 reconfirmed unresolved rows: balances 11/16, movements 9/9, valuation logs 9/9, product units 3/3, Stock Opname items 115/140, and Purchase Order items 7/11. Among the 11 unresolved balance rows, several have positive quantities and non-zero inventory value. Duplicate checks returned zero duplicate groups for both legacy Product + Warehouse keys and existing Variant + Warehouse keys.
 
 **Not yet proven:** clean-baseline migration replay, function dependency completeness, Goods Receipt/transfer/reversal/Stock Opname integration, RLS/warehouse role tests, rollback, valuation reconciliation, and application runtime. The migration has NOT been applied to Development or Production. Do not treat MD-014 as unblocked until those tests pass.
+
+
+### 13.1 Disposable transaction replay — source migration validated
+
+The MD-014 migration was executed against Development inside an explicit transaction with a final `ROLLBACK`; it returned successfully with no SQL errors. The run used a transaction-local `request.jwt.claims` role of `service_role` so the existing warehouse-scope trigger's documented trusted server path could execute during the disposable replay. No migration was applied or committed.
+
+The replay exposed and the source migration was corrected for three issues:
+
+1. Product-keyed balance uniqueness had to be dropped before synchronizing denormalized `product_id` from canonical Variant IDs, because several Variants of the same Product can exist in one Warehouse.
+2. Stock Opname Product-keyed uniqueness had to be replaced with separate partial unique indexes for Variant rows and unresolved legacy Product-only rows.
+3. A transfer status validation expression used a PL/pgSQL `IF CASE ... END < quantity` form that failed parsing. It now assigns the status bucket through a PL/pgSQL `CASE` statement and checks the result separately.
+
+Post-replay read-only verification confirmed the original Development index `uq_inventory_balance_product_warehouse` still exists, proving the transaction rolled back. The Development migration ledger remains unchanged at eight applied entries through `20261121050458`.
+
+**Validation status:** SQL DDL/function-definition replay passes transactionally. This is not proof of live posting behavior, application compatibility, role/warehouse isolation, valuation reconciliation, or safe rollout. MD-014 remains IN PROGRESS and Sales posting remains blocked.

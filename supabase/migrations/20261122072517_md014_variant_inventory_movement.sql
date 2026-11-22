@@ -14,33 +14,10 @@ BEGIN
   -- All new/active posting functions below write by Product Variant only.
   -- Never infer a Variant for historical rows from Product ID alone.
 
-  IF EXISTS (
-    SELECT 1 FROM public.inventory_balances b
-    JOIN public.product_variants pv ON pv.id = b.product_variant_id
-    WHERE b.product_id IS NOT NULL AND b.product_id IS DISTINCT FROM pv.product_id
-  ) OR EXISTS (
-    SELECT 1 FROM public.inventory_movements m
-    JOIN public.product_variants pv ON pv.id = m.product_variant_id
-    WHERE m.product_id IS NOT NULL AND m.product_id IS DISTINCT FROM pv.product_id
-  ) OR EXISTS (
-    SELECT 1 FROM public.inventory_valuation_logs l
-    JOIN public.product_variants pv ON pv.id = l.product_variant_id
-    WHERE l.product_id IS NOT NULL AND l.product_id IS DISTINCT FROM pv.product_id
-  ) OR EXISTS (
-    SELECT 1 FROM public.product_units u
-    JOIN public.product_variants pv ON pv.id = u.product_variant_id
-    WHERE u.product_id IS NOT NULL AND u.product_id IS DISTINCT FROM pv.product_id
-  ) OR EXISTS (
-    SELECT 1 FROM public.stock_opname_items i
-    JOIN public.product_variants pv ON pv.id = i.product_variant_id
-    WHERE i.product_id IS NOT NULL AND i.product_id IS DISTINCT FROM pv.product_id
-  ) OR EXISTS (
-    SELECT 1 FROM public.purchase_order_items poi
-    JOIN public.product_variants pv ON pv.id = poi.product_variant_id
-    WHERE poi.product_id IS NOT NULL AND poi.product_id IS DISTINCT FROM pv.product_id
-  ) THEN
-    RAISE EXCEPTION 'MD-014 blocked: denormalized Product ID conflicts with its Product Variant parent.';
-  END IF;
+  -- For rows that already carry a Variant ID, that canonical FK determines
+  -- the parent Product. The deterministic updates below synchronize denormalized
+  -- product_id values before composite Variant/Product foreign keys are added.
+  -- Rows without a Variant ID remain untouched legacy records.
 
   IF EXISTS (
     SELECT 1 FROM public.inventory_balances

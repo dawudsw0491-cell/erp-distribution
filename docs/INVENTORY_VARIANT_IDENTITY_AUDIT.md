@@ -1065,3 +1065,34 @@ Implications:
 This completes the warehouse-level count split for the seven tables listed. It does not yet prove row-level transaction ancestry or identify a supported way to remove immutable ledger rows. The final manifest must include source-reference/group linkage and exact IDs, not just table counts.
 
 No database changes were performed.
+
+
+## 25. Posted movement source-reference inventory
+
+A fresh read-only query enumerated all 9 Inventory Movements with Product SKU, warehouse, status, quantity, Product Unit, group and source references. All 9 are **posted**; there are no draft movement rows in the current snapshot.
+
+| Movement ID | Product | Warehouse | Type | Qty | Source |
+|---|---|---|---|---:|---|
+| b7663ef8-3f11-4e4a-8f0e-c22dac4c6a55 | IPH-15-256-WHT | WH-SOL-001 | purchase | +10 | GR-20261116-C6BB0763 |
+| 1e616624-d093-4778-a7fa-e6407a55acff | HXA-000002 | WH-SOL-001 | purchase | +1 | GR-20261117-78177A18 |
+| 21fc072f-f17f-4292-a8b3-ca82ee729322 | HXA-000004 | WH-SOL-001 | purchase | +1 | GR-20261117-78177A18 |
+| 99fcb4cc-8700-430c-9dc8-289b9dbb6f65 | HXA-000003 | WH-SOL-001 | purchase | +1 | GR-20261117-78177A18 |
+| 59dcf90a-9bb5-4ff9-81c3-052cf2064bbc | IPH-15-256-WHT | WH-SOL-001 | transfer_out | -1 | TRF-1E071C072558 |
+| 54ccd2ef-3bd3-4bc9-89fc-9e91bd836d5f | HXA-000002 | WH-SOL-001 | transfer_out | -1 | TRF-419BEDC4804A |
+| b543a882-91ef-41d8-bd36-d9abac536783 | TEST-HEXA-001 | WH-SOL-001 | purchase | +1 | GR-20261120-2770CA9C |
+| e448ab47-1545-47ff-9341-83bef0fb487b | IPH-15-256-WHT | WH-TEST-001 | transfer_in | +1 | TRF-1E071C072558 |
+| d5e037e3-7911-4eef-bfb2-3ff2363a668f | HXA-000002 | WH-TEST-001 | transfer_in | +1 | TRF-419BEDC4804A |
+
+### 25.1 Transfer group completeness
+
+Two posted transfer groups are confirmed:
+- TRF-1E071C072558: IPH-15-256-WHT, one transfer_out (-1) from WH-SOL-001 and one transfer_in (+1) to WH-TEST-001.
+- TRF-419BEDC4804A: HXA-000002, one transfer_out (-1) from WH-SOL-001 and one transfer_in (+1) to WH-TEST-001; both rows reference the same Product Unit.
+
+Both groups are complete in movement row count and quantity arithmetic. Both remain Product-oriented with NULL Variant identity. The transfer group IDs/source references must be treated as indivisible pairs in any reset design; never plan one side independently.
+
+### 25.2 Reset consequence
+
+All movement rows are posted and protected by the immutable movement lifecycle/delete guard. Reversing these movements would create additional ledger history rather than remove test data, and would not satisfy the user's selected reset disposition. The valuation rows are separately immutable. A reset that claims to clear all test transaction history therefore requires a supported Development restore/reseed or a separately engineered, explicitly approved administrative reset mechanism with verified recovery and a documented audit boundary. Neither is currently confirmed or authorized.
+
+No movement, transfer, valuation, or balance row was modified.

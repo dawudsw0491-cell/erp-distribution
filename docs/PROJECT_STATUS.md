@@ -1,10 +1,10 @@
 # Project Status — HEXA CORE ERP Distribution
 
-**Current implementation branch:** `work/hexa-core-implementation-20261120`  
+**Current implementation branch:** `fix/engineering-governance-masterdata-consolidation-20261120`  
 **Branch base:** `work/master-data-baseline-20261119` at `bb2d212bf375a9941d695486137301712f4ddd40`  
 **Protected baseline:** `master` at `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`  
 **Supabase:** `erp-distribution-dev`, PostgreSQL 17.11, ACTIVE_HEALTHY  
-**Last live inspection:** 2026-11-20
+**Last live inspection:** 2026-11-22 (see `docs/PROJECT_AUDIT_2026-11-22.md` for reconciled current snapshot)
 
 ## Module status (current evidence)
 
@@ -21,17 +21,17 @@
 | Supplier | PARTIAL | Main CRUD plus address/contact/bank/product relations exist; end-to-end validation absent |
 | Customer | PARTIAL | CRUD and live table exist; no Sales consumer route present |
 | Warehouse | PARTIAL | CRUD exists; Inventory/Purchasing dependencies and warehouse access policy need tests |
-| Purchasing / Purchase Orders | PARTIAL | PO CRUD/workflow RPCs and tables exist; runtime workflow not tested |
+| Purchasing / Purchase Orders | PARTIAL — VARIANT SOURCE PORTED / LIVE POSTING BLOCKED | PO create source submits Variant ID and PO detail displays Variant SKU; live Development PO/GR RPC contract is not yet switched. Runtime workflow not tested. |
 | Goods Receipt | PARTIAL | Creation/posting RPCs and tables exist; seven flagged SECURITY DEFINER grants hardened; end-to-end not tested |
-| Inventory Movement | PARTIAL | Draft/post/reversal functions and tables exist; runtime posting tests absent |
-| Inventory Transfer | PARTIAL | Source and live RPCs exist; runtime transfer/rollback tests absent |
-| Inventory Balances / Valuation | PARTIAL | Balance and valuation tables/logs exist; reconciliation and valuation tests absent |
+| Inventory Movement | PARTIAL — VARIANT SOURCE PORTED / LIVE POSTING BLOCKED | Current branch actions/forms and history reads use Product Variant identity; live Development posting RPC remains Product-keyed until MD-014 is applied. Runtime posting tests absent. |
+| Inventory Transfer | PARTIAL — VARIANT SOURCE PORTED / LIVE POSTING BLOCKED | Draft source and history now use Variant identity; legacy history without Variant is labelled unresolved. Live Development posting RPC remains Product-keyed; do not post until MD-014 is applied. |
+| Inventory Balances / Valuation | BLOCKED — MD-014 | Dashboard and balance read surfaces count Variant SKU and expose unresolved Product-only rows separately. Development still has 154/188 NULL Variant IDs across six core tables; reconciliation and posting migration are not complete. |
 | Stock Opname | PARTIAL | Session/item/unit count workflows and RPCs exist; approval/posting tests absent |
-| Sales | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Returns | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Accounting | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Settings | NOT IMPLEMENTED | Sidebar entry exists; no route page in app tree |
-| Reporting / Analytics | NOT IMPLEMENTED / SCOPE UNKNOWN | No dedicated module identified in current route tree |
+| Sales | BLOCKED — NOT IMPLEMENTED | Sidebar entry exists, but no Sales transaction tables or route. SALES-001 design defines SO → partial DO; DO posting is blocked until MD-014 variant-level Inventory is validated in Development. |
+| Returns | BLOCKED — NOT IMPLEMENTED | No return transaction tables or posting RPCs. Requires source-document linkage, stock disposition, valuation, approval, and accounting rules. |
+| Accounting | BLOCKED — NOT IMPLEMENTED | Finance permissions exist, but no chart-of-accounts, journal, fiscal-period, receivable/payable, or ledger tables were found in live Development. |
+| Settings | PARTIAL — SOURCE IMPLEMENTED | `/settings` now provides a permission-aware administration hub to existing User Management, Master Data, and Warehouse routes. Company/system configuration and central audit viewer are not implemented. |
+| Reporting / Analytics | NOT IMPLEMENTED | `reports.view` and `reports.export` permissions exist, but no dedicated reports route or validated reporting contracts are implemented. |
 
 ## Live database snapshot
 
@@ -132,3 +132,19 @@ Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
 - Live schema already has `product_units`, `goods_receipt_units`, `goods_receipt_unit_identifiers`, and `product_unit_identifiers`.
 - Current Goods Receipt logic requires a full set of serialized units and mandatory IMEI_1 when `products.tracking_type='imei'`; quantity-tracked products reject individual unit rows.
 - Therefore optional IMEI with SKU/quantity fallback is a cross-module inventory behavior change, not a nullable UI field. It must cover receipt draft/posting, unit identity uniqueness, inventory movements, transfer, stock opname, and search before being enabled. This is not yet implemented.
+
+
+## Implementation update — 2026-11-22
+
+- Current branch: `fix/engineering-governance-masterdata-consolidation-20261120`.
+- MD-014 source now includes Variant-level Inventory posting, valuation, Goods Receipt partial-IMEI behavior, transfer, reversal, and Stock Opname ports. The migration remains unapplied to Development.
+- Application read contracts were aligned for Transfer history, Movement history, Purchase Order detail, Dashboard Inventory Overview, and Inventory Dashboard. Variant SKU is the canonical SKU count; Product-only balance rows are separately exposed as unresolved legacy data.
+- Settings Administration Hub exists at `/settings` and reuses existing permission-aware routes; it does not create duplicate Master Data CRUD or unvalidated configuration tables.
+- Vercel Preview deployment `dpl_AR5uxZFnhgdUK87FsPJK56yKwNDN` is READY on commit `04e73bab6c4b951853415f556b127d99b1117749`. Next.js compilation, TypeScript, and 58/58 static page generation passed. ESLint and authenticated runtime role/warehouse tests remain open.
+- Development preflight still reports NULL Variant identity: inventory_balances 11/16, inventory_movements 9/9, inventory_valuation_logs 9/9, product_units 3/3, purchase_order_items 7/11, stock_opname_items 115/140. No Development or Production schema/data changes were made during this implementation pass.
+- Sales, Returns, and Accounting remain blocked from operational posting until their Inventory and ledger dependencies are validated. No speculative transaction tables or fake dashboard KPIs were introduced.
+
+
+## Current audit reconciliation — 2026-11-22
+
+The historical status sections above preserve prior implementation evidence and earlier snapshots. The current consolidated audit is now recorded in `docs/PROJECT_AUDIT_2026-11-22.md`. The live Development catalog was re-read on 2026-11-22: 47 public tables (all RLS-enabled), 77 public functions, 44 SECURITY DEFINER functions, 33 non-internal triggers, 103 RLS policies, and 189 indexes. The applied migration ledger has eight entries through `20261121050458 rbac_warehouse_scope_alignment`. MD-014 remains unapplied and blocked by 154/188 NULL Variant IDs across six tables. Latest Vercel Preview is READY on commit `9dc9df91456a57b62b69318ea8d59c61ee79b6f0`. The audit is read-only; no database or Production mutation occurred.

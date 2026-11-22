@@ -1,4 +1,4 @@
-
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthorizationContext = {
@@ -14,15 +14,40 @@ export type AuthorizationContext = {
   authorized: boolean;
 };
 
+// Reuse the Supabase client and authenticated user for the current
+// server-render request. React cache is request-scoped; it does not
+// persist user data between independent requests.
+const getRequestSupabase = cache(async () => createClient());
+
+const getRequestUser = cache(async () => {
+  const supabase = await getRequestSupabase();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return { user, error };
+});
+
+const getRequestProfile = cache(async (userId: string) => {
+  const supabase = await getRequestSupabase();
+
+  return supabase
+    .from("user_profiles")
+    .select("full_name, is_active")
+    .eq("id", userId)
+    .maybeSingle();
+});
+
 export async function getAuthorizationContext(
   requiredPermission: string
 ): Promise<AuthorizationContext> {
-  const supabase = await createClient();
+  const [supabase, authResult] = await Promise.all([
+    getRequestSupabase(),
+    getRequestUser(),
+  ]);
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { user, error: authError } = authResult;
 
   if (authError || !user) {
     return {
@@ -33,48 +58,22 @@ export async function getAuthorizationContext(
     };
   }
 
-  const {
-    data: profile,
-    error: profileError,
-  } = await supabase
-    .from("user_profiles")
-    .select("full_name, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Profile lookup and permission RPC are independent after the
+  // authenticated user is known. Run them concurrently to remove one
+  // sequential network round-trip from every protected page.
+  const [profileResult, permissionResult] = await Promise.all([
+    getRequestProfile(user.id),
+    supabase.rpc("has_permission", {
+      required_permission: requiredPermission,
+    }),
+  ]);
 
-  if (profileError || !profile || !profile.is_active) {
-    return {
-      supabase,
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-      profile: null,
-      authorized: false,
-    };
-  }
+  const profile = profileResult.data;
+  const profileIsValid =
+    !profileResult.error && Boolean(profile?.is_active);
 
-  const {
-    data: hasPermission,
-    error: permissionError,
-  } = await supabase.rpc("has_permission", {
-    required_permission: requiredPermission,
-  });
-
-  if (permissionError || hasPermission !== true) {
-    return {
-      supabase,
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-      profile: {
-        full_name: profile.full_name,
-        is_active: profile.is_active,
-      },
-      authorized: false,
-    };
-  }
+  const permissionIsValid =
+    !permissionResult.error && permissionResult.data === true;
 
   return {
     supabase,
@@ -82,10 +81,12 @@ export async function getAuthorizationContext(
       id: user.id,
       email: user.email,
     },
-    profile: {
-      full_name: profile.full_name,
-      is_active: profile.is_active,
-    },
-    authorized: true,
+    profile: profileIsValid && profile
+      ? {
+          full_name: profile.full_name,
+          is_active: profile.is_active,
+        }
+      : null,
+    authorized: profileIsValid && permissionIsValid,
   };
 }

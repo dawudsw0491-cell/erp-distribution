@@ -160,6 +160,14 @@ async function InventoryContent() {
   }
 
   const balances = (balanceResult.data ?? []) as BalanceRow[];
+  const variantSkuCount = new Set(
+    balances
+      .map((row) => row.product_variant_id)
+      .filter((id): id is string => Boolean(id))
+  ).size;
+  const unresolvedVariantBalanceRows = balances.filter(
+    (row) => !row.product_variant_id
+  ).length;
 
   const summary = balances.reduce(
     (result, row) => {
@@ -231,11 +239,16 @@ async function InventoryContent() {
             </p>
           </header>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <MetricCard
-              label="Total SKU Tersedia"
-              value={formatNumber(balances.length)}
-              description="Jumlah kombinasi produk dan gudang yang memiliki saldo."
+              label="Variant SKU Teridentifikasi"
+              value={formatNumber(variantSkuCount)}
+              description="Jumlah SKU Variant unik yang memiliki saldo."
+            />
+            <MetricCard
+              label="Saldo Legacy tanpa Variant"
+              value={formatNumber(unresolvedVariantBalanceRows)}
+              description="Baris saldo Product-only yang belum direkonsiliasi."
             />
             <MetricCard
               label="Total On Hand"

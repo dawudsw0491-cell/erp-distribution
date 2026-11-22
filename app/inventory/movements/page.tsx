@@ -31,6 +31,7 @@ type MovementRow = {
   id: string;
   movement_group_id: string | null;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -221,7 +222,7 @@ async function StockMovementContent({
     ? statusFilter
     : "";
 
-  const [movementResult, warehouseResult, productResult] =
+  const [movementResult, warehouseResult, productResult, variantResult] =
     await Promise.all([
       supabase
         .from("inventory_movements")
@@ -238,15 +239,19 @@ async function StockMovementContent({
       supabase
         .from("products")
         .select("id, sku, product_name, tracking_type, unit, is_active")
-        .eq("is_active", true)
         .order("sku", { ascending: true })
         .limit(5000),
+      supabase
+        .from("product_variants")
+        .select("id, product_id, variant_sku, variant_name, is_active")
+        .order("variant_sku", { ascending: true }),
     ]);
 
   if (
     movementResult.error ||
     warehouseResult.error ||
-    productResult.error
+    productResult.error ||
+    variantResult.error
   ) {
     if (movementResult.error) {
       console.error(
@@ -290,6 +295,19 @@ async function StockMovementContent({
   const movements = (movementResult.data ?? []) as MovementRow[];
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
   const products = (productResult.data ?? []) as ProductRow[];
+  const variants = (variantResult.data ?? []).flatMap((variant) => {
+    const product = products.find((item) => item.id === variant.product_id);
+    if (!product) return [];
+    return [{
+      id: variant.id,
+      product_id: variant.product_id,
+      variant_sku: variant.variant_sku,
+      variant_name: variant.variant_name,
+      product_name: product.product_name,
+      tracking_type: product.tracking_type,
+    }];
+  });
+  const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
@@ -302,6 +320,9 @@ async function StockMovementContent({
   let rows = movements.map((movement) => ({
     movement,
     product: productMap.get(movement.product_id),
+    variant: movement.product_variant_id
+      ? variantMap.get(movement.product_variant_id)
+      : undefined,
     warehouse: warehouseMap.get(movement.warehouse_id),
   }));
 
@@ -326,7 +347,7 @@ async function StockMovementContent({
   if (keyword) {
     const search = keyword.toLowerCase();
 
-    rows = rows.filter(({ movement, product, warehouse }) =>
+    rows = rows.filter(({ movement, product, variant, warehouse }) =>
       [
         movement.id,
         movement.source_reference_number ?? "",
@@ -335,6 +356,8 @@ async function StockMovementContent({
         movement.movement_type,
         movement.status,
         movement.inventory_status ?? "",
+        variant?.variant_sku ?? "",
+        variant?.variant_name ?? "",
         product?.sku ?? "",
         product?.product_name ?? "",
         warehouse?.warehouse_name ?? "",
@@ -539,14 +562,14 @@ async function StockMovementContent({
                 </label>
                 <select
                   id="movement-product"
-                  name="product_id"
+                  name="product_variant_id"
                   required
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                 >
                   <option value="">Pilih Produk</option>
-                  {products.map((product) => (
+                  {variants.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.sku} - {product.product_name}
+                      {product.variant_sku} - {product.product_name} ({product.variant_name})
                     </option>
                   ))}
                 </select>
@@ -659,7 +682,7 @@ async function StockMovementContent({
               <div className="flex flex-wrap gap-2 xl:col-span-3">
                 <button
                   type="submit"
-                  disabled={products.length === 0 || warehouses.length === 0}
+                  disabled={variants.length === 0 || warehouses.length === 0}
                   className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Buat Draft Movement
@@ -744,7 +767,7 @@ async function StockMovementContent({
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedRows.map(({ movement, product, warehouse }) => (
+                      {paginatedRows.map(({ movement, product, variant, warehouse }) => (
                         <tr
                           key={movement.id}
                           className="align-top hover:bg-blue-50/40"
@@ -770,8 +793,11 @@ async function StockMovementContent({
                               {product?.product_name ?? "Produk tidak ditemukan"}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              SKU: {product?.sku ?? "-"}
+                              SKU Variant: {variant?.variant_sku ?? (product?.sku ? `${product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                             </p>
+                            {variant?.variant_name && (
+                              <p className="mt-1 text-xs text-slate-400">{variant.variant_name}</p>
+                            )}
                           </td>
 
                           <td className="whitespace-nowrap px-4 py-4 text-slate-700">

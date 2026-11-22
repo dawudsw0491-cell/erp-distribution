@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 
 import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
@@ -24,6 +25,8 @@ type PageProps = {
     approved?: string;
     rejected?: string;
     cancelled?: string;
+    q?: string;
+    gr_status?: string;
   }>;
 };
 
@@ -57,6 +60,7 @@ type PurchaseOrderDetail = {
   } | null;
   items: {
     id: string;
+    product_variant_id: string | null;
     quantity: number;
     received_quantity: number;
     unit_cost: number;
@@ -67,6 +71,10 @@ type PurchaseOrderDetail = {
     product: {
       sku: string;
       product_name: string;
+    } | null;
+    variant: {
+      variant_sku: string;
+      variant_name: string | null;
     } | null;
   }[];
 };
@@ -213,6 +221,7 @@ export default async function PurchaseOrderDetailPage({
       ),
       items:purchase_order_items (
         id,
+        product_variant_id,
         quantity,
         received_quantity,
         unit_cost,
@@ -223,6 +232,10 @@ export default async function PurchaseOrderDetailPage({
         product:products!fk_purchase_order_items_product_id (
           sku,
           product_name
+        ),
+        variant:product_variants!purchase_order_items_product_variant_id_fkey (
+          variant_sku,
+          variant_name
         )
       )
     `)
@@ -241,11 +254,17 @@ export default async function PurchaseOrderDetailPage({
   const order = data as unknown as PurchaseOrderDetail;
   const currency = order.currency || "IDR";
 
-  // Ambil riwayat Goods Receipt untuk PO ini.
-  const {
-    data: receiptData,
-    error: receiptError,
-  } = await supabase
+  // Riwayat Goods Receipt: pencarian dan status diterapkan pada server.
+  const receiptKeyword = (query.q ?? "").trim().slice(0, 100);
+  const allowedReceiptStatuses = ["draft", "posted", "cancelled"] as const;
+  const receiptStatus = allowedReceiptStatuses.includes(
+    query.gr_status as (typeof allowedReceiptStatuses)[number]
+  )
+    ? query.gr_status!
+    : "";
+  const safeReceiptKeyword = receiptKeyword.replace(/[,%()]/g, "").trim();
+
+  let receiptListQuery = supabase
     .from("goods_receipts")
     .select(`
       id,
@@ -255,18 +274,37 @@ export default async function PurchaseOrderDetailPage({
       posted_at,
       created_at
     `)
-    .eq("purchase_order_id", order.id)
-    .order("created_at", { ascending: false });
+    .eq("purchase_order_id", order.id);
 
-  if (receiptError) {
-    console.error(
-      "Goods Receipt history query failed:",
-      receiptError
+  if (safeReceiptKeyword) {
+    receiptListQuery = receiptListQuery.ilike(
+      "receipt_number",
+      `%${safeReceiptKeyword}%`
     );
   }
 
+  if (receiptStatus) {
+    receiptListQuery = receiptListQuery.eq("status", receiptStatus);
+  }
+
+  const [receiptListResult, receiptExistenceResult] = await Promise.all([
+    receiptListQuery.order("created_at", { ascending: false }),
+    supabase
+      .from("goods_receipts")
+      .select("id", { count: "exact", head: true })
+      .eq("purchase_order_id", order.id),
+  ]);
+
+  const receiptError =
+    receiptListResult.error || receiptExistenceResult.error;
+
+  if (receiptError) {
+    console.error("Goods Receipt history query failed:", receiptError);
+  }
+
   const goodsReceipts =
-    (receiptData ?? []) as GoodsReceiptSummary[];
+    (receiptListResult.data ?? []) as GoodsReceiptSummary[];
+  const hasAnyGoodsReceipt = (receiptExistenceResult.count ?? 0) > 0;
 
   const totalOrdered = order.items.reduce(
     (total, item) =>
@@ -297,7 +335,7 @@ export default async function PurchaseOrderDetailPage({
   const canCancelPurchaseOrder =
     order.status === "approved" &&
     !receiptError &&
-    goodsReceipts.length === 0 &&
+    !hasAnyGoodsReceipt &&
     canUpdatePurchaseOrder;
 
   return (
@@ -641,8 +679,13 @@ export default async function PurchaseOrderDetailPage({
                           {item.product?.product_name || "-"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          SKU: {item.product?.sku || "-"}
+                          SKU Variant: {item.variant?.variant_sku ?? (item.product?.sku ? `${item.product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                         </p>
+                        {item.variant?.variant_name && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            {item.variant.variant_name}
+                          </p>
+                        )}
                       </td>
 
                       <td className="px-4 py-4 text-right tabular-nums">
@@ -708,6 +751,29 @@ export default async function PurchaseOrderDetailPage({
               </p>
             </div>
 
+            <div className="border-b border-slate-200 p-5">
+              <RealtimeFilterBar
+                key={[receiptKeyword, receiptStatus].join("|")}
+                initialKeyword={receiptKeyword}
+                searchLabel="Nomor Goods Receipt"
+                searchPlaceholder="Cari nomor GR..."
+                helperText="Pencarian nomor GR dan status diperbarui otomatis."
+                filters={[
+                  {
+                    param: "gr_status",
+                    label: "Status Goods Receipt",
+                    initialValue: receiptStatus,
+                    options: [
+                      { value: "", label: "Semua Status" },
+                      { value: "draft", label: "Draft" },
+                      { value: "posted", label: "Posted" },
+                      { value: "cancelled", label: "Cancelled" },
+                    ],
+                  },
+                ]}
+              />
+            </div>
+
             {receiptError ? (
               <div className="p-5 text-sm text-red-600">
                 Riwayat Goods Receipt gagal dimuat.
@@ -715,11 +781,15 @@ export default async function PurchaseOrderDetailPage({
             ) : goodsReceipts.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="font-medium text-slate-700">
-                  Belum ada Goods Receipt.
+                  {hasAnyGoodsReceipt
+                    ? "Goods Receipt tidak ditemukan"
+                    : "Belum ada Goods Receipt."}
                 </p>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Penerimaan barang akan tercatat di sini.
+                  {hasAnyGoodsReceipt
+                    ? "Ubah kata kunci atau filter status untuk melihat hasil lain."
+                    : "Penerimaan barang akan tercatat di sini."}
                 </p>
               </div>
             ) : (

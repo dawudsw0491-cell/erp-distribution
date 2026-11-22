@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -21,6 +22,11 @@ type SearchParams = Promise<{
   error?: string;
   created?: string;
   posted?: string;
+  q?: string;
+  transfer_status?: string;
+  inventory_status?: string;
+  source_warehouse?: string;
+  destination_warehouse?: string;
 }>;
 
 type ProductRow = {
@@ -29,6 +35,15 @@ type ProductRow = {
   product_name: string;
   tracking_type: string;
   unit: string;
+  is_active: boolean;
+};
+
+type VariantRow = {
+  id: string;
+  product_id: string;
+  variant_sku: string;
+  variant_name: string;
+  is_active: boolean;
 };
 
 type WarehouseRow = {
@@ -40,6 +55,7 @@ type WarehouseRow = {
 type UnitRow = {
   id: string;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -53,6 +69,7 @@ type MovementRow = {
   id: string;
   movement_group_id: string | null;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -180,11 +197,11 @@ async function StockTransferContent({
     warehouseResult,
     unitResult,
     movementResult,
+    variantResult,
   ] = await Promise.all([
     supabase
       .from("products")
-      .select("id, sku, product_name, tracking_type, unit")
-      .eq("is_active", true)
+      .select("id, sku, product_name, tracking_type, unit, is_active")
       .order("sku", { ascending: true }),
 
     supabase
@@ -198,6 +215,7 @@ async function StockTransferContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -215,6 +233,7 @@ async function StockTransferContent({
         id,
         movement_group_id,
         product_id,
+        product_variant_id,
         warehouse_id,
         product_unit_id,
         movement_type,
@@ -228,13 +247,19 @@ async function StockTransferContent({
       .in("movement_type", ["transfer_out", "transfer_in"])
       .order("created_at", { ascending: false })
       .limit(2000),
+
+    supabase
+      .from("product_variants")
+      .select("id, product_id, variant_sku, variant_name, is_active")
+      .order("variant_sku", { ascending: true }),
   ]);
 
   const hasError =
     productResult.error ||
     warehouseResult.error ||
     unitResult.error ||
-    movementResult.error;
+    movementResult.error ||
+    variantResult.error;
 
   if (hasError) {
     console.error("Stock Transfer query failed:", {
@@ -242,6 +267,7 @@ async function StockTransferContent({
       warehouse: warehouseResult.error,
       unit: unitResult.error,
       movement: movementResult.error,
+      variant: variantResult.error,
     });
 
     return (
@@ -266,10 +292,18 @@ async function StockTransferContent({
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
   const units = (unitResult.data ?? []) as unknown as UnitRow[];
   const movements = (movementResult.data ?? []) as MovementRow[];
+  const variantRows = (variantResult.data ?? []) as VariantRow[];
+  const variants = variantRows.flatMap((variant) => {
+    const product = products.find((item) => item.id === variant.product_id);
+    if (!product) return [];
+    return [{ ...variant, product_name: product.product_name, tracking_type: product.tracking_type }];
+  });
+  const activeVariants = variants.filter((variant) => variant.is_active && products.some((product) => product.id === variant.product_id && product.is_active));
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
   );
+  const variantMap = new Map(variants.map((item) => [item.id, item]));
 
   const warehouseMap = new Map(
     warehouses.map((item) => [item.id, item])
@@ -293,6 +327,9 @@ async function StockTransferContent({
       );
 
       const product = productMap.get(outbound.product_id);
+      const variant = outbound.product_variant_id
+        ? variantMap.get(outbound.product_variant_id)
+        : undefined;
 
       const sourceWarehouse = warehouseMap.get(
         outbound.warehouse_id
@@ -306,10 +343,12 @@ async function StockTransferContent({
         id: outbound.movement_group_id!,
         reference: outbound.source_reference_number ?? "-",
         product,
+        variant,
         sourceWarehouse,
         destinationWarehouse,
         quantity: Math.abs(Number(outbound.quantity_delta)),
         inventoryStatus: outbound.inventory_status ?? "-",
+        productUnitId: outbound.product_unit_id,
         status: outbound.status,
         notes: outbound.notes,
         createdAt: outbound.created_at,
@@ -317,12 +356,85 @@ async function StockTransferContent({
           !!inbound &&
           inbound.status === outbound.status &&
           inbound.product_id === outbound.product_id &&
+          inbound.product_variant_id === outbound.product_variant_id &&
+          (outbound.status !== "draft" || Boolean(outbound.product_variant_id)) &&
           inbound.quantity_delta === -outbound.quantity_delta &&
           inbound.inventory_status === outbound.inventory_status &&
           inbound.product_unit_id === outbound.product_unit_id &&
           inbound.warehouse_id !== outbound.warehouse_id,
       };
     });
+
+  const keyword = (params.q ?? "").trim().slice(0, 100).toLowerCase();
+  const transferStatusValues = ["draft", "posted", "cancelled"] as const;
+  const transferStatus = transferStatusValues.includes(
+    params.transfer_status as (typeof transferStatusValues)[number]
+  )
+    ? params.transfer_status!
+    : "";
+  const inventoryStatus = Object.keys(STATUS_LABELS).includes(
+    params.inventory_status ?? ""
+  )
+    ? params.inventory_status!
+    : "";
+  const sourceWarehouse = warehouses.some(
+    (warehouse) => warehouse.id === params.source_warehouse
+  )
+    ? params.source_warehouse!
+    : "";
+  const destinationWarehouse = warehouses.some(
+    (warehouse) => warehouse.id === params.destination_warehouse
+  )
+    ? params.destination_warehouse!
+    : "";
+
+  const unitMap = new Map(units.map((unit) => [unit.id, unit]));
+
+  const filteredTransfers = transfers.filter((transfer) => {
+    if (transferStatus && transfer.status !== transferStatus) return false;
+    if (
+      inventoryStatus &&
+      transfer.inventoryStatus !== inventoryStatus
+    ) return false;
+    if (
+      sourceWarehouse &&
+      transfer.sourceWarehouse?.id !== sourceWarehouse
+    ) return false;
+    if (
+      destinationWarehouse &&
+      transfer.destinationWarehouse?.id !== destinationWarehouse
+    ) return false;
+
+    if (!keyword) return true;
+
+    const registeredUnit = transfer.productUnitId
+      ? unitMap.get(transfer.productUnitId)
+      : undefined;
+    const identifierText = (registeredUnit?.product_unit_identifiers ?? [])
+      .map((identifier) => identifier.identifier_value)
+      .join(" ");
+
+    const searchableText = [
+      transfer.reference,
+      transfer.variant?.variant_sku,
+      transfer.product?.sku,
+      transfer.product?.product_name,
+      transfer.sourceWarehouse?.warehouse_name,
+      transfer.sourceWarehouse?.warehouse_code,
+      transfer.destinationWarehouse?.warehouse_name,
+      transfer.destinationWarehouse?.warehouse_code,
+      transfer.inventoryStatus,
+      transfer.status,
+      transfer.notes,
+      registeredUnit?.unit_code,
+      identifierText,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(keyword);
+  });
 
   const draftCount = transfers.filter(
     (item) => item.status === "draft"
@@ -434,7 +546,7 @@ async function StockTransferContent({
                 Transfer memerlukan minimal dua gudang aktif.
                 Tambahkan gudang melalui Master Data terlebih dahulu.
               </div>
-            ) : products.length === 0 ? (
+            ) : activeVariants.length === 0 ? (
               <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 Belum tersedia produk aktif untuk ditransfer.
               </div>
@@ -452,7 +564,7 @@ async function StockTransferContent({
                   </label>
                   <select
                     id="transfer-product"
-                    name="product_id"
+                    name="product_variant_id"
                     required
                     defaultValue=""
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
@@ -460,9 +572,9 @@ async function StockTransferContent({
                     <option value="" disabled>
                       Pilih produk
                     </option>
-                    {products.map((product) => (
+                    {activeVariants.map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.product_name} ({product.sku}) -{" "}
+                        {product.product_name} · {product.variant_sku} ({product.variant_name}) -{" "}
                         {trackingLabel(product.tracking_type)}
                       </option>
                     ))}
@@ -560,7 +672,7 @@ async function StockTransferContent({
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    Produk IMEI/serial wajib menggunakan quantity 1.
+                    Untuk produk IMEI, kosongkan unit untuk transfer agregat SKU atau pilih satu unit ber-IMEI (quantity 1). Produk serial selalu wajib memilih unit individual.
                   </p>
                 </div>
 
@@ -578,7 +690,7 @@ async function StockTransferContent({
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   >
                     <option value="">
-                      Tidak menggunakan unit individual
+                      Transfer agregat SKU (tanpa IMEI)
                     </option>
                     {units.map((unit) => {
                       const identifiers =
@@ -589,13 +701,16 @@ async function StockTransferContent({
                         .join(" / ");
 
                       const product = productMap.get(unit.product_id);
+                      const variant = unit.product_variant_id
+                        ? variantMap.get(unit.product_variant_id)
+                        : undefined;
                       const warehouse = unit.warehouse_id
                         ? warehouseMap.get(unit.warehouse_id)
                         : undefined;
 
                       return (
                         <option key={unit.id} value={unit.id}>
-                          {product?.sku ?? unit.unit_code}
+                          {variant?.variant_sku ?? `${product?.sku ?? unit.unit_code} · Variant belum teridentifikasi`}
                           {" - "}
                           {unit.unit_code}
                           {identifierText
@@ -610,8 +725,7 @@ async function StockTransferContent({
                     })}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
-                    Pilih unit yang sesuai dengan produk dan gudang asal.
-                    Validasi akhir dilakukan oleh database.
+                    Pilih unit untuk memindahkan satu unit ber-IMEI/serial. Kosongkan pilihan untuk memindahkan stok agregat SKU (hanya untuk produk IMEI dan quantity).
                   </p>
                 </div>
 
@@ -650,17 +764,86 @@ async function StockTransferContent({
                 Riwayat Transfer Gudang
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Menampilkan maksimal 2.000 movement transfer terbaru.
+                Menampilkan {filteredTransfers.length.toLocaleString("id-ID")} dari maksimal 2.000 transfer terbaru.
               </p>
             </div>
 
-            {transfers.length === 0 ? (
+            <div className="border-b border-slate-200 p-5">
+              <RealtimeFilterBar
+                key={[
+                  keyword,
+                  transferStatus,
+                  inventoryStatus,
+                  sourceWarehouse,
+                  destinationWarehouse,
+                ].join("|")}
+                initialKeyword={keyword}
+                searchLabel="Cari Riwayat Transfer"
+                searchPlaceholder="Referensi, SKU, produk, gudang, IMEI, serial..."
+                helperText="Pencarian dan seluruh filter diterapkan otomatis tanpa tombol."
+                filters={[
+                  {
+                    param: "transfer_status",
+                    label: "Status Transfer",
+                    initialValue: transferStatus,
+                    options: [
+                      { value: "", label: "Semua Status Transfer" },
+                      { value: "draft", label: "Draft" },
+                      { value: "posted", label: "Posted" },
+                      { value: "cancelled", label: "Cancelled" },
+                    ],
+                  },
+                  {
+                    param: "inventory_status",
+                    label: "Status Persediaan",
+                    initialValue: inventoryStatus,
+                    options: [
+                      { value: "", label: "Semua Status Persediaan" },
+                      ...Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ],
+                  },
+                  {
+                    param: "source_warehouse",
+                    label: "Gudang Asal",
+                    initialValue: sourceWarehouse,
+                    options: [
+                      { value: "", label: "Semua Gudang Asal" },
+                      ...warehouses.map((warehouse) => ({
+                        value: warehouse.id,
+                        label: warehouse.warehouse_name,
+                      })),
+                    ],
+                  },
+                  {
+                    param: "destination_warehouse",
+                    label: "Gudang Tujuan",
+                    initialValue: destinationWarehouse,
+                    options: [
+                      { value: "", label: "Semua Gudang Tujuan" },
+                      ...warehouses.map((warehouse) => ({
+                        value: warehouse.id,
+                        label: warehouse.warehouse_name,
+                      })),
+                    ],
+                  },
+                ]}
+              />
+            </div>
+
+            {filteredTransfers.length === 0 ? (
               <div className="px-5 py-16 text-center">
                 <h3 className="font-semibold text-slate-800">
-                  Belum Ada Transfer
+                  {transfers.length === 0
+                    ? "Belum Ada Transfer"
+                    : "Transfer Tidak Ditemukan"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Draft transfer yang dibuat akan muncul di sini.
+                  {transfers.length === 0
+                    ? "Draft transfer yang dibuat akan muncul di sini."
+                    : "Ubah kata kunci atau pilihan filter untuk melihat hasil lain."}
                 </p>
               </div>
             ) : (
@@ -690,7 +873,7 @@ async function StockTransferContent({
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {transfers.map((transfer) => (
+                    {filteredTransfers.map((transfer) => (
                       <tr
                         key={transfer.id}
                         className="hover:bg-blue-50/40"
@@ -711,7 +894,7 @@ async function StockTransferContent({
                             {transfer.product?.product_name ?? "Produk tidak ditemukan"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {transfer.product?.sku ?? "-"}
+                            {transfer.variant?.variant_sku ?? (transfer.product?.sku ? `${transfer.product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                           </p>
                           {transfer.product && (
                             <p className="mt-1 text-xs text-slate-400">

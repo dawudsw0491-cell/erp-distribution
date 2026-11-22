@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard,
@@ -27,6 +27,7 @@ import LogoutButton from "@/components/layout/logout-button";
 
 type ErpSidebarProps = {
   activePath?: string;
+  persistent?: boolean;
 };
 
 type MenuChild = {
@@ -128,6 +129,11 @@ const menuGroups: MenuGroup[] = [
     icon: <Wallet size={18} />,
   },
   {
+    label: "Laporan",
+    href: "/reports",
+    icon: <ClipboardList size={18} />,
+  },
+  {
     label: "Pengaturan",
     href: "/settings",
     icon: <Settings size={18} />,
@@ -144,11 +150,23 @@ function isRouteActive(currentPath: string, href: string) {
 
 export default function ErpSidebar({
   activePath = "/",
+  persistent = false,
 }: ErpSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const currentPath = pathname || activePath;
+  // Warm the App Router cache before the user clicks a destination.
+  // This changes navigation timing only; server authorization and data
+  // fetching still run normally when the destination is requested.
+  function prefetchDestination(href: string) {
+    if (href.startsWith("/") && !href.startsWith("/#")) {
+      router.prefetch(href);
+    }
+  }
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  if (!persistent) return null;
 
   function toggleGroup(label: string, currentlyExpanded: boolean) {
     setExpandedGroups((previous) => ({
@@ -247,6 +265,10 @@ export default function ErpSidebar({
                           <Link
                             key={child.href}
                             href={child.href}
+                            prefetch={true}
+                            onMouseEnter={() => prefetchDestination(child.href)}
+                            onFocus={() => prefetchDestination(child.href)}
+                            onTouchStart={() => prefetchDestination(child.href)}
                             className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 ease-in-out ${
                               childActive
                                 ? "translate-x-1 bg-blue-50 font-semibold text-blue-700"
@@ -284,6 +306,10 @@ export default function ErpSidebar({
             <Link
               key={group.label}
               href={group.href || "#"}
+              prefetch={true}
+              onMouseEnter={() => prefetchDestination(group.href || "/")}
+              onFocus={() => prefetchDestination(group.href || "/")}
+              onTouchStart={() => prefetchDestination(group.href || "/")}
               className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 groupActive
                   ? "bg-blue-50 text-blue-700"

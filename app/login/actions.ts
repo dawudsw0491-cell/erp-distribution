@@ -196,6 +196,25 @@ export async function loginWithUserId(
       };
     }
 
+    // Pastikan cookie sesi yang baru dibuat benar-benar dapat dibaca
+    // sebelum server action menyatakan login berhasil.
+    const {
+      data: { user: sessionUser },
+      error: sessionUserError,
+    } = await supabase.auth.getUser();
+
+    if (sessionUserError || sessionUser?.id !== profile.id) {
+      console.error(
+        "Login session persistence check failed:",
+        sessionUserError?.message ?? "Authenticated user does not match profile."
+      );
+
+      return {
+        success: false,
+        message: "Sesi login belum tersimpan. Silakan coba kembali.",
+      };
+    }
+
     const { error: resetError } = await admin.rpc(
       "reset_pin_failures",
       { target_user_id: profile.id }

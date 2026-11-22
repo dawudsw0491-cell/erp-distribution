@@ -20,16 +20,17 @@ type Warehouse = {
   warehouse_name: string;
 };
 
-type Product = {
+type ProductVariant = {
   id: string;
-  sku: string;
+  product_id: string;
+  variant_sku: string;
+  variant_name: string;
   product_name: string;
-  product_type: string;
   tracking_type: string;
 };
 
 type PurchaseItem = {
-  product_id: string;
+  product_variant_id: string;
   quantity: string;
   unit_cost: string;
   discount_amount: string;
@@ -40,12 +41,12 @@ type PurchaseItem = {
 type Props = {
   suppliers: Supplier[];
   warehouses: Warehouse[];
-  products: Product[];
+  variants: ProductVariant[];
 };
 
-function createEmptyItem(productId: string): PurchaseItem {
+function createEmptyItem(productVariantId: string): PurchaseItem {
   return {
-    product_id: productId,
+    product_variant_id: productVariantId,
     quantity: "1",
     unit_cost: "0",
     discount_amount: "0",
@@ -69,7 +70,7 @@ function formatCurrency(value: number, currency: string) {
 export default function PurchaseOrderForm({
   suppliers,
   warehouses,
-  products,
+  variants,
 }: Props) {
   const [supplierId, setSupplierId] = useState(
     suppliers[0]?.id ?? ""
@@ -85,7 +86,7 @@ export default function PurchaseOrderForm({
   });
 
   const [items, setItems] = useState<PurchaseItem[]>([
-    createEmptyItem(products[0]?.id ?? ""),
+    createEmptyItem(variants[0]?.id ?? ""),
   ]);
 
   const selectedSupplier = suppliers.find(
@@ -140,7 +141,7 @@ export default function PurchaseOrderForm({
   function addItem() {
     setItems((current) => [
       ...current,
-      createEmptyItem(products[0]?.id ?? ""),
+      createEmptyItem(variants[0]?.id ?? ""),
     ]);
   }
 
@@ -157,8 +158,8 @@ export default function PurchaseOrderForm({
     const tax = Number(item.tax_amount);
 
     return (
-      !item.product_id ||
-      !products.some((product) => product.id === item.product_id) ||
+      !item.product_variant_id ||
+      !variants.some((variant) => variant.id === item.product_variant_id) ||
       !Number.isFinite(quantity) ||
       quantity <= 0 ||
       !Number.isFinite(unitCost) ||
@@ -306,7 +307,7 @@ export default function PurchaseOrderForm({
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Pilih produk langsung dari Product Master.
+              Pilih SKU Variant dari Product Master.
             </p>
           </div>
 
@@ -321,8 +322,8 @@ export default function PurchaseOrderForm({
 
         <div className="mt-5 space-y-5">
           {items.map((item, index) => {
-            const selectedProduct = products.find(
-              (product) => product.id === item.product_id
+            const selectedProduct = variants.find(
+              (product) => product.id === item.product_variant_id
             );
 
             const gross =
@@ -366,30 +367,30 @@ export default function PurchaseOrderForm({
 
                     <select
                       id={`product-${index}`}
-                      value={item.product_id}
+                      value={item.product_variant_id}
                       onChange={(event) =>
                         updateItem(
                           index,
-                          "product_id",
+                          "product_variant_id",
                           event.target.value
                         )
                       }
                       required
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                     >
-                      {products.map((product) => (
+                      {variants.map((product) => (
                         <option
                           key={product.id}
                           value={product.id}
                         >
-                          {product.sku} - {product.product_name}
+                          {product.variant_sku} - {product.product_name} ({product.variant_name})
                         </option>
                       ))}
                     </select>
 
                     {selectedProduct && (
                       <p className="mt-1 text-xs text-slate-500">
-                        SKU: {selectedProduct.sku}
+                        SKU: {selectedProduct.variant_sku}
                         {" · "}
                         Tracking: {selectedProduct.tracking_type}
                       </p>

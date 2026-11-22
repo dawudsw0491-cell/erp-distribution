@@ -77,34 +77,41 @@ export async function createProductAttributeValue(
     };
   }
 
-  const { data: duplicateCode, error: duplicateCodeError } = await supabase
-    .from("product_attribute_values")
-    .select("id")
-    .eq("attribute_id", attributeId)
-    .ilike("value_code", valueCode)
-    .maybeSingle();
+  // Independent duplicate checks run concurrently to avoid serial database latency.
+  const [
+    { data: duplicateCode, error: duplicateCodeError },
+    { data: duplicateName, error: duplicateNameError },
+  ] = await Promise.all([
+    supabase
+      .from("product_attribute_values")
+      .select("id")
+      .eq("attribute_id", attributeId)
+      .ilike("value_code", valueCode)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("product_attribute_values")
+      .select("id")
+      .eq("attribute_id", attributeId)
+      .ilike("value_name", valueName)
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (duplicateCodeError) {
-    console.error("Attribute value code check failed:", duplicateCodeError);
-    return { error: "Gagal memeriksa duplikasi Value Code. Silakan coba lagi." };
+  if (duplicateCodeError || duplicateNameError) {
+    console.error("Attribute value duplicate check failed:", {
+      code: duplicateCodeError,
+      name: duplicateNameError,
+    });
+    return {
+      error: "Gagal memeriksa duplikasi Attribute Value. Silakan coba lagi.",
+    };
   }
 
   if (duplicateCode) {
     return {
       error: "Value Code sudah digunakan pada Parent Attribute tersebut.",
     };
-  }
-
-  const { data: duplicateName, error: duplicateNameError } = await supabase
-    .from("product_attribute_values")
-    .select("id")
-    .eq("attribute_id", attributeId)
-    .ilike("value_name", valueName)
-    .maybeSingle();
-
-  if (duplicateNameError) {
-    console.error("Attribute value name check failed:", duplicateNameError);
-    return { error: "Gagal memeriksa duplikasi Value Name. Silakan coba lagi." };
   }
 
   if (duplicateName) {
@@ -238,34 +245,39 @@ export async function updateProductAttributeValue(
     }
   }
 
-  const { data: duplicateCode, error: duplicateCodeError } = await supabase
-    .from("product_attribute_values")
-    .select("id")
-    .eq("attribute_id", attributeId)
-    .ilike("value_code", valueCode)
-    .neq("id", id)
-    .maybeSingle();
+  // Independent duplicate checks run concurrently to avoid serial database latency.
+  const [
+    { data: duplicateCode, error: duplicateCodeError },
+    { data: duplicateName, error: duplicateNameError },
+  ] = await Promise.all([
+    supabase
+      .from("product_attribute_values")
+      .select("id")
+      .eq("attribute_id", attributeId)
+      .ilike("value_code", valueCode)
+      .neq("id", id)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("product_attribute_values")
+      .select("id")
+      .eq("attribute_id", attributeId)
+      .ilike("value_name", valueName)
+      .neq("id", id)
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (duplicateCodeError) {
-    console.error("Attribute value code check failed:", duplicateCodeError);
-    return fail("Gagal memeriksa duplikasi Value Code.");
+  if (duplicateCodeError || duplicateNameError) {
+    console.error("Attribute value duplicate check failed:", {
+      code: duplicateCodeError,
+      name: duplicateNameError,
+    });
+    return fail("Gagal memeriksa duplikasi Attribute Value.");
   }
 
   if (duplicateCode) {
     return fail("Value Code sudah digunakan pada Parent Attribute tersebut.");
-  }
-
-  const { data: duplicateName, error: duplicateNameError } = await supabase
-    .from("product_attribute_values")
-    .select("id")
-    .eq("attribute_id", attributeId)
-    .ilike("value_name", valueName)
-    .neq("id", id)
-    .maybeSingle();
-
-  if (duplicateNameError) {
-    console.error("Attribute value name check failed:", duplicateNameError);
-    return fail("Gagal memeriksa duplikasi Value Name.");
   }
 
   if (duplicateName) {

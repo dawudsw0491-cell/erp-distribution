@@ -17,6 +17,8 @@ type ProductsPageProps = {
     q?: string;
     status?: string;
     page?: string;
+    created?: string;
+    new?: string;
   }>;
 };
 
@@ -406,6 +408,13 @@ async function ProductsContent({
             )}
           </header>
 
+          {params.created === "1" && (
+            <div role="status" aria-live="polite" className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
+              <span>Produk berhasil disimpan dan daftar produk telah diperbarui.</span>
+              {params.new && <Link href={`/products/${encodeURIComponent(params.new)}`} className="font-semibold underline underline-offset-2">Lihat produk</Link>}
+            </div>
+          )}
+
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-300 bg-slate-100 p-5 shadow-sm">
               <p className="text-sm font-bold text-slate-800">
@@ -639,13 +648,7 @@ export default function ProductsPage({
 }: ProductsPageProps) {
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-slate-100">
-          <p className="text-sm text-slate-600">
-            Memuat data produk...
-          </p>
-        </main>
-      }
+      fallback={null}
     >
       <ProductsContent searchParams={searchParams} />
     </Suspense>

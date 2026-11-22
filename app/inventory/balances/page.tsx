@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -21,6 +22,7 @@ type SearchParams = Promise<{
 
 type BalanceRow = {
   product_id: string | null;
+  product_variant_id: string | null;
   warehouse_id: string;
   available_quantity: number;
   reserved_quantity: number;
@@ -273,7 +275,7 @@ async function StockBalanceContent({
       ? parsedPage
       : 1;
 
-  const [productResult, warehouseResult, balanceResult] =
+  const [productResult, warehouseResult, balanceResult, variantResult] =
     await Promise.all([
       fetchAllRows<ProductRow>(
         supabase
@@ -298,6 +300,7 @@ async function StockBalanceContent({
           .from("inventory_balances")
           .select(`
             product_id,
+            product_variant_id,
             warehouse_id,
             available_quantity,
             reserved_quantity,
@@ -308,9 +311,22 @@ async function StockBalanceContent({
             inventory_value,
             average_unit_cost
           `)
-          .not("product_id", "is", null)
-          .order("product_id", { ascending: true })
+          .not("product_variant_id", "is", null)
+          .order("product_variant_id", { ascending: true })
           .order("warehouse_id", { ascending: true })
+      ),
+
+      fetchAllRows<{
+        id: string;
+        product_id: string;
+        variant_sku: string;
+        variant_name: string;
+      }>(
+        supabase
+          .from("product_variants")
+          .select("id, product_id, variant_sku, variant_name")
+          .eq("is_active", true)
+          .order("variant_sku", { ascending: true })
       ),
     ]);
 
@@ -326,13 +342,28 @@ async function StockBalanceContent({
     return <StockBalanceError message={balanceResult.error.message} />;
   }
 
+  if (variantResult.error) {
+    return <StockBalanceError message={variantResult.error.message} />;
+  }
+
   const products = productResult.data;
   const warehouses = warehouseResult.data;
   const balances = balanceResult.data;
 
-  const productMap = new Map(
+  const parentProductMap = new Map(
     products.map((product) => [product.id, product])
   );
+  const productMap = new Map<string, ProductRow>();
+  for (const variant of variantResult.data) {
+    const parent = parentProductMap.get(variant.product_id);
+    if (!parent) continue;
+    productMap.set(variant.id, {
+      ...parent,
+      id: variant.id,
+      sku: variant.variant_sku,
+      product_name: parent.product_name + " · " + variant.variant_name,
+    });
+  }
 
   const warehouseMap = new Map(
     warehouses.map((warehouse) => [warehouse.id, warehouse])
@@ -349,10 +380,10 @@ async function StockBalanceContent({
   const balanceMap = new Map<string, BalanceRow>();
 
   for (const balance of balances) {
-    if (!balance.product_id) continue;
+    if (!balance.product_variant_id) continue;
 
     balanceMap.set(
-      `${balance.product_id}:${balance.warehouse_id}`,
+      `${balance.product_variant_id}:${balance.warehouse_id}`,
       balance
     );
   }
@@ -362,9 +393,9 @@ async function StockBalanceContent({
   // Stock Balance hanya dibentuk dari kombinasi produk-gudang
   // yang benar-benar mempunyai record inventory_balances.
   let rows: StockDisplayRow[] = balances.flatMap((balance) => {
-    if (!balance.product_id) return [];
+    if (!balance.product_variant_id) return [];
 
-    const product = productMap.get(balance.product_id);
+    const product = productMap.get(balance.product_variant_id);
     const warehouse = warehouseMap.get(balance.warehouse_id);
 
     if (!product || !warehouse) return [];
@@ -521,99 +552,44 @@ async function StockBalanceContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-slate-900">
-              Pencarian dan Filter
-            </h2>
-
-            <form
-              action="/inventory/balances"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-            >
-              <div>
-                <label
-                  htmlFor="balance-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-
-                <input
-                  id="balance-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="SKU, produk, gudang..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="warehouse-filter"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Gudang
-                </label>
-
-                <select
-                  id="warehouse-filter"
-                  name="warehouse"
-                  defaultValue={effectiveWarehouseFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Gudang</option>
-
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.warehouse_code} - {warehouse.warehouse_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="stock-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status Persediaan
-                </label>
-
-                <select
-                  id="stock-status"
-                  name="status"
-                  defaultValue={statusFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="all">Semua Status</option>
-                  <option value="available">Available</option>
-                  <option value="reserved">Reserved</option>
-                  <option value="damaged">Damaged</option>
-                  <option value="repair">Repair</option>
-                  <option value="zero">Stok Kosong</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/inventory/balances"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <RealtimeFilterBar
+            key={[
+              keyword,
+              effectiveWarehouseFilter,
+              statusFilter,
+            ].join("|")}
+            initialKeyword={keyword}
+            searchLabel="Pencarian Stock Balance"
+            searchPlaceholder="SKU, nama produk, kode gudang, nama gudang..."
+            helperText="Pencarian dan filter gudang serta status persediaan diperbarui otomatis."
+            filters={[
+              {
+                param: "warehouse",
+                label: "Gudang",
+                initialValue: effectiveWarehouseFilter,
+                options: [
+                  { value: "", label: "Semua Gudang" },
+                  ...warehouses.map((warehouse) => ({
+                    value: warehouse.id,
+                    label: warehouse.warehouse_code + " - " + warehouse.warehouse_name,
+                  })),
+                ],
+              },
+              {
+                param: "status",
+                label: "Status Persediaan",
+                initialValue: statusFilter === "all" ? "" : statusFilter,
+                options: [
+                  { value: "", label: "Semua Status" },
+                  { value: "available", label: "Available" },
+                  { value: "reserved", label: "Reserved" },
+                  { value: "damaged", label: "Damaged" },
+                  { value: "repair", label: "Repair" },
+                  { value: "zero", label: "Stok Kosong" },
+                ],
+              },
+            ]}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-4">

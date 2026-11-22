@@ -1,8 +1,10 @@
-
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
+import MasterDataLoading from "@/components/layout/master-data-loading";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +32,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
-        {children}
+        <MasterDataNavigationShell>
+          <Suspense fallback={<MasterDataLoading />}>{children}</Suspense>
+        </MasterDataNavigationShell>
       </body>
     </html>
   );

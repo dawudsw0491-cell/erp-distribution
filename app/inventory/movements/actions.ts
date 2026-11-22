@@ -34,7 +34,7 @@ export async function createInventoryMovementAction(
     "inventory.update"
   );
 
-  const productId = getString(formData, "product_id");
+  const productVariantId = getString(formData, "product_variant_id");
   const warehouseId = getString(formData, "warehouse_id");
   const movementType = getString(formData, "movement_type");
   const quantityRaw = getString(formData, "quantity_delta");
@@ -60,7 +60,7 @@ export async function createInventoryMovementAction(
   const notes = getOptionalString(formData, "notes");
 
   if (
-    !isValidUUID(productId) ||
+    !isValidUUID(productVariantId) ||
     !isValidUUID(warehouseId)
   ) {
     redirectWithError("Produk atau warehouse tidak valid.");
@@ -83,9 +83,9 @@ export async function createInventoryMovementAction(
   }
 
   const { error } = await supabase.rpc(
-    "create_inventory_movement_by_product",
+    "create_inventory_movement",
     {
-      p_product_id: productId,
+      p_product_variant_id: productVariantId,
       p_warehouse_id: warehouseId,
       p_movement_type: movementType,
       p_quantity_delta: quantity,

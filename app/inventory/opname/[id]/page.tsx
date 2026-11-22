@@ -66,9 +66,12 @@ type OpnameItemRow = {
   id: string;
   session_id: string;
   product_id: string | null;
+  product_variant_id: string | null;
   inventory_status: string;
   snapshot_quantity: number;
+  snapshot_aggregate_quantity: number;
   counted_quantity: number | null;
+  counted_aggregate_quantity: number | null;
   variance_quantity: number | null;
   snapshot_average_unit_cost: number;
   snapshot_inventory_value: number;
@@ -88,6 +91,7 @@ type ProductRow = {
 type ProductUnitRow = {
   id: string;
   product_id: string | null;
+  product_variant_id: string;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -355,9 +359,12 @@ async function StockOpnameDetailContent({
         id,
         session_id,
         product_id,
+        product_variant_id,
         inventory_status,
         snapshot_quantity,
+        snapshot_aggregate_quantity,
         counted_quantity,
+        counted_aggregate_quantity,
         variance_quantity,
         snapshot_average_unit_cost,
         snapshot_inventory_value,
@@ -400,15 +407,17 @@ async function StockOpnameDetailContent({
   const items =
     (itemResult.data ?? []) as OpnameItemRow[];
 
-  // Product Master adalah sumber identitas produk.
-  const productIds = [
-    ...new Set(
-      items
-        .map((item) => item.product_id)
-        .filter((value): value is string => !!value)
-    ),
-  ];
+  // Stock Opname identity is resolved from Variant, then its parent Product.
+  const variantIds = [...new Set(items.map((item) => item.product_variant_id).filter((value): value is string => !!value))];
+  const variantResult =
+    variantIds.length > 0
+      ? await supabase
+          .from("product_variants")
+          .select("id, product_id, variant_sku, variant_name")
+          .in("id", variantIds)
+      : { data: [], error: null };
 
+  const productIds = [...new Set((variantResult.data ?? []).map((item) => item.product_id))];
   const productResult =
     productIds.length > 0
       ? await supabase
@@ -417,11 +426,11 @@ async function StockOpnameDetailContent({
           .in("id", productIds)
       : { data: [], error: null };
 
-  if (productResult.error) {
-    console.error(
-      "Stock Opname product query failed:",
-      productResult.error
-    );
+  if (variantResult.error || productResult.error) {
+    console.error("Stock Opname Variant/Product query failed:", {
+      variant: variantResult.error,
+      product: productResult.error,
+    });
 
     return (
       <div className="flex min-h-screen bg-slate-100">
@@ -430,11 +439,11 @@ async function StockOpnameDetailContent({
         <main className="min-w-0 flex-1 p-5 md:p-8">
           <div className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6">
             <h1 className="font-bold text-red-700">
-              Gagal Memuat Product Master
+              Gagal Memuat Product Variant
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Terjadi kesalahan saat membaca data produk.
+              Terjadi kesalahan saat membaca identitas SKU Variant dan Product induknya.
             </p>
           </div>
         </main>
@@ -442,36 +451,54 @@ async function StockOpnameDetailContent({
     );
   }
 
-  const productMap = new Map<string, ProductRow>(
-    ((productResult.data ?? []) as ProductRow[]).map(
-      (product) => [product.id, product]
-    )
+  const parentProducts = new Map<string, ProductRow>(
+    ((productResult.data ?? []) as ProductRow[]).map((product) => [product.id, product])
   );
+  const productMap = new Map<string, ProductRow>();
+  for (const variant of variantResult.data ?? []) {
+    const parent = parentProducts.get(variant.product_id);
+    if (!parent) continue;
+    productMap.set(variant.id, {
+      id: variant.id,
+      sku: variant.variant_sku,
+      product_name: parent.product_name + " · " + variant.variant_name,
+      tracking_type: parent.tracking_type,
+      unit: parent.unit,
+    });
+  }
 
   // Item quantity dikirim ke komponen bulk.
   // Item snapshot nol tetap dikirim agar muncul pada pemeriksaan tambahan.
   const bulkQuantityItems = items
     .filter((item) => {
-      const product = item.product_id
-        ? productMap.get(item.product_id)
+      const product = item.product_variant_id
+        ? productMap.get(item.product_variant_id)
         : undefined;
 
-      return product?.tracking_type === "quantity";
+      return product?.tracking_type === "quantity" || product?.tracking_type === "imei";
     })
     .map((item) => {
-      const product = item.product_id
-        ? productMap.get(item.product_id)
+      const product = item.product_variant_id
+        ? productMap.get(item.product_variant_id)
         : undefined;
 
       return {
         id: item.id,
-        product_id: item.product_id,
+        product_id: item.product_variant_id,
         inventory_status: item.inventory_status,
-        snapshot_quantity: Number(item.snapshot_quantity ?? 0),
+        snapshot_quantity: Number(
+          product?.tracking_type === "imei"
+            ? item.snapshot_aggregate_quantity ?? 0
+            : item.snapshot_quantity ?? 0
+        ),
         counted_quantity:
-          item.counted_quantity === null
-            ? null
-            : Number(item.counted_quantity),
+          product?.tracking_type === "imei"
+            ? item.counted_aggregate_quantity === null
+              ? null
+              : Number(item.counted_aggregate_quantity)
+            : item.counted_quantity === null
+              ? null
+              : Number(item.counted_quantity),
         variance_quantity:
           item.variance_quantity === null
             ? null
@@ -488,8 +515,8 @@ async function StockOpnameDetailContent({
     });
 
   const serializedItems = items.filter((item) => {
-    const product = item.product_id
-      ? productMap.get(item.product_id)
+    const product = item.product_variant_id
+      ? productMap.get(item.product_variant_id)
       : undefined;
 
     return (
@@ -506,6 +533,7 @@ async function StockOpnameDetailContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -577,13 +605,13 @@ async function StockOpnameDetailContent({
   );
 
   const bulkScanUnits = serializedItems.flatMap((item) => {
-  const product = item.product_id
-    ? productMap.get(item.product_id)
+  const product = item.product_variant_id
+    ? productMap.get(item.product_variant_id)
     : undefined;
 
   const itemUnits = units.filter(
     (unit) =>
-      unit.product_id === item.product_id &&
+      !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
       unit.unit_status === item.inventory_status
   );
 
@@ -934,8 +962,8 @@ async function StockOpnameDetailContent({
               </h2>
 
               <p className="mt-2 text-sm text-blue-800">
-                Gunakan tabel bulk untuk produk Quantity. Produk
-                IMEI/Serial tetap diperiksa berdasarkan unit terdaftar.
+                Gunakan tabel bulk untuk produk Quantity dan stok agregat IMEI.
+                Unit IMEI/Serial yang terdaftar tetap diperiksa satu per satu.
               </p>
 
               {!canManageOpname && (
@@ -954,8 +982,8 @@ async function StockOpnameDetailContent({
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Produk Quantity dikelola melalui tabel penghitungan massal.
-                Produk IMEI/Serial dikelola berdasarkan unit.
+                Produk Quantity dan stok agregat IMEI dihitung melalui tabel massal.
+                Unit IMEI/Serial yang terdaftar dihitung satu per satu.
               </p>
             </div>
 
@@ -1012,8 +1040,8 @@ async function StockOpnameDetailContent({
                     </div>
 
                     {serializedItems.map((item) => {
-                      const product = item.product_id
-                        ? productMap.get(item.product_id)
+                      const product = item.product_variant_id
+                        ? productMap.get(item.product_variant_id)
                         : undefined;
 
                       const trackingType =
@@ -1035,7 +1063,7 @@ async function StockOpnameDetailContent({
 
                       const itemUnits = units.filter(
                         (unit) =>
-                          unit.product_id === item.product_id &&
+                          !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
                           unit.unit_status === item.inventory_status
                       );
 

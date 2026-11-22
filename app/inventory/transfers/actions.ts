@@ -36,7 +36,7 @@ const VALID_STATUSES = [
 export async function createInventoryTransferAction(
   formData: FormData
 ): Promise<never> {
-  const productId = getString(formData, "product_id");
+  const productVariantId = getString(formData, "product_variant_id");
 
   const sourceWarehouseId = getString(
     formData,
@@ -63,7 +63,7 @@ export async function createInventoryTransferAction(
   const notes = getString(formData, "notes");
 
   if (
-    !isValidUUID(productId) ||
+    !isValidUUID(productVariantId) ||
     !isValidUUID(sourceWarehouseId) ||
     !isValidUUID(destinationWarehouseId)
   ) {
@@ -110,9 +110,9 @@ export async function createInventoryTransferAction(
   }
 
   const { data, error } = await supabase.rpc(
-  "create_inventory_transfer_by_product",
+  "create_inventory_transfer",
   {
-    p_product_id: productId,
+    p_product_variant_id: productVariantId,
       p_source_warehouse_id: sourceWarehouseId,
       p_destination_warehouse_id: destinationWarehouseId,
       p_quantity: Number(quantity),

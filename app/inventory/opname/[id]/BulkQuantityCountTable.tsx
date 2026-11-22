@@ -406,12 +406,12 @@ export default function BulkQuantityCountTable({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">
-              Bulk Quantity Counting
+              Bulk Quantity & IMEI Aggregate Counting
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Hitung semua produk Quantity langsung dari tabel,
-              termasuk item dengan saldo sistem nol.
+              Hitung produk Quantity dan stok agregat IMEI dari tabel ini.
+              Unit IMEI/Serial terdaftar tetap dicatat terpisah.
             </p>
           </div>
 
@@ -538,8 +538,8 @@ export default function BulkQuantityCountTable({
             </h4>
 
             <p className="mt-1 text-xs text-slate-500">
-              {quantityItems.length} item snapshot Quantity, termasuk
-              saldo nol.
+              {quantityItems.length} item Quantity / agregat IMEI,
+              termasuk saldo nol.
             </p>
           </div>
 

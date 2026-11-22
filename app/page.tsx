@@ -1,5 +1,6 @@
 
 import { Suspense } from "react";
+import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
@@ -8,7 +9,8 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 import DashboardClock from "@/components/layout/dashboard-clock";
 
 type BalanceRow = {
-  product_variant_id: string;
+  product_id: string | null;
+  product_variant_id: string | null;
   warehouse_id: string;
   available_quantity: number;
   reserved_quantity: number;
@@ -19,32 +21,52 @@ type BalanceRow = {
   inventory_value: number;
 };
 
-const summaryCards = [
-  {
-    title: "Total Produk",
-    value: "0",
-    note: "Produk terdaftar",
-    icon: "▦",
-  },
-  {
-    title: "Total Persediaan",
-    value: "0",
-    note: "Unit tersedia",
-    icon: "▣",
-  },
-  {
-    title: "Penjualan Hari Ini",
-    value: "Rp 0",
-    note: "Belum ada transaksi",
-    icon: "↗",
-  },
-  {
-    title: "Total Piutang",
-    value: "Rp 0",
-    note: "Piutang pelanggan",
-    icon: "◷",
-  },
-];
+type PurchaseOrderActivityRow = {
+  id: string;
+  po_number: string;
+  status: string;
+  warehouse_id: string;
+  created_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  cancelled_at: string | null;
+};
+
+type GoodsReceiptActivityRow = {
+  id: string;
+  receipt_number: string;
+  purchase_order_id: string;
+  warehouse_id: string;
+  posted_at: string;
+  created_at: string;
+};
+
+type InventoryMovementActivityRow = {
+  id: string;
+  warehouse_id: string;
+  movement_type: string;
+  source_reference_type: string | null;
+  source_reference_number: string | null;
+  posted_at: string;
+  created_at: string;
+};
+
+type ScopedActivityRow =
+  | ({ kind: "purchase_order" } & PurchaseOrderActivityRow)
+  | ({ kind: "goods_receipt" } & GoodsReceiptActivityRow)
+  | ({ kind: "inventory_movement" } & InventoryMovementActivityRow);
+
+type ActivityRecord = {
+  id: string;
+  occurredAt: string;
+  source: string;
+  activity: string;
+  reference: string;
+  status: string;
+  href: string;
+};
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("id-ID", {
@@ -60,14 +82,97 @@ function formatCurrency(value: number) {
   }).format(value || 0);
 }
 
+function formatActivityDateTime(value: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+async function filterActivityByWarehouseAccess<T extends { warehouse_id: string }>(
+  supabase: Awaited<ReturnType<typeof getAuthorizationContext>>["supabase"],
+  rows: T[]
+): Promise<{ rows: T[]; hasError: boolean }> {
+  const warehouseIds = [...new Set(rows.map((row) => row.warehouse_id))];
+
+  const accessChecks = await Promise.all(
+    warehouseIds.map(async (warehouseId) => {
+      const { data, error } = await supabase.rpc("has_warehouse_access", {
+        target_warehouse_id: warehouseId,
+      });
+
+      return {
+        warehouseId,
+        allowed: !error && data === true,
+        hasError: Boolean(error),
+      };
+    })
+  );
+
+  const allowedWarehouseIds = new Set(
+    accessChecks
+      .filter((check) => check.allowed)
+      .map((check) => check.warehouseId)
+  );
+
+  return {
+    rows: rows.filter((row) => allowedWarehouseIds.has(row.warehouse_id)),
+    hasError: accessChecks.some((check) => check.hasError),
+  };
+}
+
+function getPurchaseOrderActivityStatus(status: string) {
+  const labels: Record<string, string> = {
+    draft: "Draft",
+    submitted: "Diajukan",
+    approved: "Disetujui",
+    rejected: "Ditolak",
+    partially_received: "Diterima Sebagian",
+    received: "Selesai Diterima",
+    cancelled: "Dibatalkan",
+  };
+
+  return labels[status] ?? status;
+}
+
+function getInventoryMovementActivityLabel(movementType: string) {
+  const labels: Record<string, string> = {
+    purchase: "Penerimaan Pembelian",
+    sale: "Pengeluaran Penjualan",
+    transfer_in: "Transfer Masuk",
+    transfer_out: "Transfer Keluar",
+    adjustment: "Penyesuaian Stok",
+    customer_return: "Retur Pelanggan",
+    supplier_return: "Retur Supplier",
+    opening_balance: "Saldo Awal",
+    status_change: "Perubahan Status Stok",
+  };
+
+  return labels[movementType] ?? movementType;
+}
+
 async function DashboardContent() {
   await connection();
 
-  const {
-    user,
-    profile,
-    authorized,
-  } = await getAuthorizationContext("dashboard.view");
+  // Jalankan pemeriksaan permission secara paralel agar waktu tunggu tidak
+  // menumpuk untuk setiap modul dashboard.
+  const [
+    dashboardAccess,
+    masterAccess,
+    inventoryAccess,
+    purchasingAccess,
+  ] = await Promise.all([
+    getAuthorizationContext("dashboard.view"),
+    getAuthorizationContext("master.view"),
+    getAuthorizationContext("inventory.view"),
+    getAuthorizationContext("purchasing.view"),
+  ]);
+
+  const { user, profile, authorized, supabase } = dashboardAccess;
 
   if (!user) {
     redirect("/login");
@@ -90,80 +195,184 @@ async function DashboardContent() {
     );
   }
 
+  // getAuthorizationContext sudah membaca user_profiles untuk memvalidasi
+  // pengguna aktif. Gunakan hasil tersebut; jangan mengulang query yang sama.
+  const databaseConnected = Boolean(profile?.is_active);
+  const databaseHealthStatus = databaseConnected
+    ? "Terhubung"
+    : "Tidak terverifikasi";
+
+  const systemHealthItems = [
+    {
+      label: "Status Server",
+      icon: "▤",
+      value: "Merespons",
+      tone: "ok" as const,
+    },
+    {
+      label: "Koneksi Database",
+      icon: "▥",
+      value: databaseHealthStatus,
+      tone: databaseConnected ? "ok" as const : "warning" as const,
+    },
+    {
+      label: "Backup Terakhir",
+      icon: "◷",
+      value: "Tidak tersedia",
+      tone: "warning" as const,
+    },
+    {
+      label: "Uptime Sistem",
+      icon: "↗",
+      value: "Tidak tersedia",
+      tone: "warning" as const,
+    },
+  ];
+
+  const systemConditionLabel = databaseConnected
+    ? "Operasional terbatas"
+    : "Perlu pemeriksaan";
+  const systemConditionNote = databaseConnected
+    ? "Server merespons dan profil pengguna aktif berhasil diverifikasi. Backup serta uptime belum memiliki sumber telemetry."
+    : "Profil pengguna tidak dapat diverifikasi. Periksa status akun dan koneksi autentikasi.";
+
   const displayName =
     profile.full_name?.trim() || user.email || "Pengguna";
 
   const initial = displayName.charAt(0).toUpperCase();
 
+  // Product KPI mengikuti permission dan statistik resmi Master Data.
+
+  let totalProductCount: number | null = null;
+  let productLoadError = false;
+
+  if (
+    masterAccess.user &&
+    masterAccess.profile &&
+    masterAccess.authorized
+  ) {
+    const productStatisticsResult =
+      await masterAccess.supabase.rpc("get_product_statistics");
+
+    if (productStatisticsResult.error) {
+      productLoadError = true;
+    } else {
+      totalProductCount = Number(
+        productStatisticsResult.data?.[0]?.total_products ?? 0
+      );
+    }
+  }
+
   // INVENTORY OVERVIEW ACCESS
-  const inventoryAccess =
-    await getAuthorizationContext("inventory.view");
+
 
   let inventoryData:
     | {
         balances: BalanceRow[];
-        warehouseCount: number;
-        variantCount: number;
-        postedMovementCount: number;
+        warehouseCount: number | null;
+        variantCount: number | null;
+        postedMovementCount: number | null;
       }
     | null = null;
 
   let inventoryLoadError = false;
+  let masterReferenceLoadError = false;
 
   if (
     inventoryAccess.user &&
     inventoryAccess.profile &&
     inventoryAccess.authorized
   ) {
-    const [
-      balanceResult,
-      warehouseResult,
-      variantResult,
-      movementResult,
-    ] = await Promise.all([
-      inventoryAccess.supabase
-        .from("inventory_balances")
-        .select(`
-          product_variant_id,
-          warehouse_id,
-          available_quantity,
-          reserved_quantity,
-          quarantine_quantity,
-          damaged_quantity,
-          repair_quantity,
-          on_hand_quantity,
-          inventory_value
-        `),
+    const balanceResult = await inventoryAccess.supabase
+      .from("inventory_balances")
+      .select(`
+        product_id,
+        product_variant_id,
+        warehouse_id,
+        available_quantity,
+        reserved_quantity,
+        quarantine_quantity,
+        damaged_quantity,
+        repair_quantity,
+        on_hand_quantity,
+        inventory_value
+      `);
 
-      inventoryAccess.supabase
-        .from("warehouses")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
+    let warehouseCount: number | null = null;
+    let variantCount: number | null = null;
+    let activeWarehouseIds: string[] | null = null;
 
-      inventoryAccess.supabase
-        .from("product_variants")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
+    // Warehouse dan Product Variant memakai policy master.view di live DB.
+    // Jangan menjalankannya melalui context inventory.view karena RLS dapat
+    // mengembalikan hitungan nol yang sebenarnya hanya tidak terlihat.
+    if (masterAccess.authorized) {
+      const [warehouseResult, variantResult] = await Promise.all([
+        masterAccess.supabase
+          .from("warehouses")
+          .select("id", { count: "exact" })
+          .eq("is_active", true),
 
-      inventoryAccess.supabase
-        .from("inventory_movements")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "posted"),
-    ]);
+        masterAccess.supabase
+          .from("product_variants")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true),
+      ]);
 
-    if (
-      balanceResult.error ||
-      warehouseResult.error ||
-      variantResult.error ||
-      movementResult.error
-    ) {
+      if (warehouseResult.error || variantResult.error) {
+        masterReferenceLoadError = true;
+      } else {
+        warehouseCount = warehouseResult.count ?? 0;
+        activeWarehouseIds = (warehouseResult.data ?? []).map(
+          (warehouse) => warehouse.id
+        );
+        variantCount = variantResult.count ?? 0;
+      }
+    }
+
+    if (balanceResult.error) {
       inventoryLoadError = true;
     } else {
+      const visibleBalanceRows = (balanceResult.data ?? []) as BalanceRow[];
+      const candidateWarehouseIds = masterAccess.authorized
+        ? activeWarehouseIds
+        : [...new Set(visibleBalanceRows.map((row) => row.warehouse_id))];
+
+      let postedMovementCount: number | null = null;
+
+      if (candidateWarehouseIds !== null) {
+        const warehouseScopeCheck = await filterActivityByWarehouseAccess(
+          inventoryAccess.supabase,
+          candidateWarehouseIds.map((warehouseId) => ({
+            warehouse_id: warehouseId,
+          }))
+        );
+
+        if (!warehouseScopeCheck.hasError) {
+          const visibleWarehouseIds = warehouseScopeCheck.rows.map(
+            (row) => row.warehouse_id
+          );
+
+          if (visibleWarehouseIds.length === 0) {
+            postedMovementCount = 0;
+          } else {
+            const movementCountResult = await inventoryAccess.supabase
+              .from("inventory_movements")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "posted")
+              .in("warehouse_id", visibleWarehouseIds);
+
+            if (!movementCountResult.error) {
+              postedMovementCount = movementCountResult.count ?? 0;
+            }
+          }
+        }
+      }
+
       inventoryData = {
-        balances: (balanceResult.data ?? []) as BalanceRow[],
-        warehouseCount: warehouseResult.count ?? 0,
-        variantCount: variantResult.count ?? 0,
-        postedMovementCount: movementResult.count ?? 0,
+        balances: visibleBalanceRows,
+        warehouseCount,
+        variantCount,
+        postedMovementCount,
       };
     }
   }
@@ -192,9 +401,251 @@ async function DashboardContent() {
     }
   );
 
+  // Canonical stock identity is Product Variant. Product-only legacy rows
+  // remain visible as unresolved balances and are never counted as a SKU.
   const totalInventorySku = new Set(
-    balances.map((row) => row.product_variant_id)
+    balances
+      .map((row) => row.product_variant_id)
+      .filter((id): id is string => Boolean(id))
   ).size;
+  const unresolvedVariantBalanceRows = balances.filter(
+    (row) => row.product_variant_id === null
+  ).length;
+
+  // BUSINESS ACTIVITY FEED
+  // Purchase Order dan Goods Receipt menggunakan permission Purchasing yang sama.
+  // Reuse satu authorization context agar tidak melakukan query permission ganda.
+
+  const goodsReceiptAccess = purchasingAccess;
+
+  const purchasingActivityAuthorized = Boolean(
+    purchasingAccess.user &&
+      purchasingAccess.profile &&
+      purchasingAccess.authorized
+  );
+  const goodsReceiptActivityAuthorized = Boolean(
+    goodsReceiptAccess.user &&
+      goodsReceiptAccess.profile &&
+      goodsReceiptAccess.authorized
+  );
+  const inventoryActivityAuthorized = Boolean(
+    inventoryAccess.user &&
+      inventoryAccess.profile &&
+      inventoryAccess.authorized
+  );
+
+  const [
+    purchaseOrderActivityResult,
+    goodsReceiptActivityResult,
+    inventoryMovementActivityResult,
+  ] = await Promise.all([
+    purchasingActivityAuthorized
+      ? (async () => {
+          const { data, error } = await purchasingAccess.supabase
+            .from("purchase_orders")
+            .select(`
+              id,
+              po_number,
+              status,
+              warehouse_id,
+              created_at,
+              updated_at,
+              submitted_at,
+              approved_at,
+              rejected_at,
+              cancelled_at
+            `)
+            .neq("status", "draft")
+            .order("updated_at", { ascending: false })
+            .limit(12);
+
+          return {
+            rows: error ? [] : (data ?? []) as PurchaseOrderActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as PurchaseOrderActivityRow[],
+          hasError: false,
+        }),
+    goodsReceiptActivityAuthorized
+      ? (async () => {
+          const { data, error } = await goodsReceiptAccess.supabase
+            .from("goods_receipts")
+            .select("id, receipt_number, purchase_order_id, warehouse_id, posted_at, created_at")
+            .eq("status", "posted")
+            .not("posted_at", "is", null)
+            .order("posted_at", { ascending: false })
+            .limit(12);
+
+          return {
+            rows: error ? [] : (data ?? []) as GoodsReceiptActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as GoodsReceiptActivityRow[],
+          hasError: false,
+        }),
+    inventoryActivityAuthorized
+      ? (async () => {
+          const { data, error } = await inventoryAccess.supabase
+            .from("inventory_movements")
+            .select(`
+              id,
+              warehouse_id,
+              movement_type,
+              source_reference_type,
+              source_reference_number,
+              posted_at,
+              created_at
+            `)
+            .eq("status", "posted")
+            .not("posted_at", "is", null)
+            .order("posted_at", { ascending: false })
+            .limit(12);
+
+          return {
+            rows: error ? [] : (data ?? []) as InventoryMovementActivityRow[],
+            hasError: Boolean(error),
+          };
+        })()
+      : Promise.resolve({
+          rows: [] as InventoryMovementActivityRow[],
+          hasError: false,
+        }),
+  ]);
+
+  const authorizedActivitySourceCount = [
+    purchasingActivityAuthorized,
+    goodsReceiptActivityAuthorized,
+    inventoryActivityAuthorized,
+  ].filter(Boolean).length;
+
+  const sourceActivityLoadErrors = [
+    ...(purchaseOrderActivityResult.hasError ? ["Purchase Order"] : []),
+    ...(goodsReceiptActivityResult.hasError ? ["Goods Receipt"] : []),
+    ...(inventoryMovementActivityResult.hasError ? ["Inventory Movement"] : []),
+  ];
+
+  const candidateActivityRows: ScopedActivityRow[] = [
+    ...purchaseOrderActivityResult.rows.map((row) => ({
+      ...row,
+      kind: "purchase_order" as const,
+    })),
+    ...goodsReceiptActivityResult.rows.map((row) => ({
+      ...row,
+      kind: "goods_receipt" as const,
+    })),
+    ...inventoryMovementActivityResult.rows.map((row) => ({
+      ...row,
+      kind: "inventory_movement" as const,
+    })),
+  ];
+
+  // RPC per warehouse dijalankan dengan identitas pengguna yang sedang login.
+  // Jika pemeriksaan gagal, baris ditolak (fail closed), tidak ditampilkan.
+  const {
+    rows: visibleActivityRows,
+    hasError: warehouseAccessCheckFailed,
+  } = await filterActivityByWarehouseAccess(
+    inventoryAccess.supabase,
+    candidateActivityRows
+  );
+
+  const activityLoadErrors = [
+    ...sourceActivityLoadErrors,
+    ...(warehouseAccessCheckFailed ? ["Pemeriksaan Akses Gudang"] : []),
+  ];
+
+  const activityItems: ActivityRecord[] = visibleActivityRows.map((row) => {
+    if (row.kind === "purchase_order") {
+      return {
+        id: `po-${row.id}`,
+        occurredAt:
+          row.updated_at ??
+          row.approved_at ??
+          row.submitted_at ??
+          row.created_at,
+        source: "Purchasing",
+        activity: "Purchase Order",
+        reference: row.po_number,
+        status: getPurchaseOrderActivityStatus(row.status),
+        href: `/purchases/${row.id}`,
+      };
+    }
+
+    if (row.kind === "goods_receipt") {
+      return {
+        id: `gr-${row.id}`,
+        occurredAt: row.posted_at,
+        source: "Goods Receipt",
+        activity: "Penerimaan Barang",
+        reference: row.receipt_number,
+        status: "Posted",
+        href: `/purchases/${row.purchase_order_id}/goods-receipts/${row.id}`,
+      };
+    }
+
+    return {
+      id: `movement-${row.id}`,
+      occurredAt: row.posted_at,
+      source: "Inventory",
+      activity: getInventoryMovementActivityLabel(row.movement_type),
+      reference:
+        row.source_reference_number ??
+        row.source_reference_type ??
+        `MOV-${row.id.slice(0, 8)}`,
+      status: "Posted",
+      href: "/inventory/movements",
+    };
+  }).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, 10);
+
+  // KPI penjualan dan piutang tidak menampilkan nol sebelum sumber
+  // transaksi terposting tersedia. Nilai kosong dibedakan dari nol riil.
+  const summaryCards = [
+    {
+      title: "Total Produk",
+      value: !masterAccess.authorized
+        ? "—"
+        : productLoadError
+          ? "Gagal dimuat"
+          : formatNumber(totalProductCount ?? 0),
+      note: !masterAccess.authorized
+        ? "Permission master.view diperlukan"
+        : productLoadError
+          ? "Statistik produk gagal dimuat"
+          : "Produk terdaftar",
+      icon: "▦",
+    },
+    {
+      title: "Total Persediaan",
+      value: !inventoryAccess.authorized
+        ? "—"
+        : inventoryLoadError || !inventoryData
+          ? "Gagal dimuat"
+          : formatNumber(inventorySummary.available),
+      note: !inventoryAccess.authorized
+        ? "Permission inventory.view diperlukan"
+        : inventoryLoadError || !inventoryData
+          ? "Saldo persediaan gagal dimuat"
+          : "Unit dengan status Available",
+      icon: "▣",
+    },
+    {
+      title: "Penjualan Hari Ini",
+      value: "—",
+      note: "Belum ada sumber penjualan terposting",
+      icon: "↗",
+    },
+    {
+      title: "Total Piutang",
+      value: "—",
+      note: "Buku besar piutang pelanggan belum tersedia",
+      icon: "◷",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 text-slate-800 md:flex">
@@ -244,7 +695,7 @@ async function DashboardContent() {
           </section>
 
           {/* EXISTING ERP SUMMARY */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {summaryCards.map((card) => (
               <div
                 key={card.title}
@@ -297,29 +748,50 @@ async function DashboardContent() {
                 <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   {[
                     {
-                      label: "Total SKU",
+                      label: "Variant SKU Teridentifikasi",
                       value: formatNumber(totalInventorySku),
-                      note: "Varian produk yang memiliki saldo",
+                      note: "SKU Variant unik dengan saldo tercatat",
+                      href: "/inventory/balances",
+                    },
+                    {
+                      label: "Saldo Legacy tanpa Variant",
+                      value: formatNumber(unresolvedVariantBalanceRows),
+                      note: "Baris saldo Product-only yang belum direkonsiliasi",
+                      href: "/inventory/balances",
                     },
                     {
                       label: "Total On Hand",
                       value: formatNumber(inventorySummary.onHand),
-                      note: "Kuantitas seluruh status persediaan",
+                      note: "Jumlah seluruh bucket status persediaan",
+                      href: "/inventory/balances",
                     },
                     {
                       label: "Gudang Aktif",
-                      value: formatNumber(inventoryData.warehouseCount),
-                      note: "Gudang berstatus aktif",
+                      value: !masterAccess.authorized
+                        ? "—"
+                        : masterReferenceLoadError
+                          ? "Gagal dimuat"
+                          : formatNumber(inventoryData.warehouseCount ?? 0),
+                      note: !masterAccess.authorized
+                        ? "Permission master.view diperlukan"
+                        : masterReferenceLoadError
+                          ? "Data gudang gagal dimuat"
+                          : "Gudang berstatus aktif",
+                      href: masterAccess.authorized
+                        ? "/warehouses"
+                        : "/inventory/balances",
                     },
                     {
                       label: "Nilai Persediaan",
                       value: formatCurrency(inventorySummary.value),
-                      note: "Berdasarkan valuasi inventory",
+                      note: "Total inventory value pada gudang yang dapat diakses",
+                      href: "/inventory/balances",
                     },
                   ].map((item) => (
-                    <div
+                    <Link
                       key={item.label}
-                      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                      href={item.href}
+                      className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <p className="text-sm font-medium text-slate-500">
                         {item.label}
@@ -330,7 +802,7 @@ async function DashboardContent() {
                       <p className="mt-2 text-xs text-slate-500">
                         {item.note}
                       </p>
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
@@ -391,11 +863,17 @@ async function DashboardContent() {
                       Aktivitas Inventory
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {formatNumber(inventoryData.postedMovementCount)} transaksi movement berstatus Posted.
+                      {inventoryData.postedMovementCount === null
+                        ? "Jumlah movement tidak tersedia untuk lingkup akses ini."
+                        : `${formatNumber(inventoryData.postedMovementCount)} transaksi movement berstatus Posted pada gudang yang dapat diakses.`}
                     </p>
                   </div>
                   <p className="text-xs text-slate-500">
-                    {formatNumber(inventoryData.variantCount)} varian produk aktif
+                    {inventoryData.variantCount === null
+                        ? masterReferenceLoadError
+                          ? "Jumlah varian gagal dimuat."
+                          : "Permission master.view diperlukan untuk jumlah varian."
+                        : `${formatNumber(inventoryData.variantCount)} varian produk aktif`}
                   </p>
                 </div>
               </>
@@ -410,8 +888,14 @@ async function DashboardContent() {
                 Aktivitas Bisnis
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                Ringkasan transaksi terbaru
+                Purchase Order non-draft, Goods Receipt Posted, dan Inventory Movement Posted
               </p>
+
+              {activityLoadErrors.length > 0 && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Sebagian sumber aktivitas gagal dimuat: {activityLoadErrors.join(", ")}.
+                </p>
+              )}
 
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -423,13 +907,50 @@ async function DashboardContent() {
                       <th className="pb-3 font-medium">Status</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} className="py-10 text-center text-slate-400">
-                        Belum ada transaksi. Data akan tampil setelah modul
-                        operasional terhubung.
-                      </td>
-                    </tr>
+                  <tbody className="divide-y divide-slate-100">
+                    {activityItems.length > 0 ? (
+                      activityItems.map((item) => (
+                        <tr key={item.id} className="align-top hover:bg-blue-50/40">
+                          <td className="whitespace-nowrap py-4 pr-4 text-xs text-slate-500">
+                            {formatActivityDateTime(item.occurredAt)}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <Link
+                              href={item.href}
+                              className="font-semibold text-blue-700 hover:underline"
+                            >
+                              {item.activity}
+                            </Link>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {item.source}
+                            </p>
+                          </td>
+                          <td className="py-4 pr-4">
+                            <Link
+                              href={item.href}
+                              className="break-all text-slate-700 hover:text-blue-700 hover:underline"
+                            >
+                              {item.reference}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap py-4">
+                            <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="py-10 text-center text-slate-400">
+                          {authorizedActivitySourceCount === 0
+                            ? "Tidak ada permission untuk membaca sumber aktivitas bisnis."
+                            : activityLoadErrors.length > 0
+                              ? "Aktivitas tidak dapat dimuat dari sumber yang diizinkan."
+                              : "Belum ada aktivitas terposting pada sumber yang dapat Anda akses."}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -495,12 +1016,7 @@ async function DashboardContent() {
                 </div>
               </div>
 
-              {[
-                { label: "Status Server", icon: "▤" },
-                { label: "Koneksi Database", icon: "▥" },
-                { label: "Backup Terakhir", icon: "◷" },
-                { label: "Uptime Sistem", icon: "↗" },
-              ].map((item) => (
+              {systemHealthItems.map((item) => (
                 <div key={item.label} className="mt-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
@@ -510,23 +1026,27 @@ async function DashboardContent() {
                       {item.label}
                     </span>
                   </div>
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-                    {item.label === "Status Server" || item.label === "Koneksi Database"
-                      ? "Belum diperiksa"
-                      : "Belum tersedia"}
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      item.tone === "ok"
+                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {item.value}
                   </span>
                 </div>
               ))}
 
-              <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-sky-100/80 to-blue-100/80 p-4">
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg text-blue-600">●</span>
+                  <span className={`text-lg ${databaseConnected ? "text-amber-600" : "text-red-600"}`}>●</span>
                   <span className="text-sm font-bold text-slate-700">
-                    Kondisi Sistem
+                    Kondisi Sistem: {systemConditionLabel}
                   </span>
                 </div>
-                <p className="mt-1 pl-6 text-xs text-slate-500">
-                  Menunggu hasil pemeriksaan layanan sistem.
+                <p className="mt-1 pl-6 text-xs text-slate-600">
+                  {systemConditionNote}
                 </p>
               </div>
             </div>

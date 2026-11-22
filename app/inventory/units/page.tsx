@@ -1,6 +1,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
@@ -27,6 +28,7 @@ type Identifier = {
 type UnitRow = {
   id: string;
   product_id: string | null;
+  product_variant_id: string;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -39,6 +41,10 @@ type UnitRow = {
     sku: string;
     product_name: string;
     tracking_type: string;
+  } | null;
+  product_variants: {
+    variant_sku: string;
+    variant_name: string;
   } | null;
   warehouses: {
     warehouse_code: string;
@@ -178,6 +184,7 @@ async function UnitRegistryContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -190,6 +197,10 @@ async function UnitRegistryContent({
           sku,
           product_name,
           tracking_type
+        ),
+        product_variants!product_units_product_variant_id_fkey (
+          variant_sku,
+          variant_name
         ),
         warehouses (
           warehouse_code,
@@ -259,7 +270,7 @@ async function UnitRegistryContent({
         unit.unit_code,
         unit.unit_status,
         unit.notes ?? "",
-        unit.products?.sku ?? "",
+        unit.product_variants?.variant_sku ?? "",
         unit.products?.product_name ?? "",
         unit.warehouses?.warehouse_name ?? "",
         unit.warehouses?.warehouse_code ?? "",
@@ -416,95 +427,39 @@ async function UnitRegistryContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-slate-900">
-              Pencarian dan Filter
-            </h2>
-
-            <form
-              action="/inventory/units"
-              method="GET"
-              className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-            >
-              <div>
-                <label
-                  htmlFor="unit-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-                <input
-                  id="unit-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  maxLength={100}
-                  placeholder="IMEI, serial, SKU, produk..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="unit-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status Unit
-                </label>
-                <select
-                  id="unit-status"
-                  name="status"
-                  defaultValue={statusFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Status</option>
-                  {Object.entries(unitStatuses).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="unit-warehouse"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Gudang
-                </label>
-                <select
-                  id="unit-warehouse"
-                  name="warehouse"
-                  defaultValue={warehouseFilter}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                >
-                  <option value="">Semua Gudang</option>
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.warehouse_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/inventory/units"
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <RealtimeFilterBar
+            key={[keyword, statusFilter, warehouseFilter].join("|")}
+            initialKeyword={keyword}
+            searchLabel="Pencarian Unit"
+            searchPlaceholder="IMEI, serial, kode unit, SKU, produk..."
+            helperText="Cari berdasarkan IMEI, serial, kode unit, SKU, nama produk, atau gudang. Status unit dan gudang diterapkan otomatis."
+            filters={[
+              {
+                param: "status",
+                label: "Status Unit",
+                initialValue: statusFilter,
+                options: [
+                  { value: "", label: "Semua Status" },
+                  ...Object.entries(unitStatuses).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                ],
+              },
+              {
+                param: "warehouse",
+                label: "Gudang",
+                initialValue: warehouseFilter,
+                options: [
+                  { value: "", label: "Semua Gudang" },
+                  ...warehouses.map((warehouse) => ({
+                    value: warehouse.id,
+                    label: warehouse.warehouse_name,
+                  })),
+                ],
+              },
+            ]}
+          />
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-4">
@@ -568,10 +523,10 @@ async function UnitRegistryContent({
 
                           <td className="px-4 py-4">
                             <p className="font-semibold text-slate-900">
-                              {unit.products?.product_name ?? "Produk legacy"}
+                              {unit.products?.product_name ?? "Produk legacy"} · {unit.product_variants?.variant_name ?? "Variant"}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              SKU: {unit.products?.sku ?? "-"}
+                              SKU Variant: {unit.product_variants?.variant_sku ?? "-"}
                             </p>
                             {unit.products?.tracking_type && (
                               <p className="mt-1 text-xs text-slate-400">

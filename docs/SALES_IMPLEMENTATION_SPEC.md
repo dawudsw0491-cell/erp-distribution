@@ -258,7 +258,7 @@ Sales Invoice remains outside this Phase 1 slice. No invoice, payment, tax, AR, 
 Migration:
 - `supabase/migrations/20261122220000_inventory_sales_posting_permission_bridge.sql`
 - Reads the canonical `post_inventory_movement_unlocked(uuid,numeric)` definition using `pg_get_functiondef`, verifies the exact expected original permission gate and movement-lock/read block, then changes only the authorization gate.
-- The `sale` exception requires `source_reference_type='delivery_order'`, a source DO line linked back to the same movement ID, matching product, variant, DO warehouse and SO relationship, a draft DO, current user's `sales.create`, warehouse access, and movement creator identity.
+- The `sale` exception requires `source_reference_type='delivery_order'`, a source DO line linked back to the same movement ID, matching product, variant, Product Unit and exact negative quantity, DO warehouse and SO relationship, a draft DO, current user's `sales.create`, warehouse access, and movement creator identity.
 - Non-sale movements retain the existing `inventory.update` requirement. Manual movement creation and the public wrapper were not changed. The internal unlocked function ACL remains unchanged; authenticated callers do not receive direct execute access.
 - Source transformation was checked against the live Development function definition: exact expected blocks each matched once, and the transformed definition retains inventory balance and valuation operations. No function was changed in Development.
 

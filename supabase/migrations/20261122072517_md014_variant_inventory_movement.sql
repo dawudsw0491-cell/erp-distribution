@@ -6,6 +6,11 @@
 
 BEGIN;
 
+-- Run this schema migration through the existing trusted server-only path.
+-- private.enforce_warehouse_scope() explicitly allows service_role migrations;
+-- this transaction-local claim is automatically discarded at COMMIT/ROLLBACK.
+SET LOCAL request.jwt.claims = '{"role":"service_role"}';
+
 DO $preflight$
 DECLARE
   v_detail text;

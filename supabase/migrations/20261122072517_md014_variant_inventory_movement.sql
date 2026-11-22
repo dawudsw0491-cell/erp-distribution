@@ -3322,8 +3322,7 @@ BEGIN
 
     RETURN v_po_id;
 END;
-$function$
-
+$function$;
 
 REVOKE ALL ON FUNCTION public.create_purchase_order_by_product(uuid, uuid, date, date, text, jsonb, numeric) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.create_purchase_order(uuid, uuid, date, date, text, jsonb, numeric) FROM PUBLIC, anon;

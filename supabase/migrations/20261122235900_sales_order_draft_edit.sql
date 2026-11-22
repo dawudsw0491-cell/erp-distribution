@@ -56,6 +56,9 @@ begin
   if p_order_date is null then
     raise exception 'Tanggal Sales Order wajib diisi.';
   end if;
+  if length(coalesce(p_notes,'')) > 2000 then
+    raise exception 'Catatan Sales Order maksimal 2000 karakter.';
+  end if;
   if p_items is null
      or jsonb_typeof(p_items) is distinct from 'array'
      or jsonb_array_length(p_items) = 0

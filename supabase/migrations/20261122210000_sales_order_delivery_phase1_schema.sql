@@ -175,3 +175,152 @@ group by soi.id, soi.sales_order_id, soi.product_id, soi.product_variant_id, soi
 revoke all on public.sales_order_line_fulfillment from anon, authenticated;
 grant select on public.sales_order_line_fulfillment to authenticated;
 
+
+
+-- All writes are performed through authenticated, permission-checked RPCs.
+create or replace function public.sales_create_order(
+  p_customer_id uuid,
+  p_warehouse_id uuid,
+  p_order_date date,
+  p_notes text,
+  p_items jsonb
+) returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_order_id uuid;
+  v_item jsonb;
+  v_product_id uuid;
+  v_variant_id uuid;
+  v_quantity numeric(18,3);
+  v_unit_price numeric(20,2);
+  v_tracking text;
+begin
+  if v_user_id is null or not public.has_permission('sales.create') then
+    raise exception 'Permission sales.create diperlukan.';
+  end if;
+  if not public.has_warehouse_access(p_warehouse_id) then
+    raise exception 'Akses warehouse ditolak.';
+  end if;
+  if not exists (select 1 from public.customers c where c.id=p_customer_id and c.is_active) then
+    raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items)=0 then
+    raise exception 'Sales Order wajib memiliki minimal satu baris.';
+  end if;
+
+  insert into public.sales_orders(customer_id, warehouse_id, order_date, notes, created_by)
+  values (p_customer_id, p_warehouse_id, coalesce(p_order_date,current_date), nullif(btrim(p_notes),''), v_user_id)
+  returning id into v_order_id;
+
+  for v_item in select value from jsonb_array_elements(p_items)
+  loop
+    v_variant_id := nullif(v_item->>'product_variant_id','')::uuid;
+    v_quantity := (v_item->>'quantity')::numeric;
+    v_unit_price := (v_item->>'unit_price')::numeric;
+
+    if v_variant_id is null or v_quantity is null or v_quantity <= 0
+       or v_unit_price is null or v_unit_price < 0 then
+      raise exception 'Baris Sales Order tidak valid.';
+    end if;
+
+    select pv.product_id, p.tracking_type
+      into v_product_id, v_tracking
+    from public.product_variants pv
+    join public.products p on p.id=pv.product_id
+    where pv.id=v_variant_id and pv.is_active and p.is_active;
+    if not found then raise exception 'Product Variant tidak ditemukan atau tidak aktif.'; end if;
+
+    if v_tracking in ('imei','serial') and v_quantity <> trunc(v_quantity) then
+      raise exception 'Produk IMEI/serial wajib menggunakan kuantitas bilangan bulat.';
+    end if;
+
+    insert into public.sales_order_items(
+      sales_order_id, product_id, product_variant_id, quantity, unit_price
+    ) values (v_order_id, v_product_id, v_variant_id, v_quantity, v_unit_price);
+  end loop;
+  return v_order_id;
+end;
+$$;
+
+create or replace function public.sales_confirm_order(p_sales_order_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order public.sales_orders%rowtype;
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null or not public.has_permission('sales.create') then
+    raise exception 'Permission sales.create diperlukan.';
+  end if;
+  select * into v_order from public.sales_orders
+  where id=p_sales_order_id for update;
+  if not found then raise exception 'Sales Order tidak ditemukan.'; end if;
+  if not public.has_warehouse_access(v_order.warehouse_id) then
+    raise exception 'Akses warehouse ditolak.';
+  end if;
+  if v_order.status <> 'draft' then raise exception 'Hanya Sales Order draft yang dapat dikonfirmasi.'; end if;
+  if not exists (select 1 from public.sales_order_items where sales_order_id=v_order.id) then
+    raise exception 'Sales Order kosong tidak dapat dikonfirmasi.';
+  end if;
+
+  update public.sales_orders so
+  set status='confirmed',
+      subtotal=coalesce((select sum(i.line_total) from public.sales_order_items i where i.sales_order_id=so.id),0),
+      confirmed_by=v_user_id,
+      confirmed_at=clock_timestamp(),
+      updated_at=now()
+  where so.id=v_order.id;
+  return v_order.id;
+end;
+$$;
+
+create or replace function public.sales_cancel_order(p_sales_order_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order public.sales_orders%rowtype;
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null or not public.has_permission('sales.create') then
+    raise exception 'Permission sales.create diperlukan.';
+  end if;
+  select * into v_order from public.sales_orders
+  where id=p_sales_order_id for update;
+  if not found then raise exception 'Sales Order tidak ditemukan.'; end if;
+  if not public.has_warehouse_access(v_order.warehouse_id) then
+    raise exception 'Akses warehouse ditolak.';
+  end if;
+  if v_order.status not in ('draft','confirmed') then
+    raise exception 'Status Sales Order tidak dapat dibatalkan.';
+  end if;
+  if exists (
+    select 1 from public.delivery_order_items doi
+    join public.delivery_orders d on d.id=doi.delivery_order_id
+    join public.sales_order_items soi on soi.id=doi.sales_order_item_id
+    where soi.sales_order_id=v_order.id and d.status='posted'
+  ) then
+    raise exception 'Sales Order dengan pengiriman terposting tidak dapat dibatalkan.';
+  end if;
+  update public.sales_orders
+  set status='cancelled', cancelled_by=v_user_id, cancelled_at=now(), updated_at=now()
+  where id=v_order.id;
+  return v_order.id;
+end;
+$$;
+
+revoke all on function public.sales_create_order(uuid,uuid,date,text,jsonb) from public, anon;
+revoke all on function public.sales_confirm_order(uuid) from public, anon;
+revoke all on function public.sales_cancel_order(uuid) from public, anon;
+grant execute on function public.sales_create_order(uuid,uuid,date,text,jsonb) to authenticated;
+grant execute on function public.sales_confirm_order(uuid) to authenticated;
+grant execute on function public.sales_cancel_order(uuid) to authenticated;

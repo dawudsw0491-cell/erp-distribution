@@ -221,7 +221,7 @@ async function StockMovementContent({
     ? statusFilter
     : "";
 
-  const [movementResult, warehouseResult, productResult] =
+  const [movementResult, warehouseResult, productResult, variantResult] =
     await Promise.all([
       supabase
         .from("inventory_movements")
@@ -241,12 +241,18 @@ async function StockMovementContent({
         .eq("is_active", true)
         .order("sku", { ascending: true })
         .limit(5000),
+      supabase
+        .from("product_variants")
+        .select("id, product_id, variant_sku, variant_name")
+        .eq("is_active", true)
+        .order("variant_sku", { ascending: true }),
     ]);
 
   if (
     movementResult.error ||
     warehouseResult.error ||
-    productResult.error
+    productResult.error ||
+    variantResult.error
   ) {
     if (movementResult.error) {
       console.error(
@@ -290,6 +296,16 @@ async function StockMovementContent({
   const movements = (movementResult.data ?? []) as MovementRow[];
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
   const products = (productResult.data ?? []) as ProductRow[];
+  const variants = (variantResult.data ?? []).flatMap((variant) => {
+    const product = products.find((item) => item.id === variant.product_id);
+    if (!product) return [];
+    return [{
+      id: variant.id,
+      variant_sku: variant.variant_sku,
+      variant_name: variant.variant_name,
+      product_name: product.product_name,
+    }];
+  });
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
@@ -539,14 +555,14 @@ async function StockMovementContent({
                 </label>
                 <select
                   id="movement-product"
-                  name="product_id"
+                  name="product_variant_id"
                   required
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                 >
                   <option value="">Pilih Produk</option>
-                  {products.map((product) => (
+                  {variants.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.sku} - {product.product_name}
+                      {product.variant_sku} - {product.product_name} ({product.variant_name})
                     </option>
                   ))}
                 </select>
@@ -659,7 +675,7 @@ async function StockMovementContent({
               <div className="flex flex-wrap gap-2 xl:col-span-3">
                 <button
                   type="submit"
-                  disabled={products.length === 0 || warehouses.length === 0}
+                  disabled={variants.length === 0 || warehouses.length === 0}
                   className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Buat Draft Movement

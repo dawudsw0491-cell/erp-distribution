@@ -69,6 +69,7 @@ type OpnameItemRow = {
   product_variant_id: string;
   inventory_status: string;
   snapshot_quantity: number;
+  snapshot_aggregate_quantity: number;
   counted_quantity: number | null;
   counted_aggregate_quantity: number | null;
   variance_quantity: number | null;
@@ -361,6 +362,7 @@ async function StockOpnameDetailContent({
         product_variant_id,
         inventory_status,
         snapshot_quantity,
+        snapshot_aggregate_quantity,
         counted_quantity,
         counted_aggregate_quantity,
         variance_quantity,
@@ -472,7 +474,11 @@ async function StockOpnameDetailContent({
         id: item.id,
         product_id: item.product_id,
         inventory_status: item.inventory_status,
-        snapshot_quantity: Number(item.snapshot_quantity ?? 0),
+        snapshot_quantity: Number(
+          product?.tracking_type === "imei"
+            ? item.snapshot_aggregate_quantity ?? 0
+            : item.snapshot_quantity ?? 0
+        ),
         counted_quantity:
           product?.tracking_type === "imei"
             ? item.counted_aggregate_quantity === null

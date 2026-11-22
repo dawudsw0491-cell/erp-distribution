@@ -1696,6 +1696,1360 @@ GRANT EXECUTE ON FUNCTION public.create_goods_receipt(uuid, date, text, jsonb) T
 REVOKE ALL ON FUNCTION public.post_goods_receipt(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.post_goods_receipt(uuid) TO authenticated, service_role;
 
+
+-- Transfer draft and atomic posting are keyed by the same Product Variant.
+CREATE OR REPLACE FUNCTION public.create_inventory_transfer(
+    p_product_variant_id UUID,
+    p_source_warehouse_id UUID,
+    p_destination_warehouse_id UUID,
+    p_quantity NUMERIC,
+    p_inventory_status VARCHAR,
+    p_product_unit_id UUID DEFAULT NULL,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_group_id UUID;
+    v_tracking_type VARCHAR(30);
+    v_source_quantity NUMERIC(18,3);
+    v_unit_status VARCHAR(30);
+    v_reference_number VARCHAR(50);
+BEGIN
+    -- 1. Authentication and permission
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required.';
+    END IF;
+
+    IF NOT public.has_permission('inventory.transfer') THEN
+        RAISE EXCEPTION
+            'User tidak memiliki permission inventory.transfer.';
+    END IF;
+
+    -- 2. Validate input
+    IF p_product_variant_id IS NULL
+       OR p_source_warehouse_id IS NULL
+       OR p_destination_warehouse_id IS NULL THEN
+        RAISE EXCEPTION 'Produk dan kedua gudang wajib diisi.';
+    END IF;
+
+    IF p_source_warehouse_id = p_destination_warehouse_id THEN
+        RAISE EXCEPTION
+            'Gudang asal dan tujuan tidak boleh sama.';
+    END IF;
+
+    IF p_quantity IS NULL
+       OR p_quantity <= 0
+       OR p_quantity <> ROUND(p_quantity, 3) THEN
+        RAISE EXCEPTION 'Quantity transfer tidak valid.';
+    END IF;
+
+    IF p_inventory_status IS NULL
+       OR p_inventory_status NOT IN (
+           'available',
+           'reserved',
+           'quarantine',
+           'damaged',
+           'repair'
+       ) THEN
+        RAISE EXCEPTION 'Inventory status tidak valid.';
+    END IF;
+
+    -- 3. Validate active warehouses
+    IF (
+        SELECT COUNT(*)
+        FROM public.warehouses
+        WHERE id IN (
+            p_source_warehouse_id,
+            p_destination_warehouse_id
+        )
+        AND is_active = TRUE
+    ) <> 2 THEN
+        RAISE EXCEPTION
+            'Gudang asal dan tujuan harus aktif.';
+    END IF;
+
+    -- 4. Validate product tracking
+    SELECT p.tracking_type
+    INTO v_tracking_type
+    FROM public.product_variants pv
+    JOIN public.products p
+      ON p.id = pv.product_id
+    WHERE pv.id = p_product_variant_id
+      AND pv.is_active = TRUE
+      AND p.is_active = TRUE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Produk atau variant tidak ditemukan atau tidak aktif.';
+    END IF;
+
+    -- 5. Validate source balance and lock it
+    SELECT
+        CASE p_inventory_status
+            WHEN 'available' THEN available_quantity
+            WHEN 'reserved' THEN reserved_quantity
+            WHEN 'quarantine' THEN quarantine_quantity
+            WHEN 'damaged' THEN damaged_quantity
+            WHEN 'repair' THEN repair_quantity
+        END
+    INTO v_source_quantity
+    FROM public.inventory_balances
+    WHERE product_variant_id = p_product_variant_id
+      AND warehouse_id = p_source_warehouse_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Saldo inventory gudang asal tidak ditemukan.';
+    END IF;
+
+    IF v_source_quantity < p_quantity THEN
+        RAISE EXCEPTION
+            'Stok pada status yang dipilih tidak mencukupi.';
+    END IF;
+
+    -- 6. Validate tracked units; untagged IMEI quantity remains aggregate Variant stock.
+    IF v_tracking_type = 'quantity' THEN
+        IF p_product_unit_id IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Produk quantity tidak boleh menggunakan product_unit_id.';
+        END IF;
+
+    ELSIF v_tracking_type = 'imei' THEN
+        IF p_product_unit_id IS NULL THEN
+            IF p_quantity <> TRUNC(p_quantity) THEN
+                RAISE EXCEPTION
+                    'Aggregate IMEI transfer harus menggunakan kuantitas bilangan bulat.';
+            END IF;
+        ELSE
+            IF p_quantity <> 1 THEN
+                RAISE EXCEPTION 'Unit IMEI individual harus ditransfer satu unit.';
+            END IF;
+
+            SELECT unit_status
+            INTO v_unit_status
+            FROM public.product_units
+            WHERE id = p_product_unit_id
+              AND product_variant_id = p_product_variant_id
+              AND warehouse_id = p_source_warehouse_id
+            FOR UPDATE;
+
+            IF NOT FOUND OR v_unit_status IS DISTINCT FROM p_inventory_status THEN
+                RAISE EXCEPTION 'IMEI unit tidak ditemukan atau statusnya tidak sesuai.';
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM public.product_unit_identifiers
+                WHERE product_unit_id = p_product_unit_id
+                  AND identifier_type = 'IMEI_1'
+            ) THEN
+                RAISE EXCEPTION 'IMEI_1 wajib tersedia.';
+            END IF;
+        END IF;
+
+    ELSIF v_tracking_type = 'serial' THEN
+        IF p_product_unit_id IS NULL OR p_quantity <> 1 THEN
+            RAISE EXCEPTION 'Produk serial harus ditransfer satu unit.';
+        END IF;
+
+        SELECT unit_status
+        INTO v_unit_status
+        FROM public.product_units
+        WHERE id = p_product_unit_id
+          AND product_variant_id = p_product_variant_id
+          AND warehouse_id = p_source_warehouse_id
+        FOR UPDATE;
+
+        IF NOT FOUND OR v_unit_status IS DISTINCT FROM p_inventory_status THEN
+            RAISE EXCEPTION 'Serial unit tidak ditemukan atau statusnya tidak sesuai.';
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM public.product_unit_identifiers
+            WHERE product_unit_id = p_product_unit_id
+              AND identifier_type = 'SERIAL_NUMBER'
+        ) THEN
+            RAISE EXCEPTION 'SERIAL_NUMBER wajib tersedia.';
+        END IF;
+
+    ELSE
+        RAISE EXCEPTION 'Tracking type produk tidak dikenal.';
+    END IF;
+
+    v_group_id := pg_catalog.gen_random_uuid();
+
+    v_reference_number :=
+        'TRF-' ||
+        UPPER(LEFT(REPLACE(v_group_id::TEXT, '-', ''), 12));
+
+    -- 8. Create transfer OUT draft
+    INSERT INTO public.inventory_movements (
+        movement_group_id,
+        product_variant_id,
+        warehouse_id,
+        product_unit_id,
+        movement_type,
+        status,
+        quantity_delta,
+        inventory_status,
+        source_reference_type,
+        source_reference_id,
+        source_reference_number,
+        notes,
+        created_by
+    )
+    VALUES (
+        v_group_id,
+        p_product_variant_id,
+        p_source_warehouse_id,
+        p_product_unit_id,
+        'transfer_out',
+        'draft',
+        -p_quantity,
+        p_inventory_status,
+        'stock_transfer',
+        v_group_id,
+        v_reference_number,
+        p_notes,
+        v_user_id
+    );
+
+    -- 9. Create transfer IN draft
+    INSERT INTO public.inventory_movements (
+        movement_group_id,
+        product_variant_id,
+        warehouse_id,
+        product_unit_id,
+        movement_type,
+        status,
+        quantity_delta,
+        inventory_status,
+        source_reference_type,
+        source_reference_id,
+        source_reference_number,
+        notes,
+        created_by
+    )
+    VALUES (
+        v_group_id,
+        p_product_variant_id,
+        p_destination_warehouse_id,
+        p_product_unit_id,
+        'transfer_in',
+        'draft',
+        p_quantity,
+        p_inventory_status,
+        'stock_transfer',
+        v_group_id,
+        v_reference_number,
+        p_notes,
+        v_user_id
+    );
+
+    RETURN v_group_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.post_inventory_transfer_unlocked(
+    p_movement_group_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+    v_user_id UUID;
+    v_out RECORD;
+    v_in RECORD;
+
+    v_tracking_type VARCHAR(30);
+    v_product_id UUID;
+    v_unit_status VARCHAR(30);
+
+    v_source RECORD;
+    v_destination RECORD;
+
+    v_quantity NUMERIC(18,3);
+
+    v_source_qty_after NUMERIC(18,3);
+    v_source_value_after NUMERIC(20,4);
+    v_source_avg_after NUMERIC(20,6);
+    v_source_value_delta NUMERIC(20,4);
+
+    v_destination_qty_after NUMERIC(18,3);
+    v_destination_value_after NUMERIC(20,4);
+    v_destination_avg_after NUMERIC(20,6);
+    v_destination_value_delta NUMERIC(20,4);
+
+    v_unit_cost NUMERIC(20,6);
+    v_transfer_value NUMERIC(20,4);
+
+    v_count INTEGER;
+    v_source_status_quantity NUMERIC(18,3);
+BEGIN
+
+    -- ========================================================
+    -- 1. AUTHENTICATION AND PERMISSION
+    -- ========================================================
+
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required.';
+    END IF;
+
+    IF NOT public.has_permission('inventory.transfer') THEN
+        RAISE EXCEPTION
+            'User tidak memiliki permission inventory.transfer.';
+    END IF;
+
+
+    -- ========================================================
+    -- 2. LOCK MOVEMENTS IN DETERMINISTIC ORDER
+    -- ========================================================
+
+    PERFORM id
+    FROM public.inventory_movements
+    WHERE movement_group_id = p_movement_group_id
+    ORDER BY id
+    FOR UPDATE;
+
+    SELECT COUNT(*)
+    INTO v_count
+    FROM public.inventory_movements
+    WHERE movement_group_id = p_movement_group_id;
+
+    IF v_count <> 2 THEN
+        RAISE EXCEPTION
+            'Transfer group harus memiliki tepat dua movement.';
+    END IF;
+
+    SELECT *
+    INTO v_out
+    FROM public.inventory_movements
+    WHERE movement_group_id = p_movement_group_id
+      AND movement_type = 'transfer_out';
+
+    SELECT *
+    INTO v_in
+    FROM public.inventory_movements
+    WHERE movement_group_id = p_movement_group_id
+      AND movement_type = 'transfer_in';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Pasangan transfer_in tidak ditemukan.';
+    END IF;
+
+    IF v_out.id IS NULL OR v_in.id IS NULL THEN
+        RAISE EXCEPTION
+            'Pasangan transfer_out dan transfer_in tidak lengkap.';
+    END IF;
+
+    IF v_out.status <> 'draft' OR v_in.status <> 'draft' THEN
+        RAISE EXCEPTION
+            'Kedua movement harus berstatus draft.';
+    END IF;
+
+    IF v_out.reversal_of_id IS NOT NULL
+       OR v_in.reversal_of_id IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Reversal tidak boleh diproses melalui fungsi transfer normal.';
+    END IF;
+
+
+    -- ========================================================
+    -- 3. VALIDATE TRANSFER PAIR
+    -- ========================================================
+
+    IF v_out.product_variant_id IS DISTINCT FROM v_in.product_variant_id THEN
+        RAISE EXCEPTION
+            'Product variant transfer tidak konsisten.';
+    END IF;
+
+    IF v_out.warehouse_id = v_in.warehouse_id THEN
+        RAISE EXCEPTION
+            'Gudang sumber dan tujuan tidak boleh sama.';
+    END IF;
+
+    IF v_out.quantity_delta >= 0 OR v_in.quantity_delta <= 0 THEN
+        RAISE EXCEPTION
+            'Arah quantity transfer tidak valid.';
+    END IF;
+
+    IF ABS(v_out.quantity_delta) <> v_in.quantity_delta THEN
+        RAISE EXCEPTION
+            'Quantity transfer_out dan transfer_in harus sama.';
+    END IF;
+
+    IF v_out.inventory_status <> v_in.inventory_status THEN
+        RAISE EXCEPTION
+            'Inventory status transfer harus sama.';
+    END IF;
+
+    IF v_out.product_unit_id IS DISTINCT FROM v_in.product_unit_id THEN
+        RAISE EXCEPTION
+            'Product unit transfer tidak konsisten.';
+    END IF;
+
+    IF v_out.inventory_status NOT IN (
+        'available',
+        'reserved',
+        'quarantine',
+        'damaged',
+        'repair'
+    ) THEN
+        RAISE EXCEPTION
+            'Inventory status transfer tidak valid.';
+    END IF;
+
+
+    -- ========================================================
+    -- 4. VALIDATE PRODUCT TRACKING
+    -- ========================================================
+
+    SELECT pv.product_id, p.tracking_type
+    INTO v_product_id, v_tracking_type
+    FROM public.product_variants pv
+    JOIN public.products p
+      ON p.id = pv.product_id
+    WHERE pv.id = v_out.product_variant_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Product variant tidak ditemukan.';
+    END IF;
+
+    IF (v_out.product_id IS NOT NULL AND v_out.product_id IS DISTINCT FROM v_product_id)
+       OR (v_in.product_id IS NOT NULL AND v_in.product_id IS DISTINCT FROM v_product_id) THEN
+        RAISE EXCEPTION 'Product ID transfer tidak sesuai dengan parent Product Variant.';
+    END IF;
+
+    IF v_tracking_type = 'quantity' THEN
+        IF v_out.product_unit_id IS NOT NULL THEN
+            RAISE EXCEPTION
+                'Produk quantity tidak boleh memiliki product_unit_id.';
+        END IF;
+
+    ELSIF v_tracking_type = 'imei' THEN
+        IF v_out.product_unit_id IS NULL THEN
+            IF v_out.quantity_delta <> TRUNC(v_out.quantity_delta) THEN
+                RAISE EXCEPTION
+                    'Aggregate IMEI transfer harus menggunakan kuantitas bilangan bulat.';
+            END IF;
+        ELSE
+            IF v_out.quantity_delta <> -1 OR v_in.quantity_delta <> 1 THEN
+                RAISE EXCEPTION
+                    'Unit IMEI individual harus ditransfer satu unit.';
+            END IF;
+
+            SELECT unit_status
+            INTO v_unit_status
+            FROM public.product_units
+            WHERE id = v_out.product_unit_id
+              AND product_variant_id = v_out.product_variant_id
+              AND warehouse_id = v_out.warehouse_id
+            FOR UPDATE;
+
+            IF NOT FOUND OR v_unit_status IS DISTINCT FROM v_out.inventory_status THEN
+                RAISE EXCEPTION
+                    'IMEI unit tidak ditemukan di gudang sumber atau statusnya tidak sesuai.';
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM public.product_unit_identifiers
+                WHERE product_unit_id = v_out.product_unit_id
+                  AND identifier_type = 'IMEI_1'
+            ) THEN
+                RAISE EXCEPTION 'IMEI_1 wajib tersedia untuk unit individual.';
+            END IF;
+        END IF;
+
+    ELSIF v_tracking_type = 'serial' THEN
+        IF v_out.product_unit_id IS NULL
+           OR v_out.quantity_delta <> -1
+           OR v_in.quantity_delta <> 1 THEN
+            RAISE EXCEPTION
+                'Produk serial harus ditransfer satu unit individual.';
+        END IF;
+
+        SELECT unit_status
+        INTO v_unit_status
+        FROM public.product_units
+        WHERE id = v_out.product_unit_id
+          AND product_variant_id = v_out.product_variant_id
+          AND warehouse_id = v_out.warehouse_id
+        FOR UPDATE;
+
+        IF NOT FOUND OR v_unit_status IS DISTINCT FROM v_out.inventory_status THEN
+            RAISE EXCEPTION
+                'Serial unit tidak ditemukan di gudang sumber atau statusnya tidak sesuai.';
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM public.product_unit_identifiers
+            WHERE product_unit_id = v_out.product_unit_id
+              AND identifier_type = 'SERIAL_NUMBER'
+        ) THEN
+            RAISE EXCEPTION 'SERIAL_NUMBER wajib tersedia.';
+        END IF;
+
+    ELSE
+        RAISE EXCEPTION 'Tracking type produk tidak dikenal.';
+    END IF;
+
+
+    -- ========================================================
+    -- 5. ENSURE BALANCE ROWS EXIST
+    -- ========================================================
+
+    INSERT INTO public.inventory_balances (
+        product_variant_id,
+        product_id,
+        warehouse_id
+    )
+    VALUES
+        (v_out.product_variant_id, v_product_id, v_out.warehouse_id),
+        (v_in.product_variant_id, v_product_id, v_in.warehouse_id)
+    ON CONFLICT (product_variant_id, warehouse_id)
+    DO NOTHING;
+
+
+    -- ========================================================
+    -- 6. LOCK BALANCES IN DETERMINISTIC ORDER
+    -- ========================================================
+
+    PERFORM id
+    FROM public.inventory_balances
+    WHERE product_variant_id = v_out.product_variant_id
+      AND warehouse_id IN (
+          v_out.warehouse_id,
+          v_in.warehouse_id
+      )
+    ORDER BY warehouse_id, id
+    FOR UPDATE;
+
+    SELECT *
+    INTO v_source
+    FROM public.inventory_balances
+    WHERE product_variant_id = v_out.product_variant_id
+      AND warehouse_id = v_out.warehouse_id;
+
+    SELECT *
+    INTO v_destination
+    FROM public.inventory_balances
+    WHERE product_variant_id = v_in.product_variant_id
+      AND warehouse_id = v_in.warehouse_id;
+
+
+    -- ========================================================
+    -- 7. VALIDATE SOURCE STOCK
+    -- ========================================================
+
+    v_quantity := ABS(v_out.quantity_delta);
+
+    IF v_source.on_hand_quantity < v_quantity THEN
+        RAISE EXCEPTION
+            'Stok gudang sumber tidak mencukupi.';
+    END IF;
+
+    IF
+        CASE v_out.inventory_status
+            WHEN 'available' THEN v_source.available_quantity
+            WHEN 'reserved' THEN v_source.reserved_quantity
+            WHEN 'quarantine' THEN v_source.quarantine_quantity
+            WHEN 'damaged' THEN v_source.damaged_quantity
+            WHEN 'repair' THEN v_source.repair_quantity
+        END < v_quantity
+    THEN
+        RAISE EXCEPTION
+            'Saldo status stok gudang sumber tidak mencukupi.';
+    END IF;CASE v_out.inventory_status
+    WHEN 'available' THEN
+        v_source_status_quantity := v_source.available_quantity;
+
+    WHEN 'reserved' THEN
+        v_source_status_quantity := v_source.reserved_quantity;
+
+    WHEN 'quarantine' THEN
+        v_source_status_quantity := v_source.quarantine_quantity;
+
+    WHEN 'damaged' THEN
+        v_source_status_quantity := v_source.damaged_quantity;
+
+    WHEN 'repair' THEN
+        v_source_status_quantity := v_source.repair_quantity;
+
+    ELSE
+        RAISE EXCEPTION
+            'Status inventory tidak valid: %',
+            v_out.inventory_status;
+END CASE;
+
+IF v_source_status_quantity < v_quantity THEN
+    RAISE EXCEPTION
+        'Saldo status stok gudang sumber tidak mencukupi.';
+END IF;
+
+
+    -- ========================================================
+    -- 8. CALCULATE SOURCE VALUATION
+    -- ========================================================
+
+    v_unit_cost := v_source.average_unit_cost;
+
+    v_transfer_value := ROUND(
+        v_quantity * v_unit_cost,
+        4
+    );
+
+    v_source_qty_after :=
+        v_source.on_hand_quantity - v_quantity;
+
+    v_source_value_delta := -v_transfer_value;
+
+    v_source_value_after :=
+        v_source.inventory_value + v_source_value_delta;
+
+    IF v_source_qty_after = 0 THEN
+
+        IF ABS(v_source_value_after) > 0.0001 THEN
+            RAISE EXCEPTION
+                'Nilai sumber tidak nol ketika kuantitas menjadi nol.';
+        END IF;
+
+        v_source_value_after := 0;
+        v_source_avg_after := 0;
+
+    ELSE
+
+        IF v_source_value_after < 0 THEN
+            RAISE EXCEPTION
+                'Nilai persediaan sumber menjadi negatif.';
+        END IF;
+
+        v_source_avg_after := ROUND(
+            v_source_value_after / v_source_qty_after,
+            6
+        );
+
+    END IF;
+
+
+    -- ========================================================
+    -- 9. CALCULATE DESTINATION VALUATION
+    -- ========================================================
+
+    v_destination_qty_after :=
+        v_destination.on_hand_quantity + v_quantity;
+
+    v_destination_value_delta := v_transfer_value;
+
+    v_destination_value_after :=
+        v_destination.inventory_value + v_transfer_value;
+
+    v_destination_avg_after := ROUND(
+        v_destination_value_after / v_destination_qty_after,
+        6
+    );
+
+
+    -- ========================================================
+    -- 10. UPDATE SOURCE BALANCE
+    -- ========================================================
+
+    UPDATE public.inventory_balances
+    SET
+        available_quantity =
+            available_quantity
+            + CASE WHEN v_out.inventory_status = 'available'
+                   THEN -v_quantity ELSE 0 END,
+
+        reserved_quantity =
+            reserved_quantity
+            + CASE WHEN v_out.inventory_status = 'reserved'
+                   THEN -v_quantity ELSE 0 END,
+
+        quarantine_quantity =
+            quarantine_quantity
+            + CASE WHEN v_out.inventory_status = 'quarantine'
+                   THEN -v_quantity ELSE 0 END,
+
+        damaged_quantity =
+            damaged_quantity
+            + CASE WHEN v_out.inventory_status = 'damaged'
+                   THEN -v_quantity ELSE 0 END,
+
+        repair_quantity =
+            repair_quantity
+            + CASE WHEN v_out.inventory_status = 'repair'
+                   THEN -v_quantity ELSE 0 END,
+
+        on_hand_quantity = v_source_qty_after,
+        inventory_value = v_source_value_after,
+        average_unit_cost = v_source_avg_after,
+        updated_at = NOW()
+
+    WHERE id = v_source.id;
+
+
+    -- ========================================================
+    -- 11. UPDATE DESTINATION BALANCE
+    -- ========================================================
+
+    UPDATE public.inventory_balances
+    SET
+        available_quantity =
+            available_quantity
+            + CASE WHEN v_in.inventory_status = 'available'
+                   THEN v_quantity ELSE 0 END,
+
+        reserved_quantity =
+            reserved_quantity
+            + CASE WHEN v_in.inventory_status = 'reserved'
+                   THEN v_quantity ELSE 0 END,
+
+        quarantine_quantity =
+            quarantine_quantity
+            + CASE WHEN v_in.inventory_status = 'quarantine'
+                   THEN v_quantity ELSE 0 END,
+
+        damaged_quantity =
+            damaged_quantity
+            + CASE WHEN v_in.inventory_status = 'damaged'
+                   THEN v_quantity ELSE 0 END,
+
+        repair_quantity =
+            repair_quantity
+            + CASE WHEN v_in.inventory_status = 'repair'
+                   THEN v_quantity ELSE 0 END,
+
+        on_hand_quantity = v_destination_qty_after,
+        inventory_value = v_destination_value_after,
+        average_unit_cost = v_destination_avg_after,
+        updated_at = NOW()
+
+    WHERE id = v_destination.id;
+
+
+    -- ========================================================
+    -- 12. UPDATE SERIALIZED UNIT WAREHOUSE
+    -- ========================================================
+
+    IF v_tracking_type IN ('imei', 'serial')
+       AND v_out.product_unit_id IS NOT NULL THEN
+
+        UPDATE public.product_units
+        SET warehouse_id = v_in.warehouse_id
+        WHERE id = v_out.product_unit_id;
+
+    END IF;
+
+
+    -- ========================================================
+    -- 13. POST BOTH MOVEMENTS
+    -- ========================================================
+
+    UPDATE public.inventory_movements
+    SET
+        product_id = v_product_id,
+        status = 'posted',
+        posted_by = v_user_id,
+        posted_at = NOW()
+    WHERE id IN (v_out.id, v_in.id);
+
+
+    -- ========================================================
+    -- 14. CREATE SOURCE VALUATION LOG
+    -- ========================================================
+
+    INSERT INTO public.inventory_valuation_logs (
+        inventory_movement_id,
+        product_variant_id,
+        product_id,
+        warehouse_id,
+        transaction_type,
+        quantity_before,
+        quantity_after,
+        quantity_delta,
+        value_before,
+        value_after,
+        inventory_value_delta,
+        average_cost_before,
+        average_cost_after,
+        created_by
+    )
+    VALUES (
+        v_out.id,
+        v_out.product_variant_id,
+        v_product_id,
+        v_out.warehouse_id,
+        'transfer_out',
+        v_source.on_hand_quantity,
+        v_source_qty_after,
+        v_out.quantity_delta,
+        v_source.inventory_value,
+        v_source_value_after,
+        v_source_value_delta,
+        v_source.average_unit_cost,
+        v_source_avg_after,
+        v_user_id
+    );
+
+
+    -- ========================================================
+    -- 15. CREATE DESTINATION VALUATION LOG
+    -- ========================================================
+
+    INSERT INTO public.inventory_valuation_logs (
+        inventory_movement_id,
+        product_variant_id,
+        product_id,
+        warehouse_id,
+        transaction_type,
+        quantity_before,
+        quantity_after,
+        quantity_delta,
+        value_before,
+        value_after,
+        inventory_value_delta,
+        average_cost_before,
+        average_cost_after,
+        created_by
+    )
+    VALUES (
+        v_in.id,
+        v_in.product_variant_id,
+        v_product_id,
+        v_in.warehouse_id,
+        'transfer_in',
+        v_destination.on_hand_quantity,
+        v_destination_qty_after,
+        v_in.quantity_delta,
+        v_destination.inventory_value,
+        v_destination_value_after,
+        v_destination_value_delta,
+        v_destination.average_unit_cost,
+        v_destination_avg_after,
+        v_user_id
+    );
+
+    RETURN p_movement_group_id;
+
+END;
+$function$;
+
+-- Full/partial reversal uses original historical valuation at Variant + Warehouse.
+CREATE OR REPLACE FUNCTION public.post_inventory_reversal_unlocked(
+    p_original_movement_id UUID,
+    p_reversal_movement_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+    v_user_id UUID;
+
+    v_original RECORD;
+    v_reversal RECORD;
+    v_original_log RECORD;
+
+    v_tracking_type VARCHAR(30);
+    v_product_id UUID;
+
+    v_balance RECORD;
+    v_balance_status_quantity NUMERIC(18,3);
+
+    v_original_quantity NUMERIC(18,3);
+    v_reversal_quantity NUMERIC(18,3);
+    v_previous_reversed_quantity NUMERIC(18,3);
+    v_remaining_quantity NUMERIC(18,3);
+
+    v_original_value NUMERIC(20,4);
+    v_previous_reversed_value NUMERIC(20,4);
+    v_reversal_value NUMERIC(20,4);
+    v_value_delta NUMERIC(20,4);
+
+    v_quantity_before NUMERIC(18,3);
+    v_quantity_after NUMERIC(18,3);
+
+    v_value_before NUMERIC(20,4);
+    v_value_after NUMERIC(20,4);
+
+    v_average_before NUMERIC(20,6);
+    v_average_after NUMERIC(20,6);
+
+BEGIN
+
+    -- ========================================================
+    -- 1. AUTHENTICATION AND PERMISSION
+    -- ========================================================
+
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required.';
+    END IF;
+
+    IF NOT public.has_permission('inventory.update') THEN
+        RAISE EXCEPTION
+            'Permission inventory.update diperlukan.';
+    END IF;
+
+
+    -- ========================================================
+    -- 2. LOCK ORIGINAL MOVEMENT
+    -- ========================================================
+
+    SELECT *
+    INTO v_original
+    FROM public.inventory_movements
+    WHERE id = p_original_movement_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Original movement tidak ditemukan.';
+    END IF;
+
+    IF v_original.status <> 'posted' THEN
+        RAISE EXCEPTION
+            'Original movement harus berstatus posted.';
+    END IF;
+
+    IF v_original.reversal_of_id IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Reversal tidak boleh menjadi sumber reversal berikutnya.';
+    END IF;
+
+    IF v_original.movement_type NOT IN (
+        'purchase',
+        'adjustment',
+        'opening_balance'
+    ) THEN
+        RAISE EXCEPTION
+            'Jenis transaksi ini tidak didukung oleh fungsi reversal ini. '
+            'Gunakan proses retur atau fungsi transfer reversal yang sesuai.';
+    END IF;
+
+    IF v_original.movement_type = 'status_change' THEN
+        RAISE EXCEPTION
+            'Status change tidak dapat diproses melalui fungsi ini.';
+    END IF;
+
+
+    -- ========================================================
+    -- 3. LOCK REVERSAL DRAFT
+    -- ========================================================
+
+    SELECT *
+    INTO v_reversal
+    FROM public.inventory_movements
+    WHERE id = p_reversal_movement_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Reversal draft tidak ditemukan.';
+    END IF;
+
+    IF v_reversal.status <> 'draft' THEN
+        RAISE EXCEPTION
+            'Reversal movement harus berstatus draft.';
+    END IF;
+
+    IF v_reversal.id = v_original.id THEN
+        RAISE EXCEPTION
+            'Movement tidak dapat membalik dirinya sendiri.';
+    END IF;
+
+    IF v_reversal.reversal_of_id <> v_original.id THEN
+        RAISE EXCEPTION
+            'reversal_of_id tidak sesuai original movement.';
+    END IF;
+
+    IF v_reversal.movement_type <> v_original.movement_type THEN
+        RAISE EXCEPTION
+            'Movement type reversal harus sama dengan original.';
+    END IF;
+
+    IF v_reversal.product_variant_id <>
+       v_original.product_variant_id
+       OR v_reversal.warehouse_id <>
+       v_original.warehouse_id THEN
+        RAISE EXCEPTION
+            'Product variant atau warehouse reversal tidak sesuai original.';
+    END IF;
+
+    IF v_reversal.inventory_status IS DISTINCT FROM
+       v_original.inventory_status THEN
+        RAISE EXCEPTION
+            'Inventory status reversal harus sama dengan original.';
+    END IF;
+
+    IF v_reversal.product_unit_id IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Fungsi ini hanya mendukung produk quantity-tracked.';
+    END IF;
+
+    IF v_original.product_unit_id IS NOT NULL THEN
+        RAISE EXCEPTION
+            'Serialized unit harus menggunakan proses reversal khusus.';
+    END IF;
+
+    IF v_reversal.quantity_delta * v_original.quantity_delta >= 0 THEN
+        RAISE EXCEPTION
+            'Quantity reversal harus berlawanan arah dengan original.';
+    END IF;
+
+
+    -- ========================================================
+    -- 4. VALIDATE TRACKING TYPE
+    -- ========================================================
+
+    SELECT pv.product_id, p.tracking_type
+    INTO v_product_id, v_tracking_type
+    FROM public.product_variants pv
+    JOIN public.products p
+      ON p.id = pv.product_id
+    WHERE pv.id = v_original.product_variant_id;
+
+    IF NOT FOUND OR v_tracking_type <> 'quantity' THEN
+        RAISE EXCEPTION
+            'Fungsi reversal ini hanya untuk produk quantity-tracked.';
+    END IF;
+
+    IF (v_original.product_id IS NOT NULL AND v_original.product_id IS DISTINCT FROM v_product_id)
+       OR (v_reversal.product_id IS NOT NULL AND v_reversal.product_id IS DISTINCT FROM v_product_id) THEN
+        RAISE EXCEPTION
+            'Product ID reversal tidak sesuai dengan parent Product Variant.';
+    END IF;
+
+
+    -- ========================================================
+    -- 5. VALIDATE APPROVAL
+    -- ========================================================
+
+    IF v_original.approved_by IS NOT NULL THEN
+
+        IF v_reversal.approved_by IS NULL
+           OR v_reversal.approved_at IS NULL THEN
+            RAISE EXCEPTION
+                'Reversal wajib mendapatkan approval.';
+        END IF;
+
+        IF v_reversal.created_by = v_reversal.approved_by THEN
+            RAISE EXCEPTION
+                'Pembuat reversal tidak boleh menyetujui reversal sendiri.';
+        END IF;
+
+        IF v_user_id = v_reversal.approved_by THEN
+            RAISE EXCEPTION
+                'Approver tidak boleh melakukan posting reversal sendiri.';
+        END IF;
+
+        IF NOT public.has_permission('finance.approve') THEN
+            RAISE EXCEPTION
+                'Permission finance.approve diperlukan.';
+        END IF;
+
+    END IF;
+
+
+    -- ========================================================
+    -- 6. VALIDATE ORIGINAL VALUATION LOG
+    -- ========================================================
+
+    SELECT *
+    INTO v_original_log
+    FROM public.inventory_valuation_logs
+    WHERE inventory_movement_id = v_original.id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Original valuation log tidak ditemukan.';
+    END IF;
+
+
+    -- ========================================================
+    -- 7. CALCULATE ORIGINAL AND PREVIOUS REVERSALS
+    -- ========================================================
+
+    v_original_quantity :=
+        ABS(v_original.quantity_delta);
+
+    v_reversal_quantity :=
+        ABS(v_reversal.quantity_delta);
+
+    SELECT
+        COALESCE(SUM(ABS(m.quantity_delta)), 0),
+        COALESCE(SUM(ABS(l.inventory_value_delta)), 0)
+    INTO
+        v_previous_reversed_quantity,
+        v_previous_reversed_value
+    FROM public.inventory_movements m
+    JOIN public.inventory_valuation_logs l
+      ON l.inventory_movement_id = m.id
+    WHERE m.reversal_of_id = v_original.id
+      AND m.status = 'posted';
+
+    v_remaining_quantity :=
+        v_original_quantity - v_previous_reversed_quantity;
+
+    IF v_remaining_quantity <= 0 THEN
+        RAISE EXCEPTION
+            'Original movement sudah direversal seluruhnya.';
+    END IF;
+
+    IF v_reversal_quantity > v_remaining_quantity THEN
+        RAISE EXCEPTION
+            'Total reversal melebihi quantity original yang tersisa.';
+    END IF;
+
+
+    -- ========================================================
+    -- 8. CALCULATE HISTORICAL REVERSAL VALUE
+    -- ========================================================
+
+    v_original_value :=
+        ABS(v_original_log.inventory_value_delta);
+
+    IF v_reversal_quantity = v_remaining_quantity THEN
+
+        -- Reversal terakhir menggunakan sisa nilai historis
+        -- untuk menghindari akumulasi selisih pembulatan.
+
+        v_reversal_value :=
+            v_original_value - v_previous_reversed_value;
+
+    ELSE
+
+        v_reversal_value := ROUND(
+            v_original_value
+            * v_reversal_quantity
+            / v_original_quantity,
+            4
+        );
+
+    END IF;
+
+    IF v_reversal_value < 0 THEN
+        RAISE EXCEPTION
+            'Perhitungan historical reversal value tidak valid.';
+    END IF;
+
+    -- Reversal harus berlawanan dengan nilai transaksi asal.
+    IF v_original_log.inventory_value_delta > 0 THEN
+        v_value_delta := -v_reversal_value;
+    ELSIF v_original_log.inventory_value_delta < 0 THEN
+        v_value_delta := v_reversal_value;
+    ELSE
+        v_value_delta := 0;
+    END IF;
+
+
+    -- ========================================================
+    -- 9. LOCK INVENTORY BALANCE
+    -- ========================================================
+
+    SELECT *
+    INTO v_balance
+    FROM public.inventory_balances
+    WHERE product_variant_id = v_original.product_variant_id
+      AND warehouse_id = v_original.warehouse_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Inventory balance tidak ditemukan.';
+    END IF;
+
+    v_quantity_before := v_balance.on_hand_quantity;
+    v_value_before := v_balance.inventory_value;
+    v_average_before := v_balance.average_unit_cost;
+
+
+   -- ========================================================
+-- 10. VALIDATE AVAILABLE STATUS BUCKET
+-- ========================================================
+
+v_balance_status_quantity := CASE v_original.inventory_status
+    WHEN 'available' THEN v_balance.available_quantity
+    WHEN 'reserved' THEN v_balance.reserved_quantity
+    WHEN 'quarantine' THEN v_balance.quarantine_quantity
+    WHEN 'damaged' THEN v_balance.damaged_quantity
+    WHEN 'repair' THEN v_balance.repair_quantity
+    ELSE NULL
+END;
+
+IF v_balance_status_quantity IS NULL THEN
+    RAISE EXCEPTION
+        'Status inventory tidak valid: %',
+        v_original.inventory_status;
+END IF;
+
+IF v_reversal.quantity_delta < 0
+   AND v_balance_status_quantity < v_reversal_quantity
+THEN
+    RAISE EXCEPTION
+        'Saldo status inventory tidak mencukupi untuk reversal.';
+END IF;
+    -- ========================================================
+    -- 11. CALCULATE NEW BALANCE
+    -- ========================================================
+
+    v_quantity_after :=
+        v_quantity_before + v_reversal.quantity_delta;
+
+    v_value_after :=
+        v_value_before + v_value_delta;
+
+    IF v_quantity_after < 0 THEN
+        RAISE EXCEPTION
+            'Reversal menyebabkan kuantitas persediaan negatif.';
+    END IF;
+
+    IF v_value_after < 0 THEN
+        RAISE EXCEPTION
+            'Reversal menyebabkan nilai persediaan negatif.';
+    END IF;
+
+    IF v_quantity_after = 0 THEN
+
+        IF ABS(v_value_after) > 0.0001 THEN
+            RAISE EXCEPTION
+                'Nilai persediaan harus nol ketika kuantitas menjadi nol.';
+        END IF;
+
+        v_value_after := 0;
+        v_average_after := 0;
+
+    ELSE
+
+        v_average_after := ROUND(
+            v_value_after / v_quantity_after,
+            6
+        );
+
+    END IF;
+
+
+    -- ========================================================
+    -- 12. UPDATE INVENTORY BALANCES
+    -- ========================================================
+
+    UPDATE public.inventory_balances
+    SET
+        available_quantity =
+            available_quantity
+            + CASE WHEN v_original.inventory_status = 'available'
+                   THEN v_reversal.quantity_delta ELSE 0 END,
+
+        reserved_quantity =
+            reserved_quantity
+            + CASE WHEN v_original.inventory_status = 'reserved'
+                   THEN v_reversal.quantity_delta ELSE 0 END,
+
+        quarantine_quantity =
+            quarantine_quantity
+            + CASE WHEN v_original.inventory_status = 'quarantine'
+                   THEN v_reversal.quantity_delta ELSE 0 END,
+
+        damaged_quantity =
+            damaged_quantity
+            + CASE WHEN v_original.inventory_status = 'damaged'
+                   THEN v_reversal.quantity_delta ELSE 0 END,
+
+        repair_quantity =
+            repair_quantity
+            + CASE WHEN v_original.inventory_status = 'repair'
+                   THEN v_reversal.quantity_delta ELSE 0 END,
+
+        on_hand_quantity = v_quantity_after,
+        inventory_value = v_value_after,
+        average_unit_cost = v_average_after,
+        updated_at = NOW()
+
+    WHERE id = v_balance.id;
+
+
+    -- ========================================================
+    -- 13. POST REVERSAL MOVEMENT
+    -- ========================================================
+
+    UPDATE public.inventory_movements
+    SET
+        product_id = v_product_id,
+        status = 'posted',
+        posted_by = v_user_id,
+        posted_at = NOW()
+    WHERE id = v_reversal.id;
+
+
+    -- ========================================================
+    -- 14. CREATE REVERSAL VALUATION LOG
+    -- ========================================================
+
+    INSERT INTO public.inventory_valuation_logs (
+        inventory_movement_id,
+        product_variant_id,
+        product_id,
+        warehouse_id,
+        transaction_type,
+        quantity_before,
+        quantity_after,
+        quantity_delta,
+        value_before,
+        value_after,
+        inventory_value_delta,
+        average_cost_before,
+        average_cost_after,
+        created_by
+    )
+    VALUES (
+        v_reversal.id,
+        v_reversal.product_variant_id,
+        v_product_id,
+        v_reversal.warehouse_id,
+        v_reversal.movement_type,
+        v_quantity_before,
+        v_quantity_after,
+        v_reversal.quantity_delta,
+        v_value_before,
+        v_value_after,
+        v_value_delta,
+        v_average_before,
+        v_average_after,
+        v_user_id
+    );
+
+
+    RETURN v_reversal.id;
+
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.create_inventory_transfer_by_product(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.post_inventory_transfer_unlocked(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.post_inventory_transfer_unlocked(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.post_inventory_transfer(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.post_inventory_transfer(uuid) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.post_inventory_reversal_unlocked(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.post_inventory_reversal_unlocked(uuid, uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.post_inventory_reversal(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.post_inventory_reversal(uuid, uuid) TO authenticated, service_role;
+
 -- Internal function is never directly executable by authenticated/anon/PUBLIC.
 REVOKE ALL ON FUNCTION public.post_inventory_movement_unlocked(uuid, numeric) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.post_inventory_movement_unlocked(uuid, numeric) TO service_role;

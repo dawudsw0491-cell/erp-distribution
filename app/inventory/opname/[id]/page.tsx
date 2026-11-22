@@ -66,6 +66,7 @@ type OpnameItemRow = {
   id: string;
   session_id: string;
   product_id: string | null;
+  product_variant_id: string;
   inventory_status: string;
   snapshot_quantity: number;
   counted_quantity: number | null;
@@ -89,6 +90,7 @@ type ProductRow = {
 type ProductUnitRow = {
   id: string;
   product_id: string | null;
+  product_variant_id: string;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -356,6 +358,7 @@ async function StockOpnameDetailContent({
         id,
         session_id,
         product_id,
+        product_variant_id,
         inventory_status,
         snapshot_quantity,
         counted_quantity,
@@ -512,6 +515,7 @@ async function StockOpnameDetailContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -589,7 +593,7 @@ async function StockOpnameDetailContent({
 
   const itemUnits = units.filter(
     (unit) =>
-      unit.product_id === item.product_id &&
+      unit.product_variant_id === item.product_variant_id &&
       unit.unit_status === item.inventory_status
   );
 

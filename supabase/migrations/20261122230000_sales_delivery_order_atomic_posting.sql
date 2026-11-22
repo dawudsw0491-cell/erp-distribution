@@ -13,6 +13,7 @@ declare
   v_user_id uuid := auth.uid();
   v_do public.delivery_orders%rowtype;
   v_so public.sales_orders%rowtype;
+  v_sales_order_id uuid;
   v_customer_active boolean;
   v_line record;
   v_total_requested numeric(18,3);
@@ -24,20 +25,32 @@ begin
     raise exception 'Permission sales.create diperlukan.';
   end if;
 
+  -- Global lock order is Sales Order -> Delivery Order -> warehouse.
+  -- Cancellation also locks the Sales Order before touching its draft DOs;
+  -- acquiring the DO first here would create a lock-order inversion.
+  select d.sales_order_id
+    into v_sales_order_id
+  from public.delivery_orders d
+  where d.id = p_delivery_order_id;
+  if not found then raise exception 'Delivery Order tidak ditemukan.'; end if;
+
+  select * into v_so
+  from public.sales_orders
+  where id = v_sales_order_id
+  for update;
+  if not found then raise exception 'Sales Order tidak ditemukan.'; end if;
+
   select * into v_do
   from public.delivery_orders
   where id = p_delivery_order_id
   for update;
   if not found then raise exception 'Delivery Order tidak ditemukan.'; end if;
+  if v_do.sales_order_id <> v_so.id then
+    raise exception 'Referensi Sales Order pada Delivery Order berubah.';
+  end if;
   if v_do.status <> 'draft' then
     raise exception 'Hanya Delivery Order draft yang dapat diposting.';
   end if;
-
-  select * into v_so
-  from public.sales_orders
-  where id = v_do.sales_order_id
-  for update;
-  if not found then raise exception 'Sales Order tidak ditemukan.'; end if;
   if v_so.status not in ('confirmed','partially_delivered') then
     raise exception 'Sales Order tidak berada pada status yang dapat dikirim.';
   end if;

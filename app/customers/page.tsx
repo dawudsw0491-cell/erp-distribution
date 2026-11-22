@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import ErpSidebar from "@/components/layout/erp-sidebar";
+import MasterDataLoading from "@/components/layout/master-data-loading";
 
 export const metadata = {
   title: "Master Pelanggan | HEXACORE ERP",
@@ -424,23 +424,13 @@ export default function CustomersPage({
   searchParams: SearchParams;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 md:flex-row">
-      <ErpSidebar activePath="/customers" />
-
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl p-6 lg:p-8">
-          <div className="mb-6 text-sm text-gray-500">
-            Master Data / Master Pelanggan
-          </div>
-
-          <Suspense
-            fallback={null}
-          >
-            <CustomerContent searchParams={searchParams} />
-          </Suspense>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen min-w-0 flex-1 bg-gray-50">
+      <div className="mx-auto max-w-7xl p-6 lg:p-8">
+        <Suspense fallback={<MasterDataLoading label="Master Pelanggan" />}>
+          <CustomerContent searchParams={searchParams} />
+        </Suspense>
+      </div>
+    </main>
   );
 }
 

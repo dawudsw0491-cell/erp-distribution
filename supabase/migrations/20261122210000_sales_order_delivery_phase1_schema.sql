@@ -242,9 +242,18 @@ begin
       sales_order_id, product_id, product_variant_id, quantity, unit_price
     ) values (v_order_id, v_product_id, v_variant_id, v_quantity, v_unit_price);
   end loop;
+
+  update public.sales_orders
+  set subtotal = coalesce((
+    select sum(i.line_total)
+    from public.sales_order_items i
+    where i.sales_order_id = v_order_id
+  ),0)
+  where id = v_order_id;
+
   return v_order_id;
 end;
-$$;
+$;
 
 create or replace function public.sales_confirm_order(p_sales_order_id uuid)
 returns uuid
@@ -311,6 +320,12 @@ begin
   ) then
     raise exception 'Sales Order dengan pengiriman terposting tidak dapat dibatalkan.';
   end if;
+
+  -- A cancelled SO cannot retain an actionable draft DO.
+  update public.delivery_orders
+  set status='cancelled', updated_at=now()
+  where sales_order_id=v_order.id and status='draft';
+
   update public.sales_orders
   set status='cancelled', cancelled_by=v_user_id, cancelled_at=now(), updated_at=now()
   where id=v_order.id;

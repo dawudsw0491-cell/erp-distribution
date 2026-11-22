@@ -137,3 +137,20 @@ The follow-up read-only audit found that the conflict is broader than the origin
 - The complete evidence, exact source references, and non-destructive remediation phases are recorded in `docs/INVENTORY_VARIANT_IDENTITY_AUDIT.md`.
 
 This means the Sales blocker cannot be resolved by changing the balance constraint alone or by introducing a second parallel variant balance table. All active posting/read paths and historical data treatment must be reconciled as one migration plan. SALES-001 remains blocked; no Sales schema or posting implementation is authorized before MD-014 passes its Development validation gates.
+
+
+### 10.2 Variant-keyed Inventory migration applied; Sales posting permission bridge required
+
+MD-014 has now been applied to `erp-distribution-dev` as migration `20261122111715 md014_variant_inventory_movement`. Read-only post-apply checks confirm the six affected tables retained their row counts, historical Product-only rows remain unresolved (no guessed Variant mapping), Variant/Product parent mismatches are zero, and active Variant + Warehouse uniqueness is enforced with partial indexes. See `docs/INVENTORY_VARIANT_IDENTITY_AUDIT.md` §13.2.
+
+A bounded Sales prerequisite inspection then found that the current `public.post_inventory_movement_unlocked(uuid,numeric)` requires `inventory.update` for every movement before it reads the movement row. The existing `create_inventory_movement` RPC also requires `inventory.update`. Granting `inventory.update` to all Sales users would improperly expose manual inventory adjustments.
+
+Required narrow bridge before DO posting:
+
+- Sales RPC validates `sales.create`, active customer, confirmed SO, exact warehouse scope, product Variant tracking policy, reservation priority, and outstanding quantity.
+- Sales RPC inserts the outbound movement with immutable `source_reference_type='delivery_order'` and DO line reference.
+- The shared internal posting boundary permits a `sale` movement only when it is linked to a valid DO and caller has `sales.create`; all other movement types continue to require `inventory.update`.
+- The bridge must verify `has_warehouse_access(warehouse_id)` and lock the warehouse before allocation/posting. It must not set a forged service-role claim or widen warehouse access.
+- One database transaction must post the movement, update the Variant balance and valuation log, transition serialized unit state when applicable, and mark DO/SO fulfillment metadata.
+
+No Sales table or posting RPC has been created yet. The current Sales tables/RPC count is zero in Development. Existing `sales.create` and `sales.view` permissions are present; do not add redundant permission codes until the exact action matrix is proven. Sales Invoice remains Phase 2 and finance/AR/GL posting remains excluded.

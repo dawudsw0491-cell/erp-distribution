@@ -33,6 +33,8 @@ $old$;
                  AND d.warehouse_id = v_movement.warehouse_id
                  AND doi.product_id = v_movement.product_id
                  AND doi.product_variant_id = v_movement.product_variant_id
+                 AND doi.product_unit_id IS NOT DISTINCT FROM v_movement.product_unit_id
+                 AND v_movement.quantity_delta = -doi.quantity
                  AND soi.product_id = doi.product_id
                  AND soi.product_variant_id = doi.product_variant_id
                  AND d.sales_order_id = soi.sales_order_id

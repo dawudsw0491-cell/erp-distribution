@@ -471,15 +471,15 @@ async function StockOpnameDetailContent({
   // Item snapshot nol tetap dikirim agar muncul pada pemeriksaan tambahan.
   const bulkQuantityItems = items
     .filter((item) => {
-      const product = item.product_id
-        ? item.product_variant_id ? productMap.get(item.product_variant_id) : undefined
+      const product = item.product_variant_id
+        ? productMap.get(item.product_variant_id)
         : undefined;
 
       return product?.tracking_type === "quantity" || product?.tracking_type === "imei";
     })
     .map((item) => {
-      const product = item.product_id
-        ? productMap.get(item.product_id)
+      const product = item.product_variant_id
+        ? productMap.get(item.product_variant_id)
         : undefined;
 
       return {
@@ -515,8 +515,8 @@ async function StockOpnameDetailContent({
     });
 
   const serializedItems = items.filter((item) => {
-    const product = item.product_id
-      ? productMap.get(item.product_id)
+    const product = item.product_variant_id
+      ? productMap.get(item.product_variant_id)
       : undefined;
 
     return (
@@ -611,7 +611,7 @@ async function StockOpnameDetailContent({
 
   const itemUnits = units.filter(
     (unit) =>
-      !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
+      !!item.product_variant_id && !!unit.product_variant_id && !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
       unit.unit_status === item.inventory_status
   );
 
@@ -1040,8 +1040,8 @@ async function StockOpnameDetailContent({
                     </div>
 
                     {serializedItems.map((item) => {
-                      const product = item.product_id
-                        ? productMap.get(item.product_id)
+                      const product = item.product_variant_id
+                        ? productMap.get(item.product_variant_id)
                         : undefined;
 
                       const trackingType =
@@ -1063,7 +1063,7 @@ async function StockOpnameDetailContent({
 
                       const itemUnits = units.filter(
                         (unit) =>
-                          unit.product_variant_id === item.product_variant_id &&
+                          !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
                           unit.unit_status === item.inventory_status
                       );
 

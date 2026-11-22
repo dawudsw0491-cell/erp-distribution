@@ -3051,6 +3051,7 @@ END IF;
 END;
 $function$;
 
+REVOKE ALL ON FUNCTION public.create_inventory_movement_by_product(uuid, uuid, character varying, numeric, character varying, uuid, character varying, character varying, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.create_inventory_transfer_by_product(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_inventory_transfer(uuid, uuid, uuid, numeric, character varying, uuid, text) TO authenticated, service_role;
@@ -3068,12 +3069,6 @@ GRANT EXECUTE ON FUNCTION public.post_inventory_reversal(uuid, uuid) TO authenti
 
 
 -- Purchase Order lines persist Product ID only as a validated Variant parent.
-UPDATE public.purchase_order_items poi
-SET product_id = pv.product_id
-FROM public.product_variants pv
-WHERE pv.id = poi.product_variant_id
-  AND poi.product_id IS DISTINCT FROM pv.product_id;
-
 ALTER TABLE public.purchase_order_items
     ADD CONSTRAINT fk_purchase_order_items_variant_product
     FOREIGN KEY (product_variant_id, product_id)

@@ -37,6 +37,13 @@ type ProductRow = {
   unit: string;
 };
 
+type VariantRow = {
+  id: string;
+  product_id: string;
+  variant_sku: string;
+  variant_name: string;
+};
+
 type WarehouseRow = {
   id: string;
   warehouse_code: string;
@@ -186,6 +193,7 @@ async function StockTransferContent({
     warehouseResult,
     unitResult,
     movementResult,
+    variantResult,
   ] = await Promise.all([
     supabase
       .from("products")
@@ -234,13 +242,20 @@ async function StockTransferContent({
       .in("movement_type", ["transfer_out", "transfer_in"])
       .order("created_at", { ascending: false })
       .limit(2000),
+
+    supabase
+      .from("product_variants")
+      .select("id, product_id, variant_sku, variant_name")
+      .eq("is_active", true)
+      .order("variant_sku", { ascending: true }),
   ]);
 
   const hasError =
     productResult.error ||
     warehouseResult.error ||
     unitResult.error ||
-    movementResult.error;
+    movementResult.error ||
+    variantResult.error;
 
   if (hasError) {
     console.error("Stock Transfer query failed:", {
@@ -248,6 +263,7 @@ async function StockTransferContent({
       warehouse: warehouseResult.error,
       unit: unitResult.error,
       movement: movementResult.error,
+      variant: variantResult.error,
     });
 
     return (
@@ -272,6 +288,12 @@ async function StockTransferContent({
   const warehouses = (warehouseResult.data ?? []) as WarehouseRow[];
   const units = (unitResult.data ?? []) as unknown as UnitRow[];
   const movements = (movementResult.data ?? []) as MovementRow[];
+  const variantRows = (variantResult.data ?? []) as VariantRow[];
+  const variants = variantRows.flatMap((variant) => {
+    const product = products.find((item) => item.id === variant.product_id);
+    if (!product) return [];
+    return [{ ...variant, product_name: product.product_name, tracking_type: product.tracking_type }];
+  });
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
@@ -511,7 +533,7 @@ async function StockTransferContent({
                 Transfer memerlukan minimal dua gudang aktif.
                 Tambahkan gudang melalui Master Data terlebih dahulu.
               </div>
-            ) : products.length === 0 ? (
+            ) : variants.length === 0 ? (
               <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 Belum tersedia produk aktif untuk ditransfer.
               </div>
@@ -529,7 +551,7 @@ async function StockTransferContent({
                   </label>
                   <select
                     id="transfer-product"
-                    name="product_id"
+                    name="product_variant_id"
                     required
                     defaultValue=""
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
@@ -537,9 +559,9 @@ async function StockTransferContent({
                     <option value="" disabled>
                       Pilih produk
                     </option>
-                    {products.map((product) => (
+                    {variants.map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.product_name} ({product.sku}) -{" "}
+                        {product.product_name} · {product.variant_sku} ({product.variant_name}) -{" "}
                         {trackingLabel(product.tracking_type)}
                       </option>
                     ))}

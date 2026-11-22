@@ -29,6 +29,14 @@ BEGIN
 END;
 $preflight$;
 
+-- Remove legacy Product-keyed uniqueness before synchronizing Product IDs
+-- from canonical Variant IDs. Multiple Variants of one Product may coexist
+-- in the same Warehouse and Stock Opname session after this transition.
+ALTER TABLE public.inventory_balances
+  DROP CONSTRAINT IF EXISTS uq_inventory_balance_product_warehouse;
+ALTER TABLE public.stock_opname_items
+  DROP CONSTRAINT IF EXISTS uq_stock_opname_product;
+
 -- Product ID is retained only as a validated denormalized parent reference.
 UPDATE public.purchase_order_items poi
 SET product_id = pv.product_id

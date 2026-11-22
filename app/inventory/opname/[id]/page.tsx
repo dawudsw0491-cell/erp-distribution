@@ -454,19 +454,18 @@ async function StockOpnameDetailContent({
   const parentProducts = new Map<string, ProductRow>(
     ((productResult.data ?? []) as ProductRow[]).map((product) => [product.id, product])
   );
-  const productMap = new Map<string, ProductRow>(
-    (variantResult.data ?? []).flatMap((variant) => {
-      const parent = parentProducts.get(variant.product_id);
-      if (!parent) return [];
-      return [[variant.id, {
-        id: variant.id,
-        sku: variant.variant_sku,
-        product_name: parent.product_name + " · " + variant.variant_name,
-        tracking_type: parent.tracking_type,
-        unit: parent.unit,
-      } as ProductRow]];
-    })
-  );
+  const productMap = new Map<string, ProductRow>();
+  for (const variant of variantResult.data ?? []) {
+    const parent = parentProducts.get(variant.product_id);
+    if (!parent) continue;
+    productMap.set(variant.id, {
+      id: variant.id,
+      sku: variant.variant_sku,
+      product_name: parent.product_name + " · " + variant.variant_name,
+      tracking_type: parent.tracking_type,
+      unit: parent.unit,
+    });
+  }
 
   // Item quantity dikirim ke komponen bulk.
   // Item snapshot nol tetap dikirim agar muncul pada pemeriksaan tambahan.

@@ -60,6 +60,7 @@ type PurchaseOrderDetail = {
   } | null;
   items: {
     id: string;
+    product_variant_id: string | null;
     quantity: number;
     received_quantity: number;
     unit_cost: number;
@@ -70,6 +71,10 @@ type PurchaseOrderDetail = {
     product: {
       sku: string;
       product_name: string;
+    } | null;
+    variant: {
+      variant_sku: string;
+      variant_name: string | null;
     } | null;
   }[];
 };
@@ -216,6 +221,7 @@ export default async function PurchaseOrderDetailPage({
       ),
       items:purchase_order_items (
         id,
+        product_variant_id,
         quantity,
         received_quantity,
         unit_cost,

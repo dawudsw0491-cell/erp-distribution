@@ -28,6 +28,7 @@ type Identifier = {
 type UnitRow = {
   id: string;
   product_id: string | null;
+  product_variant_id: string;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -40,6 +41,10 @@ type UnitRow = {
     sku: string;
     product_name: string;
     tracking_type: string;
+  } | null;
+  product_variants: {
+    variant_sku: string;
+    variant_name: string;
   } | null;
   warehouses: {
     warehouse_code: string;
@@ -179,6 +184,7 @@ async function UnitRegistryContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -191,6 +197,10 @@ async function UnitRegistryContent({
           sku,
           product_name,
           tracking_type
+        ),
+        product_variants!product_units_product_variant_id_fkey (
+          variant_sku,
+          variant_name
         ),
         warehouses (
           warehouse_code,
@@ -260,7 +270,7 @@ async function UnitRegistryContent({
         unit.unit_code,
         unit.unit_status,
         unit.notes ?? "",
-        unit.products?.sku ?? "",
+        unit.product_variants?.variant_sku ?? "",
         unit.products?.product_name ?? "",
         unit.warehouses?.warehouse_name ?? "",
         unit.warehouses?.warehouse_code ?? "",
@@ -513,10 +523,10 @@ async function UnitRegistryContent({
 
                           <td className="px-4 py-4">
                             <p className="font-semibold text-slate-900">
-                              {unit.products?.product_name ?? "Produk legacy"}
+                              {unit.products?.product_name ?? "Produk legacy"} · {unit.product_variants?.variant_name ?? "Variant"}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              SKU: {unit.products?.sku ?? "-"}
+                              SKU Variant: {unit.product_variants?.variant_sku ?? "-"}
                             </p>
                             {unit.products?.tracking_type && (
                               <p className="mt-1 text-xs text-slate-400">

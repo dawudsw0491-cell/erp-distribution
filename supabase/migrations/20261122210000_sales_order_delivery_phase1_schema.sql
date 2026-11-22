@@ -208,6 +208,9 @@ begin
   if not exists (select 1 from public.customers c where c.id=p_customer_id and c.is_active) then
     raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
   end if;
+  if length(coalesce(p_notes,'')) > 2000 then
+    raise exception 'Catatan Sales Order maksimal 2000 karakter.';
+  end if;
   if p_items is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items)=0 or jsonb_array_length(p_items)>100 then
     raise exception 'Sales Order wajib memiliki minimal satu baris.';
   end if;
@@ -385,6 +388,10 @@ begin
     raise exception 'Akses warehouse ditolak.';
   end if;
   perform public.lock_inventory_warehouse(v_order.warehouse_id);
+
+  if length(coalesce(p_notes,'')) > 2000 then
+    raise exception 'Catatan Delivery Order maksimal 2000 karakter.';
+  end if;
 
   if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items)=0 then
     raise exception 'Delivery Order wajib memiliki minimal satu baris.';

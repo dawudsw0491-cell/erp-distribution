@@ -170,7 +170,7 @@ export default function ErpSidebar({
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  if (isMasterDataRoute && !persistent) return null;
+  if (!persistent) return null;
 
   function toggleGroup(label: string, currentlyExpanded: boolean) {
     setExpandedGroups((previous) => ({

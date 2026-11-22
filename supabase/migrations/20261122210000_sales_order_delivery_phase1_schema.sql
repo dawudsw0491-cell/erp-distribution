@@ -256,7 +256,7 @@ begin
 
   return v_order_id;
 end;
-$;
+$$;
 
 create or replace function public.sales_confirm_order(p_sales_order_id uuid)
 returns uuid

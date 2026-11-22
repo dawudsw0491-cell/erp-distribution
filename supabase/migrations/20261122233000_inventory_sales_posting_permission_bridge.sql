@@ -17,6 +17,7 @@ $old$;
            OR v_movement.quantity_delta >= 0
            OR v_movement.inventory_status <> 'available'
            OR NOT public.has_permission('sales.create')
+           OR NOT public.has_warehouse_access(v_movement.warehouse_id)
            OR NOT EXISTS (
                SELECT 1
                FROM public.delivery_order_items doi

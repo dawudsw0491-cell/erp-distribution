@@ -286,7 +286,7 @@ Read-only Development verification on 2026-11-22:
 - The canonical inventory posting function still contains the exact permission gate and movement-lock/read block expected by the bridge migration; both exact source blocks match the live function definition.
 - The bridge therefore has a verified source precondition, but its SQL has not been executed against Development.
 
-Remaining gates: test clean ordered migration replay in an isolated database, inspect resulting function ACL/RLS and security advisors, test SO edit-while-draft (not yet implemented), test partial DO and serialized unit cases, rollback and concurrent posting, then run TypeScript/lint/build and authenticated end-to-end validation. No Sales migration has been applied to Development or Production.
+Remaining gates: test clean ordered migration replay in an isolated database, inspect resulting function ACL/RLS and security advisors, test SO edit-while-draft, test partial DO and serialized unit cases, rollback and concurrent posting, then run TypeScript/lint/build and authenticated end-to-end validation. No Sales migration has been applied to Development or Production.
 
 
 ## 10.12 Draft Sales Order editing and RPC boundary hardening — 2026-11-22

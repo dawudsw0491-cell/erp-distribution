@@ -1,7 +1,7 @@
 # MD-014 — Canonical Variant-Level Inventory Implementation
 
 **Backlog:** MD-014 (P0)  
-**Status:** Source implementation design baseline  
+**Status:** Phase 1 movement/valuation source port committed; database application blocked by legacy Product-only identities  
 **Environment:** Development only for future validation; no live database mutation is authorized by this document  
 **Branch:** `fix/engineering-governance-masterdata-consolidation-20261120`
 
@@ -129,3 +129,13 @@ The selected disposition is reset of application-entered test transactions after
 - No reset execution in this work package.
 - No Production deployment, database migration application, destructive DDL/DML, trigger disabling, or ACL/RLS relaxation.
 - No unrelated Master Data or UI redesign.
+
+
+## 8. Execution update — 2026-11-22
+
+- Implemented the Variant-level `post_inventory_movement_unlocked` port in migration `supabase/migrations/20261122072517_md014_variant_inventory_movement.sql` using the established Variant-oriented source behavior from `database/33_inventory_posting_functions.sql`.
+- Preserved the public posting wrapper, warehouse lock, authentication and `inventory.update` permission check, approval separation and `finance.approve` requirement, movement-type restrictions, serialized-unit checks, per-status bucket validation, moving-average calculation, valuation append, and internal function EXECUTE restriction.
+- Added fail-closed preflight for Product-only balances, movements, valuation logs and Product Units; added Variant `NOT NULL` invariants, Variant + Warehouse uniqueness, and composite Product/Variant parent constraints. Existing `uq_product_variants_id_product` was verified and reused rather than recreated.
+- The current Development snapshot still contains legacy rows with NULL `product_variant_id`, so this migration is intentionally not applicable yet. It has not been run against Development; no database objects or rows were changed.
+- Source commits: `8199c4e0ab87973bc47894ebbf0f75115fcaac8e` (initial port), followed by `27e70fdc714609048f6ac33ba62b5e469f1e6fd` (redundant DDL correction).
+- Remaining implementation: SQL syntax/replay validation on a clean disposable baseline; Goods Receipt partial-IMEI port; transfer and reversal; Stock Opname; application read/write contracts; transaction, role, warehouse-scope and rollback tests. No reset or Production operation is authorized by this update.

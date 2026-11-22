@@ -256,7 +256,7 @@ Sales Invoice remains outside this Phase 1 slice. No invoice, payment, tax, AR, 
 ## 10.9 Narrow inventory permission bridge — source committed
 
 Migration:
-- `supabase/migrations/20261122233000_inventory_sales_posting_permission_bridge.sql`
+- `supabase/migrations/20261122220000_inventory_sales_posting_permission_bridge.sql`
 - Reads the canonical `post_inventory_movement_unlocked(uuid,numeric)` definition using `pg_get_functiondef`, verifies the exact expected original permission gate and movement-lock/read block, then changes only the authorization gate.
 - The `sale` exception requires `source_reference_type='delivery_order'`, a source DO line linked back to the same movement ID, matching product, variant, DO warehouse and SO relationship, a draft DO, current user's `sales.create`, warehouse access, and movement creator identity.
 - Non-sale movements retain the existing `inventory.update` requirement. Manual movement creation and the public wrapper were not changed. The internal unlocked function ACL remains unchanged; authenticated callers do not receive direct execute access.
@@ -268,3 +268,22 @@ The complete migration sequence remains unapplied. Explicit Development approval
 ## 10.10 Serialized delivery composition refinement
 
 The DO composer now supports multiple rows referencing the same SO line. This is required when a serialized SO quantity is fulfilled by multiple distinct Product Units. Client validation prevents duplicate unit selection and quantities above the SO line's remaining outstanding quantity. The server-side aggregate guard remains authoritative and prevents duplicate SO-line references from bypassing the remaining quantity.
+
+
+## 10.11 Ordered migration and live Development verification — 2026-11-22
+
+The Sales migration set is now ordered by dependency:
+1. `20261122210000_sales_order_delivery_phase1_schema.sql` — SO/DO tables, RLS, derived fulfillment view and SO/DO draft lifecycle RPCs.
+2. `20261122220000_inventory_sales_posting_permission_bridge.sql` — narrow authorization bridge, applied after Sales source tables exist and before the atomic posting RPC.
+3. `20261122230000_sales_delivery_order_atomic_posting.sql` — atomic DO posting.
+4. `20261122231500_sales_delivery_order_quantity_guard.sql` — aggregate quantity and duplicate Product Unit guard for draft DO creation.
+
+The previous `20261122223000_sales_delivery_posting_permission_bridge.sql` full-function replacement was removed before any database application because it conflicted with the later fail-closed bridge transformation. It is not part of the active migration set.
+
+Read-only Development verification on 2026-11-22:
+- The live migration ledger contains MD-014 `20261122111715` as its latest applied project migration.
+- No `sales_orders`, `sales_order_items`, `delivery_orders`, `delivery_order_items`, or `sales_*` RPC functions exist in Development.
+- The canonical inventory posting function still contains the exact permission gate and movement-lock/read block expected by the bridge migration; both exact source blocks match the live function definition.
+- The bridge therefore has a verified source precondition, but its SQL has not been executed against Development.
+
+Remaining gates: test clean ordered migration replay in an isolated database, inspect resulting function ACL/RLS and security advisors, test SO edit-while-draft (not yet implemented), test partial DO and serialized unit cases, rollback and concurrent posting, then run TypeScript/lint/build and authenticated end-to-end validation. No Sales migration has been applied to Development or Production.

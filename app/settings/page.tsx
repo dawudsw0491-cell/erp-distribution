@@ -47,19 +47,16 @@ export default async function SettingsPage() {
 
   const [
     usersAccess,
-    roleAccess,
     masterAccess,
     auditAccess,
   ] = await Promise.all([
     getAuthorizationContext("users.manage"),
-    getAuthorizationContext("roles.manage"),
     getAuthorizationContext("master.view"),
     getAuthorizationContext("audit.view"),
   ]);
 
-  const user = usersAccess.user ?? roleAccess.user ?? masterAccess.user ?? auditAccess.user;
-  const profile =
-    usersAccess.profile ?? roleAccess.profile ?? masterAccess.profile ?? auditAccess.profile;
+  const user = usersAccess.user ?? masterAccess.user ?? auditAccess.user;
+  const profile = usersAccess.profile ?? masterAccess.profile ?? auditAccess.profile;
 
   if (!user) {
     redirect("/login");
@@ -67,13 +64,13 @@ export default async function SettingsPage() {
 
   const availableItems: SettingItem[] = [];
 
-  if (usersAccess.authorized || roleAccess.authorized) {
+  if (usersAccess.authorized) {
     availableItems.push({
       title: "Pengguna dan Akses",
       description:
         "Kelola akun pengguna, penetapan role, status akun, dan proses administrasi pengguna yang sudah tersedia.",
       href: "/users",
-      permissionLabel: usersAccess.authorized ? "users.manage" : "roles.manage",
+      permissionLabel: "users.manage",
     });
   }
 

@@ -31,6 +31,7 @@ type MovementRow = {
   id: string;
   movement_group_id: string | null;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -238,13 +239,11 @@ async function StockMovementContent({
       supabase
         .from("products")
         .select("id, sku, product_name, tracking_type, unit, is_active")
-        .eq("is_active", true)
         .order("sku", { ascending: true })
         .limit(5000),
       supabase
         .from("product_variants")
-        .select("id, product_id, variant_sku, variant_name")
-        .eq("is_active", true)
+        .select("id, product_id, variant_sku, variant_name, is_active")
         .order("variant_sku", { ascending: true }),
     ]);
 
@@ -301,11 +300,14 @@ async function StockMovementContent({
     if (!product) return [];
     return [{
       id: variant.id,
+      product_id: variant.product_id,
       variant_sku: variant.variant_sku,
       variant_name: variant.variant_name,
       product_name: product.product_name,
+      tracking_type: product.tracking_type,
     }];
   });
+  const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
@@ -318,6 +320,9 @@ async function StockMovementContent({
   let rows = movements.map((movement) => ({
     movement,
     product: productMap.get(movement.product_id),
+    variant: movement.product_variant_id
+      ? variantMap.get(movement.product_variant_id)
+      : undefined,
     warehouse: warehouseMap.get(movement.warehouse_id),
   }));
 
@@ -342,7 +347,7 @@ async function StockMovementContent({
   if (keyword) {
     const search = keyword.toLowerCase();
 
-    rows = rows.filter(({ movement, product, warehouse }) =>
+    rows = rows.filter(({ movement, product, variant, warehouse }) =>
       [
         movement.id,
         movement.source_reference_number ?? "",
@@ -351,6 +356,8 @@ async function StockMovementContent({
         movement.movement_type,
         movement.status,
         movement.inventory_status ?? "",
+        variant?.variant_sku ?? "",
+        variant?.variant_name ?? "",
         product?.sku ?? "",
         product?.product_name ?? "",
         warehouse?.warehouse_name ?? "",
@@ -760,7 +767,7 @@ async function StockMovementContent({
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedRows.map(({ movement, product, warehouse }) => (
+                      {paginatedRows.map(({ movement, product, variant, warehouse }) => (
                         <tr
                           key={movement.id}
                           className="align-top hover:bg-blue-50/40"
@@ -786,8 +793,11 @@ async function StockMovementContent({
                               {product?.product_name ?? "Produk tidak ditemukan"}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              SKU: {product?.sku ?? "-"}
+                              SKU Variant: {variant?.variant_sku ?? (product?.sku ? `${product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                             </p>
+                            {variant?.variant_name && (
+                              <p className="mt-1 text-xs text-slate-400">{variant.variant_name}</p>
+                            )}
                           </td>
 
                           <td className="whitespace-nowrap px-4 py-4 text-slate-700">

@@ -1,26 +1,26 @@
 "use client";
 import Link from "next/link";
 import {useMemo,useState} from "react";
-import {createSalesOrderAction} from "../actions";
+import {createSalesOrderAction,updateDraftSalesOrderAction} from "../actions";
 type Customer={id:string;customer_code:string;customer_name:string};
 type Warehouse={id:string;warehouse_code:string;warehouse_name:string};
 type Variant={id:string;variant_sku:string;variant_name:string|null;product_name:string;tracking_type:string};
 type Item={product_variant_id:string;quantity:string;unit_price:string};
-export default function SalesOrderForm({customers,warehouses,variants}:{customers:Customer[];warehouses:Warehouse[];variants:Variant[]}) {
- const [items,setItems]=useState<Item[]>([{product_variant_id:variants[0]?.id??"",quantity:"1",unit_price:"0"}]);
+export default function SalesOrderForm({customers,warehouses,variants,mode="create",salesOrderId,initial}:{customers:Customer[];warehouses:Warehouse[];variants:Variant[];mode?:"create"|"edit";salesOrderId?:string;initial?:{customerId:string;warehouseId:string;orderDate:string;notes:string;items:Item[]}}) {
+ const [items,setItems]=useState<Item[]>(initial?.items?.length?initial.items:[{product_variant_id:variants[0]?.id??"",quantity:"1",unit_price:"0"}]);
  const total=useMemo(()=>items.reduce((s,i)=>s+Number(i.quantity||0)*Number(i.unit_price||0),0),[items]);
  const update=(index:number,key:keyof Item,value:string)=>setItems(rows=>rows.map((r,i)=>i===index?{...r,[key]:value}:r));
  const invalid=!customers.length||!warehouses.length||!variants.length||items.some(i=>!i.product_variant_id||!Number.isFinite(Number(i.quantity))||Number(i.quantity)<=0||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0);
- return <form action={createSalesOrderAction} className="space-y-5">
+ return <form action={mode==="edit"?updateDraftSalesOrderAction:createSalesOrderAction} className="space-y-5">\n {mode==="edit"&&salesOrderId&&<input type="hidden" name="sales_order_id" value={salesOrderId}/>}
  <section className="rounded-xl border bg-white p-5"><h2 className="font-semibold">Informasi Penjualan</h2><div className="mt-4 grid gap-4 md:grid-cols-2">
- <label className="text-sm font-medium">Pelanggan<select name="customer_id" required className="mt-2 w-full rounded-lg border p-2.5">{customers.map(c=><option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>)}</select></label>
- <label className="text-sm font-medium">Warehouse<select name="warehouse_id" required className="mt-2 w-full rounded-lg border p-2.5">{warehouses.map(w=><option key={w.id} value={w.id}>{w.warehouse_code} — {w.warehouse_name}</option>)}</select></label>
- <label className="text-sm font-medium">Tanggal Penjualan<input name="order_date" type="date" required defaultValue={new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})} className="mt-2 w-full rounded-lg border p-2.5"/></label>
- <label className="text-sm font-medium md:col-span-2">Catatan<textarea name="notes" maxLength={2000} rows={2} className="mt-2 w-full rounded-lg border p-2.5"/></label>
+ <label className="text-sm font-medium">Pelanggan<select name="customer_id" required defaultValue={initial?.customerId} className="mt-2 w-full rounded-lg border p-2.5">{customers.map(c=><option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>)}</select></label>
+ <label className="text-sm font-medium">Warehouse<select name="warehouse_id" required defaultValue={initial?.warehouseId} className="mt-2 w-full rounded-lg border p-2.5">{warehouses.map(w=><option key={w.id} value={w.id}>{w.warehouse_code} — {w.warehouse_name}</option>)}</select></label>
+ <label className="text-sm font-medium">Tanggal Penjualan<input name="order_date" type="date" required defaultValue={initial?.orderDate??new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})} className="mt-2 w-full rounded-lg border p-2.5"/></label>
+ <label className="text-sm font-medium md:col-span-2">Catatan<textarea name="notes" defaultValue={initial?.notes??""} maxLength={2000} rows={2} className="mt-2 w-full rounded-lg border p-2.5"/></label>
  </div></section>
  <section className="rounded-xl border bg-white p-5"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Detail Penjualan</h2><p className="text-xs text-slate-500">Produk menggunakan Product Variant kanonis.</p></div><button type="button" onClick={()=>setItems(r=>[...r,{product_variant_id:variants[0]?.id??"",quantity:"1",unit_price:"0"}])} className="rounded-lg border px-3 py-2 text-sm font-semibold">+ Tambah Baris</button></div>
  <div className="mt-4 space-y-3">{items.map((item,index)=><div key={index} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto]"><label className="text-xs font-semibold">Produk<select value={item.product_variant_id} onChange={e=>update(index,"product_variant_id",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm">{variants.map(v=><option key={v.id} value={v.id}>{v.variant_sku} — {v.product_name} {v.variant_name??""} ({v.tracking_type})</option>)}</select></label><label className="text-xs font-semibold">Kuantitas<input type="number" min="0.001" step="0.001" value={item.quantity} onChange={e=>update(index,"quantity",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm"/></label><label className="text-xs font-semibold">Harga jual<input type="number" min="0" step="0.01" value={item.unit_price} onChange={e=>update(index,"unit_price",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm"/></label><button type="button" disabled={items.length===1} onClick={()=>setItems(r=>r.filter((_,i)=>i!==index))} className="self-end px-2 py-2 text-sm text-red-600 disabled:opacity-30">Hapus</button></div>)}</div>
  <div className="mt-5 flex justify-end border-t pt-4"><div className="text-right"><p className="text-xs text-slate-500">Subtotal</p><p className="text-xl font-bold">{new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(total)}</p></div></div></section>
- <input type="hidden" name="items" value={JSON.stringify(items)}/><div className="flex justify-end gap-3"><Link href="/sales" className="rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold">Batal</Link><button disabled={invalid} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Simpan Draft SO</button></div>
+ <input type="hidden" name="items" value={JSON.stringify(items)}/><div className="flex justify-end gap-3"><Link href="/sales" className="rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold">Batal</Link><button disabled={invalid} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{mode==="edit"?"Simpan Perubahan":"Simpan Draft SO"}</button></div>
  </form>;
 }

@@ -35,6 +35,7 @@ type ProductRow = {
   product_name: string;
   tracking_type: string;
   unit: string;
+  is_active: boolean;
 };
 
 type VariantRow = {
@@ -42,6 +43,7 @@ type VariantRow = {
   product_id: string;
   variant_sku: string;
   variant_name: string;
+  is_active: boolean;
 };
 
 type WarehouseRow = {
@@ -53,6 +55,7 @@ type WarehouseRow = {
 type UnitRow = {
   id: string;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string | null;
   unit_code: string;
   unit_status: string;
@@ -66,6 +69,7 @@ type MovementRow = {
   id: string;
   movement_group_id: string | null;
   product_id: string;
+  product_variant_id: string | null;
   warehouse_id: string;
   product_unit_id: string | null;
   movement_type: string;
@@ -197,8 +201,7 @@ async function StockTransferContent({
   ] = await Promise.all([
     supabase
       .from("products")
-      .select("id, sku, product_name, tracking_type, unit")
-      .eq("is_active", true)
+      .select("id, sku, product_name, tracking_type, unit, is_active")
       .order("sku", { ascending: true }),
 
     supabase
@@ -212,6 +215,7 @@ async function StockTransferContent({
       .select(`
         id,
         product_id,
+        product_variant_id,
         warehouse_id,
         unit_code,
         unit_status,
@@ -229,6 +233,7 @@ async function StockTransferContent({
         id,
         movement_group_id,
         product_id,
+        product_variant_id,
         warehouse_id,
         product_unit_id,
         movement_type,
@@ -245,8 +250,7 @@ async function StockTransferContent({
 
     supabase
       .from("product_variants")
-      .select("id, product_id, variant_sku, variant_name")
-      .eq("is_active", true)
+      .select("id, product_id, variant_sku, variant_name, is_active")
       .order("variant_sku", { ascending: true }),
   ]);
 
@@ -294,10 +298,12 @@ async function StockTransferContent({
     if (!product) return [];
     return [{ ...variant, product_name: product.product_name, tracking_type: product.tracking_type }];
   });
+  const activeVariants = variants.filter((variant) => variant.is_active && products.some((product) => product.id === variant.product_id && product.is_active));
 
   const productMap = new Map(
     products.map((item) => [item.id, item])
   );
+  const variantMap = new Map(variants.map((item) => [item.id, item]));
 
   const warehouseMap = new Map(
     warehouses.map((item) => [item.id, item])
@@ -321,6 +327,9 @@ async function StockTransferContent({
       );
 
       const product = productMap.get(outbound.product_id);
+      const variant = outbound.product_variant_id
+        ? variantMap.get(outbound.product_variant_id)
+        : undefined;
 
       const sourceWarehouse = warehouseMap.get(
         outbound.warehouse_id
@@ -334,6 +343,7 @@ async function StockTransferContent({
         id: outbound.movement_group_id!,
         reference: outbound.source_reference_number ?? "-",
         product,
+        variant,
         sourceWarehouse,
         destinationWarehouse,
         quantity: Math.abs(Number(outbound.quantity_delta)),
@@ -346,6 +356,8 @@ async function StockTransferContent({
           !!inbound &&
           inbound.status === outbound.status &&
           inbound.product_id === outbound.product_id &&
+          inbound.product_variant_id === outbound.product_variant_id &&
+          (outbound.status !== "draft" || Boolean(outbound.product_variant_id)) &&
           inbound.quantity_delta === -outbound.quantity_delta &&
           inbound.inventory_status === outbound.inventory_status &&
           inbound.product_unit_id === outbound.product_unit_id &&
@@ -404,6 +416,7 @@ async function StockTransferContent({
 
     const searchableText = [
       transfer.reference,
+      transfer.variant?.variant_sku,
       transfer.product?.sku,
       transfer.product?.product_name,
       transfer.sourceWarehouse?.warehouse_name,
@@ -559,7 +572,7 @@ async function StockTransferContent({
                     <option value="" disabled>
                       Pilih produk
                     </option>
-                    {variants.map((product) => (
+                    {activeVariants.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.product_name} · {product.variant_sku} ({product.variant_name}) -{" "}
                         {trackingLabel(product.tracking_type)}
@@ -688,13 +701,16 @@ async function StockTransferContent({
                         .join(" / ");
 
                       const product = productMap.get(unit.product_id);
+                      const variant = unit.product_variant_id
+                        ? variantMap.get(unit.product_variant_id)
+                        : undefined;
                       const warehouse = unit.warehouse_id
                         ? warehouseMap.get(unit.warehouse_id)
                         : undefined;
 
                       return (
                         <option key={unit.id} value={unit.id}>
-                          {product?.sku ?? unit.unit_code}
+                          {variant?.variant_sku ?? `${product?.sku ?? unit.unit_code} · Variant belum teridentifikasi`}
                           {" - "}
                           {unit.unit_code}
                           {identifierText
@@ -878,7 +894,7 @@ async function StockTransferContent({
                             {transfer.product?.product_name ?? "Produk tidak ditemukan"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {transfer.product?.sku ?? "-"}
+                            {transfer.variant?.variant_sku ?? (transfer.product?.sku ? `${transfer.product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                           </p>
                           {transfer.product && (
                             <p className="mt-1 text-xs text-slate-400">

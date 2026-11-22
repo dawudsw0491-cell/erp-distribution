@@ -287,3 +287,15 @@ Read-only Development verification on 2026-11-22:
 - The bridge therefore has a verified source precondition, but its SQL has not been executed against Development.
 
 Remaining gates: test clean ordered migration replay in an isolated database, inspect resulting function ACL/RLS and security advisors, test SO edit-while-draft (not yet implemented), test partial DO and serialized unit cases, rollback and concurrent posting, then run TypeScript/lint/build and authenticated end-to-end validation. No Sales migration has been applied to Development or Production.
+
+
+## 10.12 Draft Sales Order editing and RPC boundary hardening — 2026-11-22
+
+Source additions:
+- `20261122240000_sales_order_draft_edit.sql` adds `sales_update_draft_order`, a SECURITY DEFINER RPC with an empty search_path, explicit `sales.create` and old/new warehouse checks, row locking, active customer/Variant validation, IMEI/Serial integer quantity validation, and a guard that prevents editing once any DO exists.
+- The existing SO form is reused for create and edit to avoid duplicate UI implementations. `/sales/[id]/edit` is available only for draft SOs; the detail page exposes the edit link only to users with `sales.create`.
+- Draft cancellation now also cancels child draft DOs, preventing an actionable DO from remaining under a cancelled SO. Posted DOs still block SO cancellation.
+- Draft SO creation now calculates subtotal immediately rather than displaying zero until confirmation.
+- SO/DO RPCs now reject NULL `p_items` explicitly; SQL three-valued logic must not allow NULL JSON payloads to pass an array guard.
+
+These are source-only changes. No Sales migration has been applied to Development or Production. Required verification remains isolated migration replay, function ACL/RLS review, transaction/rollback and concurrency tests, TypeScript/lint/build, and authenticated end-to-end testing.

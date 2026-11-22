@@ -1045,7 +1045,7 @@ async function StockOpnameDetailContent({
 
                       const itemUnits = units.filter(
                         (unit) =>
-                          unit.product_id === item.product_id &&
+                          unit.product_variant_id === item.product_variant_id &&
                           unit.unit_status === item.inventory_status
                       );
 

@@ -32,9 +32,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
-        <MasterDataNavigationShell>
-          <Suspense fallback={<MasterDataLoading />}>{children}</Suspense>
-        </MasterDataNavigationShell>
+        <Suspense fallback={<MasterDataLoading />}>
+          <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
+        </Suspense>
       </body>
     </html>
   );

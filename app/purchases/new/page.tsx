@@ -32,7 +32,7 @@ async function PurchaseOrderPageContent() {
     redirect("/purchases?error=permission_denied");
   }
 
-  const [supplierResult, warehouseResult, productResult] =
+  const [supplierResult, warehouseResult, productResult, variantResult] =
     await Promise.all([
       supabase
         .from("suppliers")
@@ -50,18 +50,22 @@ async function PurchaseOrderPageContent() {
 
       supabase
         .from("products")
-        .select(
-          "id, sku, product_name, product_type, tracking_type"
-        )
+        .select("id, product_name, product_type, tracking_type")
         .eq("is_active", true)
-        .eq("product_type", "goods")
-        .order("product_name"),
+        .eq("product_type", "goods"),
+
+      supabase
+        .from("product_variants")
+        .select("id, product_id, variant_sku, variant_name")
+        .eq("is_active", true)
+        .order("variant_sku"),
     ]);
 
   const loadError =
     supplierResult.error ||
     warehouseResult.error ||
-    productResult.error;
+    productResult.error ||
+    variantResult.error;
 
   if (loadError) {
     console.error("Purchase Order master data error:", loadError);
@@ -69,7 +73,23 @@ async function PurchaseOrderPageContent() {
 
   const suppliers = supplierResult.data ?? [];
   const warehouses = warehouseResult.data ?? [];
-  const products = productResult.data ?? [];
+  const productMap = new Map(
+    (productResult.data ?? []).map((product) => [product.id, product])
+  );
+  const variants = (variantResult.data ?? [])
+    .map((variant) => {
+      const product = productMap.get(variant.product_id);
+      if (!product) return null;
+      return {
+        id: variant.id,
+        variant_sku: variant.variant_sku,
+        variant_name: variant.variant_name,
+        product_id: variant.product_id,
+        product_name: product.product_name,
+        tracking_type: product.tracking_type,
+      };
+    })
+    .filter((variant) => variant !== null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -101,7 +121,7 @@ async function PurchaseOrderPageContent() {
         </div>
       ) : suppliers.length === 0 ||
         warehouses.length === 0 ||
-        products.length === 0 ? (
+        variants.length === 0 ? (
         <div className="rounded-xl border border-amber-200 bg-white p-6">
           <h2 className="font-semibold text-amber-800">
             Data master belum lengkap
@@ -115,7 +135,7 @@ async function PurchaseOrderPageContent() {
         <PurchaseOrderForm
           suppliers={suppliers}
           warehouses={warehouses}
-          products={products}
+          variants={variants}
         />
       )}
     </div>

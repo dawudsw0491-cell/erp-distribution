@@ -237,3 +237,17 @@ Source-only limitations:
 - No SQL execution, parser, role/warehouse test, concurrency test, rollback test, build or browser test has been run.
 - The Sales UI and action layer remain outstanding.
 - Sales Invoice remains excluded from Phase 1; no invoice/AR/GL logic is added.
+
+
+## 10.8 Initial single-entry Sales UI — source committed
+
+The first UI slice now exists under one `/sales` entry:
+- `app/sales/page.tsx`: Sales Order list, status filter, and one create-entry action.
+- `app/sales/new/page.tsx` + `sales-order-form.tsx`: customer, warehouse, order date, and repeatable product detail lines.
+- `app/sales/[id]/page.tsx`: one transaction detail view containing SO lines, delivered/outstanding quantities, DO list, and available lifecycle actions.
+- `app/sales/[id]/delivery-order-composer.tsx`: draft DO composition, including Product Unit selection for serialized stock when the user has `inventory.view`.
+- `app/sales/actions.ts`: server actions call permission-checked SO/DO RPCs; no direct table writes.
+
+This is intentionally a single Sales module entry, not a collection of independent sales submodules. The UI is an initial source slice and still requires TypeScript/build, authenticated role and warehouse checks, and browser validation. Serialized-unit selection depends on the caller's existing `inventory.view` permission and warehouse-scoped Product Unit read policy; this implementation does not broaden that permission.
+
+Sales Invoice remains outside this Phase 1 slice. No invoice, payment, tax, AR, or GL behavior has been introduced.

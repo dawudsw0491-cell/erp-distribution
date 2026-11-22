@@ -29,7 +29,7 @@ The later product-level functions are not merely a legacy data issue. They are a
 | Reversal | `database/35_inventory_reversal_function.sql` validates and reverses by Product Variant | Must be checked against the active live reversal function and product-keyed movement/valuation rows before any migration |
 | Stock Opname | `database/45`–`48` snapshot and post by Product Variant | Migration 58 rewrites start/reconcile/post flows around Product ID and joins balances by Product ID |
 | Goods Receipt | Earlier transaction path depends on PO item/product variant relationships | Migration 57 posts receipt quantities using Product ID and can register identified units without canonical variant balance identity |
-| UI/server actions | `app/inventory/movements/actions.ts` sends `p_product_id`; `app/inventory/transfers/actions.ts` sends `p_product_id` | Current UI contract is product-level, despite the product setup requirement that stock belongs to immutable Variant SKU |
+| UI/server actions (initial audit snapshot) | At the initial audit, movement and transfer actions sent `p_product_id`. | This was the original defect; the current branch has since ported these create actions to Variant IDs. The live database posting RPCs remain Product-keyed until MD-014 is safely applied. |
 
 ## 3. Live Development evidence
 
@@ -139,19 +139,19 @@ The coexistence of these overloads is a concrete source of ambiguity: callers ca
 
 ### 8.2 Application read/write contract map
 
-| Application surface | Current source contract | Consequence |
+| Application surface | Current source contract on implementation branch | Live Development / residual limitation |
 |---|---|---|
-| `app/inventory/balances/page.tsx` | Selects `inventory_balances` by `product_id`, filters non-null Product ID, aggregates product-level balances | Product-level UI contract |
-| `app/inventory/page.tsx` | Selects `product_variant_id` from balances, and joins variant records | Variant-level read contract; may omit product-only balances |
-| `app/inventory/movements/actions.ts` and page | Form/action uses `product_id`; movement list joins Products by Product ID | Product-level movement contract |
-| `app/inventory/transfers/actions.ts` and page | Form/action uses `product_id`; transfer matching compares Product IDs | Product-level transfer contract |
-| `app/inventory/opname/[id]/page.tsx` | Stock Opname items and unit matching use Product ID; UI includes aggregate IMEI count | Product-level Opname contract |
-| `app/inventory/units/page.tsx` | Unit list queries `product_id` and Product relation | Product-level unit display contract |
-| `app/inventory/stock-balance-realtime.tsx` | Subscribes to `inventory_balances` and `product_units` | Realtime refresh is table-based; it does not itself reconcile identity |
-| `app/purchases/[id]/goods-receipts/[receiptId]/page.tsx` | Goods Receipt display follows PO item Product relation | Display does not prove posting is variant-safe |
-| `docs/DASHBOARD_INTEGRATION_CONTRACT.md` | KPI contract uses Product ID with Variant ID fallback for SKU count; inventory values from balances | Dashboard semantics must be redefined against one canonical identity |
+| `app/inventory/balances/page.tsx` | Reads balance rows by `product_variant_id`; displays Variant SKU and parent Product name. | Live legacy rows with NULL Variant identity remain unresolved and are not assigned to a SKU. |
+| `app/inventory/page.tsx` and `app/page.tsx` | SKU KPI counts distinct non-null `product_variant_id`; Product-only balance rows are counted separately as unresolved legacy rows. | Dashboard is source-aligned, but totals still include legacy balance rows in quantity/value metrics until the approved data disposition. |
+| `app/inventory/movements/actions.ts` and page | Create action sends `p_product_variant_id`; history displays Variant SKU where identity exists and labels legacy Product-only history explicitly. | Live posting RPC remains Product-keyed until MD-014 migration is applied and verified. |
+| `app/inventory/transfers/actions.ts` and page | Draft creation sends Variant ID; history validates the paired movement Variant IDs and displays Variant SKU. Drafts without a Variant are not postable in the UI. | Live transfer posting RPC remains Product-keyed; do not post operational transfers until MD-014 is applied and verified. |
+| `app/inventory/opname/[id]/page.tsx` | Snapshot/count UI uses Variant identity; serialized unit matching is Variant-scoped; aggregate IMEI count excludes serialized units. | Existing NULL Variant items remain legacy/unresolved; migration preflight blocks. |
+| `app/inventory/units/page.tsx` | Serialized unit registry joins Product Variant and displays Variant SKU. | Legacy Product Units with NULL Variant remain unresolved. |
+| `app/purchases/[id]/page.tsx` | PO detail displays Variant SKU/name; legacy lines without Variant are labelled. | Live PO item records still include NULL Variant IDs; migration preflight blocks. |
+| `app/purchases/actions.ts` and PO form | Source action submits `product_variant_id` to Variant-level PO/GR RPC contracts. | These RPC definitions are in the unapplied MD-014 migration; live runtime is not yet enabled. |
+| `docs/DASHBOARD_INTEGRATION_CONTRACT.md` | SKU count is based only on distinct `product_variant_id`; unresolved Product-only balance rows are shown separately. | Dashboard contract is updated; authenticated runtime and warehouse-scope reconciliation remain open. |
 
-The Inventory overview and Stock Balances pages currently have different identity contracts. This can create mismatched totals even before any Sales module is added.
+The implementation branch now uses Variant identity across the primary Inventory and Purchasing source surfaces. This does not change the live Development database: Product-only records and Product-keyed posting RPCs remain until MD-014 passes reconciliation and is safely applied.
 
 ### 8.3 RLS and triggers
 

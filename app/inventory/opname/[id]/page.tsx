@@ -407,15 +407,17 @@ async function StockOpnameDetailContent({
   const items =
     (itemResult.data ?? []) as OpnameItemRow[];
 
-  // Product Master adalah sumber identitas produk.
-  const productIds = [
-    ...new Set(
-      items
-        .map((item) => item.product_id)
-        .filter((value): value is string => !!value)
-    ),
-  ];
+  // Stock Opname identity is resolved from Variant, then its parent Product.
+  const variantIds = [...new Set(items.map((item) => item.product_variant_id))];
+  const variantResult =
+    variantIds.length > 0
+      ? await supabase
+          .from("product_variants")
+          .select("id, product_id, variant_sku, variant_name")
+          .in("id", variantIds)
+      : { data: [], error: null };
 
+  const productIds = [...new Set((variantResult.data ?? []).map((item) => item.product_id))];
   const productResult =
     productIds.length > 0
       ? await supabase
@@ -424,11 +426,11 @@ async function StockOpnameDetailContent({
           .in("id", productIds)
       : { data: [], error: null };
 
-  if (productResult.error) {
-    console.error(
-      "Stock Opname product query failed:",
-      productResult.error
-    );
+  if (variantResult.error || productResult.error) {
+    console.error("Stock Opname Variant/Product query failed:", {
+      variant: variantResult.error,
+      product: productResult.error,
+    });
 
     return (
       <div className="flex min-h-screen bg-slate-100">
@@ -437,11 +439,11 @@ async function StockOpnameDetailContent({
         <main className="min-w-0 flex-1 p-5 md:p-8">
           <div className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6">
             <h1 className="font-bold text-red-700">
-              Gagal Memuat Product Master
+              Gagal Memuat Product Variant
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Terjadi kesalahan saat membaca data produk.
+              Terjadi kesalahan saat membaca identitas SKU Variant dan Product induknya.
             </p>
           </div>
         </main>
@@ -449,10 +451,21 @@ async function StockOpnameDetailContent({
     );
   }
 
+  const parentProducts = new Map<string, ProductRow>(
+    ((productResult.data ?? []) as ProductRow[]).map((product) => [product.id, product])
+  );
   const productMap = new Map<string, ProductRow>(
-    ((productResult.data ?? []) as ProductRow[]).map(
-      (product) => [product.id, product]
-    )
+    (variantResult.data ?? []).flatMap((variant) => {
+      const parent = parentProducts.get(variant.product_id);
+      if (!parent) return [];
+      return [[variant.id, {
+        id: variant.id,
+        sku: variant.variant_sku,
+        product_name: parent.product_name + " · " + variant.variant_name,
+        tracking_type: parent.tracking_type,
+        unit: parent.unit,
+      } as ProductRow]];
+    })
   );
 
   // Item quantity dikirim ke komponen bulk.
@@ -460,7 +473,7 @@ async function StockOpnameDetailContent({
   const bulkQuantityItems = items
     .filter((item) => {
       const product = item.product_id
-        ? productMap.get(item.product_id)
+        ? productMap.get(item.product_variant_id)
         : undefined;
 
       return product?.tracking_type === "quantity" || product?.tracking_type === "imei";
@@ -472,7 +485,7 @@ async function StockOpnameDetailContent({
 
       return {
         id: item.id,
-        product_id: item.product_id,
+        product_id: item.product_variant_id,
         inventory_status: item.inventory_status,
         snapshot_quantity: Number(
           product?.tracking_type === "imei"

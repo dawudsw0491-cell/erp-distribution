@@ -208,3 +208,15 @@ The source migration now also defines:
 Still outstanding before this migration is executable: implement and review the narrow permission bridge in `post_inventory_movement_unlocked`, then implement atomic DO posting that creates a `sale` movement, invokes the existing valuation/posting algorithm, and commits movement + unit location/status + DO/SO fulfillment in one transaction. Do not bypass the existing movement algorithm or grant Sales users `inventory.update`.
 
 No SQL from this source migration has been applied to Development or Production. No build, SQL parser, or integration test has been run yet.
+
+
+## 10.6 Narrow inventory posting permission bridge — source committed
+
+Source migration committed:
+- `supabase/migrations/20261122223000_sales_delivery_posting_permission_bridge.sql`
+- Replaces the authorization gate in the current Development definition of `post_inventory_movement_unlocked(uuid,numeric)`.
+- The original posting algorithm for valuation, Variant balance mutation, serialized-unit state/location and movement metadata is retained; only the permission gate is moved until after the movement row is locked and read.
+- A `sale` movement is accepted only when it has `source_reference_type='delivery_order'`, its source reference resolves to a DO line whose `inventory_movement_id` points back to that movement, the parent DO remains draft, and Product/Variant/Unit/quantity/Warehouse all match. Caller must have `sales.create` and warehouse access.
+- Every non-sale movement continues to require `inventory.update`. The manual `create_inventory_movement` RPC remains unchanged and still requires `inventory.update`.
+
+This is source-only. The bridge migration has not been applied to Development or Production. It is not yet usable until the Sales schema is applied and the atomic DO posting RPC creates and links the movement row in the same transaction. DO posting, duplicate-line aggregation validation, UI, SQL execution tests, and role/warehouse/concurrency tests remain outstanding.

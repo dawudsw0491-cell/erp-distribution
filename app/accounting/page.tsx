@@ -537,8 +537,7 @@ export default async function ReportsPage({
             )}
           </section>
 
-          <p className="text-xs text-slate-500">
-                      <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
             <h2 className="font-semibold text-amber-900">Fondasi Akuntansi</h2>
             <p className="mt-2 text-sm leading-6 text-amber-800">
               Buku besar dan laporan keuangan belum diaktifkan. Database Development belum memiliki Chart of Accounts, jurnal umum, periode fiskal, subledger Piutang/Utang, maupun General Ledger yang tervalidasi. Karena itu saldo kas, Piutang, Utang, pendapatan, HPP, laba, pajak, dan neraca tidak dihitung dari total PO atau nilai persediaan.

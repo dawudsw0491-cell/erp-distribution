@@ -605,13 +605,13 @@ async function StockOpnameDetailContent({
   );
 
   const bulkScanUnits = serializedItems.flatMap((item) => {
-  const product = item.product_id
-    ? productMap.get(item.product_id)
+  const product = item.product_variant_id
+    ? productMap.get(item.product_variant_id)
     : undefined;
 
   const itemUnits = units.filter(
     (unit) =>
-      !!item.product_variant_id && !!unit.product_variant_id && !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
+      !!item.product_variant_id && !!unit.product_variant_id && unit.product_variant_id === item.product_variant_id &&
       unit.unit_status === item.inventory_status
   );
 

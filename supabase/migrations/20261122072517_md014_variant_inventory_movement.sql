@@ -13,7 +13,8 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.inventory_movements WHERE product_variant_id IS NULL)
      OR EXISTS (SELECT 1 FROM public.inventory_valuation_logs WHERE product_variant_id IS NULL)
      OR EXISTS (SELECT 1 FROM public.product_units WHERE product_variant_id IS NULL)
-     OR EXISTS (SELECT 1 FROM public.stock_opname_items WHERE product_variant_id IS NULL) THEN
+     OR EXISTS (SELECT 1 FROM public.stock_opname_items WHERE product_variant_id IS NULL)
+     OR EXISTS (SELECT 1 FROM public.purchase_order_items WHERE product_variant_id IS NULL OR product_id IS NULL) THEN
     RAISE EXCEPTION USING
       MESSAGE = 'MD-014 blocked: Product-only inventory identities remain.',
       DETAIL = 'Resolve/reset legacy Product-only balances, movements, valuation logs, and product units through the separately approved disposition. No automatic Variant inference is allowed.';
@@ -3069,6 +3070,16 @@ GRANT EXECUTE ON FUNCTION public.post_inventory_reversal(uuid, uuid) TO authenti
 
 
 -- Purchase Order lines persist Product ID only as a validated Variant parent.
+UPDATE public.purchase_order_items poi
+SET product_id = pv.product_id
+FROM public.product_variants pv
+WHERE pv.id = poi.product_variant_id
+  AND poi.product_id IS DISTINCT FROM pv.product_id;
+
+ALTER TABLE public.purchase_order_items
+    ALTER COLUMN product_variant_id SET NOT NULL,
+    ALTER COLUMN product_id SET NOT NULL;
+
 ALTER TABLE public.purchase_order_items
     ADD CONSTRAINT fk_purchase_order_items_variant_product
     FOREIGN KEY (product_variant_id, product_id)

@@ -220,3 +220,20 @@ Source migration committed:
 - Every non-sale movement continues to require `inventory.update`. The manual `create_inventory_movement` RPC remains unchanged and still requires `inventory.update`.
 
 This is source-only. The bridge migration has not been applied to Development or Production. It is not yet usable until the Sales schema is applied and the atomic DO posting RPC creates and links the movement row in the same transaction. DO posting, duplicate-line aggregation validation, UI, SQL execution tests, and role/warehouse/concurrency tests remain outstanding.
+
+
+## 10.7 Atomic Delivery Order posting — source committed
+
+Source migration committed:
+- `supabase/migrations/20261122230000_sales_delivery_order_atomic_posting.sql`
+- Adds `sales_post_delivery_order(uuid)`, executable by authenticated users only and guarded by `sales.create`.
+- Locks the DO and SO, validates active customer, exact SO/DO customer and warehouse match, warehouse access, warehouse posting lock, SO outstanding quantities, FIFO reservation priority, tracking policy, and Product Unit availability.
+- Aggregates requested DO quantity per SO line before validating outstanding quantity, so repeated references cannot bypass the remaining SO quantity.
+- Creates one outbound `sale` movement per DO line, links the movement to its DO line before posting, and invokes the canonical `post_inventory_movement_unlocked` algorithm. That existing function remains responsible for available-bucket checks, average-cost valuation, balance updates, valuation log and serialized-unit sold/location transition.
+- Marks DO posted and updates SO to partially delivered or delivered in the same transaction. A failure in any movement rolls back the entire posting transaction.
+
+Source-only limitations:
+- This migration has not been applied to Development or Production.
+- No SQL execution, parser, role/warehouse test, concurrency test, rollback test, build or browser test has been run.
+- The Sales UI and action layer remain outstanding.
+- Sales Invoice remains excluded from Phase 1; no invoice/AR/GL logic is added.

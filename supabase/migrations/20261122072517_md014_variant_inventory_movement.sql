@@ -1,7 +1,8 @@
 -- MD-014 / Phase 1: Variant-keyed inventory movement and valuation.
 -- Source of behavior: database/33_inventory_posting_functions.sql (canonical variant path).
--- This migration intentionally fails closed while Product-only historical rows remain.
--- It is NOT to be applied to Development until the approved reset/reconciliation gate is complete.
+-- This migration preserves unresolved historical Product-only rows as legacy records.
+-- Active inventory writes move to Variant + Warehouse identity; no legacy Variant is inferred.
+-- Apply only after disposable replay, source/ledger reconciliation, and explicit Development approval.
 
 BEGIN;
 

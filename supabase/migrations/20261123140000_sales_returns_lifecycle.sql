@@ -152,6 +152,7 @@ begin
       if v_unit is not null and v_unit is distinct from v_line.source_unit then raise exception 'Product Unit tidak sesuai baris Delivery Order.'; end if;
       if v_line.tracking_type='serial' and (v_unit is null or v_qty<>1) then raise exception 'Produk serial wajib satu Product Unit per baris.'; end if;
       if v_line.tracking_type in ('imei','serial') and v_qty<>trunc(v_qty) then raise exception 'Kuantitas IMEI/serial harus bulat.'; end if;
+      if v_unit is not null and v_qty<>1 then raise exception 'Product Unit individual hanya boleh diretur satu unit per baris.'; end if;
       if v_line.tracking_type='quantity' and v_unit is not null then raise exception 'Produk quantity tidak menggunakan Product Unit.'; end if;
       select v_line.quantity-coalesce(sum(ri.quantity),0) into v_remaining
       from public.sales_return_items ri join public.sales_returns r on r.id=ri.return_id
@@ -246,7 +247,8 @@ begin
       where doi.id=v_line.source_delivery_order_item_id and doi.delivery_order_id=v_return.source_delivery_order_id;
       select coalesce(sum(ri.quantity),0) into v_returned from public.sales_return_items ri
       join public.sales_returns r on r.id=ri.return_id
-      where ri.source_delivery_order_item_id=v_line.source_delivery_order_item_id and r.status='posted';
+      where ri.source_delivery_order_item_id=v_line.source_delivery_order_item_id
+        and (r.status='posted' or (ri.return_id=p_return_id and ri.id<v_line.id));
       if v_line.quantity>v_source_qty-v_returned then raise exception 'Kuantitas customer return melebihi sisa sumber.'; end if;
       if v_line.product_unit_id is not null and exists (
         select 1 from public.sales_return_items ri join public.sales_returns r on r.id=ri.return_id
@@ -271,7 +273,8 @@ begin
       where gri.id=v_line.source_goods_receipt_item_id and gri.goods_receipt_id=v_return.source_goods_receipt_id;
       select coalesce(sum(ri.quantity),0) into v_returned from public.sales_return_items ri
       join public.sales_returns r on r.id=ri.return_id
-      where ri.source_goods_receipt_item_id=v_line.source_goods_receipt_item_id and r.status='posted';
+      where ri.source_goods_receipt_item_id=v_line.source_goods_receipt_item_id
+        and (r.status='posted' or (ri.return_id=p_return_id and ri.id<v_line.id));
       if v_line.quantity>v_source_qty-v_returned then raise exception 'Kuantitas supplier return melebihi sisa sumber.'; end if;
       if v_line.product_unit_id is not null and exists (
         select 1 from public.sales_return_items ri join public.sales_returns r on r.id=ri.return_id

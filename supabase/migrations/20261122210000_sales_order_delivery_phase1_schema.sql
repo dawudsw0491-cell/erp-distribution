@@ -202,8 +202,9 @@ begin
   if v_user_id is null or not public.has_permission('sales.create') then
     raise exception 'Permission sales.create diperlukan.';
   end if;
-  if not public.has_warehouse_access(p_warehouse_id) then
-    raise exception 'Akses warehouse ditolak.';
+  if not public.has_warehouse_access(p_warehouse_id)
+     or not exists (select 1 from public.warehouses w where w.id=p_warehouse_id and w.is_active) then
+    raise exception 'Warehouse tidak aktif atau akses warehouse ditolak.';
   end if;
   if not exists (select 1 from public.customers c where c.id=p_customer_id and c.is_active) then
     raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
@@ -274,8 +275,12 @@ begin
   select * into v_order from public.sales_orders
   where id=p_sales_order_id for update;
   if not found then raise exception 'Sales Order tidak ditemukan.'; end if;
-  if not public.has_warehouse_access(v_order.warehouse_id) then
-    raise exception 'Akses warehouse ditolak.';
+  if not public.has_warehouse_access(v_order.warehouse_id)
+     or not exists (select 1 from public.warehouses w where w.id=v_order.warehouse_id and w.is_active) then
+    raise exception 'Warehouse tidak aktif atau akses warehouse ditolak.';
+  end if;
+  if not exists (select 1 from public.customers c where c.id=v_order.customer_id and c.is_active) then
+    raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
   end if;
   if v_order.status <> 'draft' then raise exception 'Hanya Sales Order draft yang dapat dikonfirmasi.'; end if;
   if not exists (select 1 from public.sales_order_items where sales_order_id=v_order.id) then

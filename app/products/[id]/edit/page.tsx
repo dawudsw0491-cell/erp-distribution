@@ -24,8 +24,6 @@ const errorMessages: Record<string, string> = {
   invalid_model: "Product Model tidak ditemukan, tidak aktif, atau tidak sesuai dengan Brand.",
   invalid_condition: "Kondisi produk tidak valid.",
   condition_required: "Kondisi produk wajib dipilih untuk produk barang baru.",
-  invalid_subcategory:
-    "Subkategori tidak valid atau tidak sesuai dengan kategori utama.",
   duplicate: "Barcode sudah digunakan produk lain.",
   save_failed: "Perubahan produk gagal disimpan.",
   load_failed: "Gagal memuat data produk.",

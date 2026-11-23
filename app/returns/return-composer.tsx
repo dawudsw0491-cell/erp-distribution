@@ -62,6 +62,11 @@ export default function ReturnComposer({
         setError(`Kuantitas IMEI/serial ${line.product_name} harus bulat.`);
         return;
       }
+      if ((units[line.id] || line.suggested_unit_id) && quantity !== 1) {
+        event.preventDefault();
+        setError(`Unit individual ${line.product_name} harus diretur satu unit per baris.`);
+        return;
+      }
     }
     setError("");
   }

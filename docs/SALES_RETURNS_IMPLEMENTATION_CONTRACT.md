@@ -212,3 +212,8 @@ Read-only inspection of Development role mappings confirmed:
 The source migration uses `purchasing.create` for supplier-return draft creation and `purchasing.approve` for approval/posting authorization. It does not grant or alter any role permission. Posting now explicitly rejects the original draft creator as poster in addition to rejecting the approver, preserving three distinct actors.
 
 Review confirmed the live inventory movement constraints accept the proposed return movement directions and the `(product_variant_id, product_id)` composite FK is backed by a unique constraint. This is read-only schema inspection, not a migration replay or functional test.
+
+
+### Serialized supplier return UI refinement
+
+The supplier return composer now supports selecting multiple recorded Goods Receipt unit codes from one source line. Each selected unit is submitted as a separate one-unit return line, preserving Product Unit lineage. For IMEI/Serial GR lines that already contain unit records, the database rejects aggregate return lines without a Product Unit; the UI requires unit selection. Aggregate IMEI remains available only when the source GR line has no serialized unit records. This is source-level implementation only; no functional test has been run.

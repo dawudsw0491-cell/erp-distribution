@@ -78,3 +78,19 @@ export async function postReturnAction(form: FormData): Promise<never> {
   revalidatePath("/inventory/movements");
   redirect(`/returns/${id}?posted=1`);
 }
+
+export async function cancelReturnDraftAction(form: FormData): Promise<never> {
+  const id = field(form, "return_id");
+  if (!uuid(id)) redirect("/returns?error=invalid_id");
+  const { supabase, user, profile } = await getAuthorizationContext("sales.view");
+  if (!user) redirect("/login");
+  if (!profile) redirect("/returns?error=permission_denied");
+  const { error } = await supabase.rpc("sales_return_cancel_draft", { p_return_id: id });
+  if (error) {
+    console.error("Cancel return draft failed:", error);
+    redirect(`/returns/${id}?error=cancel_failed`);
+  }
+  revalidatePath("/returns");
+  revalidatePath(`/returns/${id}`);
+  redirect("/returns?cancelled=1");
+}

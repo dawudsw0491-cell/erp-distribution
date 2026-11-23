@@ -14,6 +14,7 @@ type SourceLine = {
   inventory_status: string;
   units: UnitOption[];
   suggested_unit_id: string | null;
+  has_source_unit?: boolean;
 };
 
 export default function ReturnComposer({
@@ -92,7 +93,7 @@ export default function ReturnComposer({
               <td className="p-3"><p className="font-semibold">{line.product_name}</p><p className="text-xs text-slate-500">{line.variant_sku} · {line.variant_name}</p></td>
               <td className="p-3">{line.source_quantity} unit</td>
               <td className="p-3"><input type="number" min="0.001" max={line.source_quantity} step={line.tracking_type === "quantity" ? "0.001" : "1"} value={quantities[line.id] ?? ""} onChange={(e) => setQuantities((old) => ({ ...old, [line.id]: e.target.value }))} disabled={!selected[line.id]} placeholder="0" className="w-28 rounded-lg border px-2 py-1.5 disabled:bg-slate-100" /></td>
-              <td className="p-3">{line.units.length ? <select value={units[line.id] ?? line.suggested_unit_id ?? ""} onChange={(e) => setUnits((old) => ({ ...old, [line.id]: e.target.value }))} disabled={!selected[line.id]} className="min-w-36 rounded-lg border px-2 py-1.5 disabled:bg-slate-100"><option value="">Tanpa unit khusus</option>{line.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.unit_code}</option>)}</select> : <span className="text-xs text-slate-400">Agregat SKU</span>}</td>
+              <td className="p-3">{line.units.length ? <select value={units[line.id] ?? line.suggested_unit_id ?? ""} onChange={(e) => setUnits((old) => ({ ...old, [line.id]: e.target.value }))} disabled={!selected[line.id]} className="min-w-36 rounded-lg border px-2 py-1.5 disabled:bg-slate-100"><option value="">Tanpa unit khusus</option>{line.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.unit_code}</option>)}</select> : <span className="text-xs text-slate-400">{line.has_source_unit ? "Unit mengikuti DO" : "Agregat SKU"}</span>}</td>
             </tr>
           ))}</tbody>
         </table>

@@ -38,8 +38,9 @@ begin
     raise exception 'Hanya Sales Order draft yang dapat diubah.';
   end if;
   if not public.has_warehouse_access(v_order.warehouse_id)
-     or not public.has_warehouse_access(p_warehouse_id) then
-    raise exception 'Akses warehouse ditolak.';
+     or not public.has_warehouse_access(p_warehouse_id)
+     or not exists (select 1 from public.warehouses w where w.id=p_warehouse_id and w.is_active) then
+    raise exception 'Warehouse tujuan tidak aktif atau akses warehouse ditolak.';
   end if;
   if exists (
     select 1 from public.delivery_orders d

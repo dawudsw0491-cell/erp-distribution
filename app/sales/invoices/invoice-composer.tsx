@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createInvoiceAction } from "./actions";
 
 type InvoiceLine = { id: string; product_name: string; variant_sku: string; variant_name: string; delivered: number; already_invoiced: number; unit_price: number };
 export default function InvoiceComposer({deliveryOrderId,lines}:{deliveryOrderId:string;lines:InvoiceLine[]}) {
   const [quantities,setQuantities]=useState<Record<string,string>>(()=>Object.fromEntries(lines.map(line=>[line.id,String(Math.max(0,line.delivered-line.already_invoiced))])));
-  const selected=useMemo(()=>lines.map(line=>({delivery_order_item_id:line.id,quantity:quantities[line.id]??"0"}).filter?null:null),[lines,quantities]);
   const items=lines.map(line=>({delivery_order_item_id:line.id,quantity:quantities[line.id]??"0"})).filter(item=>Number(item.quantity)>0);
   const total=lines.reduce((sum,line)=>sum+Number(quantities[line.id]??0)*line.unit_price,0);
   const today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});

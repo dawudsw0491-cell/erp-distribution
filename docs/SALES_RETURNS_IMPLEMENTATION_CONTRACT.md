@@ -138,3 +138,10 @@ The following implementation rules are now fixed by the live source relationship
 ### Remaining implementation work (not permission to bypass gates)
 
 The source document lock, quantity recomputation, and valuation source are now defined. Before writing migrations, the implementation must inspect the complete goods-receipt unit identifier relationship and the inventory movement creation signature, then define exact RPC lock order and return-to-movement source reference convention. Migration replay remains required before applying schema to connected Development. Finance-side credit/refund and supplier debit/credit notes remain outside inventory return posting until the Accounting source-event contract exists.
+
+
+### Goods Receipt serialized-unit lineage resolved
+
+`goods_receipt_units` stores `goods_receipt_item_id` and `unit_code`; the Goods Receipt posting function creates `product_units` with the same `unit_code` and `product_variant_id`, then copies identifiers into `product_unit_identifiers`. Therefore a supplier-return tagged unit can be resolved through the source GR item to its Product Variant and the matching Product Unit `unit_code` (with warehouse and identifier consistency checks). The return line must retain both `goods_receipt_item_id` and `product_unit_id`; it must not infer source ownership from an IMEI value alone. A unit is returnable only while it remains in the receipt's warehouse, has an eligible inventory status, and has not already been returned.
+
+This closes the serialized source-lineage question for Goods Receipt. The remaining implementation prerequisites are to inspect exact approval RPC/RBAC conventions and settle the canonical movement source reference convention; both are source-level checks. The final accounting treatment of supplier credit/debit remains separate.

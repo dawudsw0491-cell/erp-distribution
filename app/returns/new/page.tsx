@@ -44,7 +44,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
     sourceLines=(data??[]).map((row:any)=>{
       const product=Array.isArray(row.products)?row.products[0]:row.products;
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null};
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null,has_source_unit:Boolean(row.product_unit_id)};
     });
   }
   if(selected&&type==="supplier"){

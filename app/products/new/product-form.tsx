@@ -349,7 +349,6 @@ export default function ProductForm({
   const [condition, setCondition] = useState("BARU");
   const [productType, setProductType] = useState("goods");
   const [categoryId, setCategoryId] = useState("");
-  const [subcategoryId, setSubcategoryId] = useState("");
   const [variants, setVariants] = useState<VariantDraft[]>([{
     variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "",
   }]);
@@ -370,14 +369,6 @@ export default function ProductForm({
     [categories]
   );
 
-  const subcategories = useMemo(
-    () =>
-      categories.filter(
-        (item) => item.parent_id === categoryId
-      ),
-    [categories, categoryId]
-  );
-
   const recommendation = useMemo(
     () =>
       productType === "goods"
@@ -395,7 +386,6 @@ export default function ProductForm({
     if (!recommendation) return;
 
     setCategoryId(recommendation.categoryId);
-    setSubcategoryId(recommendation.subcategoryId);
   }
 
   return (
@@ -464,7 +454,6 @@ export default function ProductForm({
 
                 if (nextType === "service") {
                   setCategoryId("");
-                  setSubcategoryId("");
                 }
               }}
               className={inputClass}
@@ -486,7 +475,6 @@ export default function ProductForm({
                   value={condition}
                   onChange={(event) => {
                     setCondition(event.target.value);
-                    setSubcategoryId("");
                   }}
                   className={inputClass}
                 >
@@ -502,32 +490,11 @@ export default function ProductForm({
                   value={categoryId}
                   onChange={(event) => {
                     setCategoryId(event.target.value);
-                    setSubcategoryId("");
                   }}
                   className={inputClass}
                 >
                   <option value="">Pilih Kategori Utama</option>
                   {mainCategories.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.category_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>Subkategori</label>
-                <select
-                  name="product_subcategory_id"
-                  value={subcategoryId}
-                  disabled={!categoryId}
-                  onChange={(event) =>
-                    setSubcategoryId(event.target.value)
-                  }
-                  className={inputClass}
-                >
-                  <option value="">Pilih Subkategori</option>
-                  {subcategories.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.category_name}
                     </option>
@@ -544,17 +511,7 @@ export default function ProductForm({
 
                     <p className="mt-2 text-sm text-slate-700">
                       {recommendation.categoryName}
-                      {recommendation.subcategoryName
-                        ? ` → ${recommendation.subcategoryName}`
-                        : ""}
                     </p>
-
-                    {recommendation.missingSubcategory && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Subkategori yang sesuai belum tersedia.
-                        Kategori utama tetap dapat digunakan.
-                      </p>
-                    )}
 
                     <button
                       type="button"
@@ -566,9 +523,7 @@ export default function ProductForm({
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">
-                    Isi nama produk dan kondisi untuk memperoleh
-                    rekomendasi klasifikasi. Sistem hanya menggunakan
-                    kategori yang sudah tersedia.
+                    Kategori utama mengidentifikasi jenis perangkat. Kondisi BARU atau SECOND dicatat terpisah sebagai identitas kondisi unit.
                   </p>
                 )}
               </div>

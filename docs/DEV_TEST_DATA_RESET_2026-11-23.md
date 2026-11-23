@@ -87,3 +87,16 @@ Protected counts remained intact as shown above. Migration ledger still contains
 Development is now a clean application-data baseline, not a fully seeded operational dataset. Before testing purchasing or inventory workflows, create the required master records again (at minimum warehouse, supplier, product, product variants, and any required attributes). The Owner login and role/permission mappings remain.
 
 No Production action was performed. No paid Supabase resource was provisioned.
+
+
+## Post-reset reference restoration and validation addendum
+
+The reset correctly removed business records but also removed reusable Product classification/specification references that are required to create new test Products. These are system reference definitions, not business entities, and have been restored in Development through source-controlled migrations:
+
+- `20261123070547_restore_product_specification_reference_data`: canonical attributes RAM, ROM, COLOR, WARRANTY and seven reusable Warranty templates.
+- `20261123071148_restore_canonical_product_categories`: six canonical top-level categories used by Product Management.
+- `20261123070350_stock_opname_aggregate_posting_guard`: restores aggregate IMEI Stock Opname posting and requires explicit aggregate counts before review.
+- `20261123070715_fix_stock_opname_reconciliation_join`: fixes the target-table reference in Stock Opname reconciliation.
+- `20261123070619_purchase_order_submitted_status` and `20261123071021_approve_submitted_purchase_order`: align the PO status constraint and approval RPC with both draft-direct and submitted approval paths.
+
+Transactional SQL integration smoke tests ran inside `BEGIN/ROLLBACK`; all temporary test records were rolled back. Tested Product/Variant specification creation, PO approval, Goods Receipt posting, Variant-level inventory balances, Stock Transfer, manual Inventory Movement, quantity Stock Opname review/approval/posting, and optional untagged IMEI aggregate Goods Receipt/Movement/Transfer/Stock Opname. Development business tables remained empty after testing. Browser/runtime validation remains pending.

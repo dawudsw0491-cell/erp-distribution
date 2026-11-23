@@ -190,3 +190,10 @@ Source files now exist on the implementation branch; they have **not** been appl
 - Draft edit, document-level cancellation UX is present for draft only; posted reversal is not implemented and must remain unavailable.
 - Source document navigation/reference display can be improved; current detail page identifies source document type but not yet its source number/link.
 - Finance credit/refund, supplier debit/credit, AR/AP and GL remain outside Returns until Accounting contract is approved.
+
+
+### UI/source-lineage refinement
+
+- Customer-return Product Unit is derived server-side from the selected posted DO line; the browser cannot substitute a different unit. This avoids depending on direct Product Unit table visibility for Sales users.
+- Supplier-return unit selection sends the original Goods Receipt `unit_code`; the draft RPC resolves it to the canonical Product Unit and verifies receipt-line ownership, Variant, warehouse and source inventory status.
+- The initial composer exposes one individually tagged unit per source line per draft. The database posting contract supports multiple tagged unit lines; the current UI may require separate drafts for multiple units from one GR line until multi-unit selection is added.

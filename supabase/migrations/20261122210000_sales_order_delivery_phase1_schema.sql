@@ -132,9 +132,11 @@ using (public.has_permission('sales.view') and exists (
 ));
 
 revoke all on public.sales_orders, public.sales_order_items,
-  public.delivery_orders, public.delivery_order_items from anon, authenticated;
+  public.delivery_orders, public.delivery_order_items from public, anon, authenticated;
 grant select on public.sales_orders, public.sales_order_items,
   public.delivery_orders, public.delivery_order_items to authenticated;
+revoke all on sequence public.sales_order_number_seq,
+  public.delivery_order_number_seq from public, anon, authenticated;
 grant usage, select on sequence public.sales_order_number_seq,
   public.delivery_order_number_seq to authenticated;
 
@@ -172,7 +174,7 @@ left join public.delivery_order_items doi on doi.sales_order_item_id = soi.id
 left join public.delivery_orders d on d.id = doi.delivery_order_id
 group by soi.id, soi.sales_order_id, soi.product_id, soi.product_variant_id, soi.quantity;
 
-revoke all on public.sales_order_line_fulfillment from anon, authenticated;
+revoke all on public.sales_order_line_fulfillment from public, anon, authenticated;
 grant select on public.sales_order_line_fulfillment to authenticated;
 
 

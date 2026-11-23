@@ -24,7 +24,7 @@ Environment: isolated disposable Development database only. No Production change
 - Confirm SO/DO header references point to canonical customers and warehouses.
 - Confirm SO and DO lines enforce the composite Product Variant + parent Product relationship.
 - Confirm DO line Product Unit references are nullable and reference the canonical `product_units` table.
-- Confirm SO/DO status and posting-metadata checks, indexes, RLS enablement, SELECT-only table grants, and authenticated RPC grants.
+- Confirm SO/DO status and posting-metadata checks, indexes, RLS enablement, explicit PUBLIC/anon/authenticated revocation on Sales tables/view/sequences, SELECT-only table grants, and authenticated RPC grants.
 - Confirm there are no direct authenticated table write grants and no duplicate Sales tables, alternate IMEI registry, or separate reservation ledger.
 - Confirm the derived fulfillment view counts posted DO quantities only.
 

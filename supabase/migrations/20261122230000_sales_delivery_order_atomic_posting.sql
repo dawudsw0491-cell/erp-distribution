@@ -65,8 +65,9 @@ begin
     raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
   end if;
 
-  if not public.has_warehouse_access(v_do.warehouse_id) then
-    raise exception 'Akses warehouse ditolak.';
+  if not public.has_warehouse_access(v_do.warehouse_id)
+     or not exists (select 1 from public.warehouses w where w.id=v_do.warehouse_id and w.is_active) then
+    raise exception 'Warehouse tidak aktif atau akses warehouse ditolak.';
   end if;
 
   -- Serialize all stock posting for this warehouse before validating

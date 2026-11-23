@@ -82,3 +82,27 @@ No GL journal, AR credit note, AP debit note, cash refund, or customer balance a
 - RET-001F: finance integration only after ACC-001 double-entry policy is approved.
 
 No database migration or inventory mutation is authorized by this design document.
+
+
+## Verified live posting-engine behavior (Development)
+
+Read-only inspection of `post_inventory_movement_unlocked(uuid,numeric)` confirms:
+
+- Both return movement types require a separate approver: `approved_by` / `approved_at` must be present, creator and approver must differ, poster must differ from approver, and the posting actor must have `finance.approve`.
+- Customer return is strictly positive and must enter `quarantine`; a serialized returned unit must currently be `sold` with no warehouse, then becomes `quarantine` in the destination warehouse. The movement requires a non-null source reference. The engine requires an explicit `p_unit_cost` and assigns it to a serialized unit.
+- Supplier return is strictly negative. Its valuation uses the current warehouse average cost in the inventory posting engine; serialized units must be in the warehouse and their current status must match the movement's selected inventory bucket, then become `returned_to_supplier` with no warehouse.
+- Positive movements require a valid `p_unit_cost`; outbound supplier return removes value at the current average cost. No arbitrary selling price should be passed to the movement engine.
+- `inventory_valuation_logs` records the movement type, quantity/value deltas, and average cost before/after.
+- Current role mapping includes `sales.return` for Sales, Manager and Owner; `purchasing.approve` for Manager and Owner; and `finance.approve` for Finance, Manager and Owner. Role mapping is confirmed, but live user assignments and warehouse isolation still require runtime tests.
+- The engine's customer-return quarantine rule is stricter than a free choice of sellable/quarantine/damaged. Any disposition change must be a separate controlled inspection/status-change process after return receipt, not an override of the return posting movement.
+
+### Customer return cost basis gate
+
+The Sales DO line stores its outbound movement ID, and the valuation log stores the exact inventory value removed by that movement. For an aggregate customer return, the candidate historical cost is the absolute original sale movement's `inventory_value_delta` divided by its absolute `quantity_delta`. For a serialized unit, the Product Unit's historical `unit_cost` may be used only if it is preserved and independently verified. This candidate basis must be tested for partial returns, multiple sales at different average costs, and repeat returns before implementation; the schema must not derive return cost from invoice selling price.
+
+### Remaining blockers
+
+- Confirm how source return quantities are protected against duplicate and concurrent requests and how a source movement is located for both aggregate and serialized returns.
+- Confirm supplier return source-line valuation against Goods Receipt's posted purchase movement and its valuation log, especially if stock has since been transferred or mixed.
+- Confirm the intended approval action and actor permissions in RPC design, including whether supplier return approval should require both `purchasing.approve` and the engine's `finance.approve`.
+- Validate clean-baseline migration replay and browser flows before applying any schema change to connected Development.

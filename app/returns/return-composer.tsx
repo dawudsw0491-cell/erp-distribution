@@ -36,7 +36,7 @@ export default function ReturnComposer({
   const payload = useMemo(() => sourceLines.filter((line) => selected[line.id]).map((line) => ({
     source_line_id: line.id,
     quantity: quantities[line.id] || "1",
-    ...(units[line.id] ? { product_unit_id: units[line.id] } : {}),
+    ...(units[line.id] ? { product_unit_code: units[line.id] } : {}),
   })), [sourceLines, selected, quantities, units]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -77,7 +77,7 @@ export default function ReturnComposer({
       <input type="hidden" name="source_document_id" value={sourceDocumentId} />
       <input type="hidden" name="items" value={JSON.stringify(payload.map((item) => {
         const line = sourceLines.find((row) => row.id === item.source_line_id);
-        return { ...item, ...(item.product_unit_id ? {} : line?.suggested_unit_id ? { product_unit_id: line.suggested_unit_id } : {}) };
+        return { ...item, ...(item.product_unit_code ? {} : line?.suggested_unit_id ? { product_unit_id: line.suggested_unit_id } : {}) };
       }))} />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium">Tanggal Retur<input type="date" name="return_date" required value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>

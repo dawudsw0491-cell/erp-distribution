@@ -54,15 +54,12 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   if(selected&&type==="supplier"){
     const {data,error}=await supabase.from("goods_receipt_items").select("id,quantity_received,inventory_status,purchase_order_items(product_variant_id,product_variants(id,variant_sku,variant_name,products(product_name,tracking_type))),goods_receipt_units(unit_code)").eq("goods_receipt_id",selected.id).order("created_at");
     if(error) lineError=error.message;
-    const unitCodes=(data??[]).flatMap((row:any)=>row.goods_receipt_units??[]).map((unit:any)=>unit.unit_code).filter(Boolean);
-    const {data:units}=unitCodes.length?await supabase.from("product_units").select("id,unit_code,product_variant_id,warehouse_id,unit_status").in("unit_code",unitCodes).eq("warehouse_id",selected.warehouse_id??""): {data:[] as any[]};
     sourceLines=(data??[]).map((row:any)=>{
       const poi=Array.isArray(row.purchase_order_items)?row.purchase_order_items[0]:row.purchase_order_items;
       const variant=Array.isArray(poi?.product_variants)?poi.product_variants[0]:poi?.product_variants;
       const product=Array.isArray(variant?.products)?variant.products[0]:variant?.products;
-      const receiptCodes=new Set((row.goods_receipt_units??[]).map((unit:any)=>unit.unit_code));
-      const options=(units??[]).filter((unit:any)=>receiptCodes.has(unit.unit_code)&&unit.product_variant_id===variant?.id&&unit.unit_status===row.inventory_status);
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity_received),inventory_status:row.inventory_status,units:options.map((unit:any)=>({id:unit.id,unit_code:unit.unit_code})),suggested_unit_id:null};
+      const options=(row.goods_receipt_units??[]).map((unit:any)=>({id:unit.unit_code,unit_code:unit.unit_code}));
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity_received),inventory_status:row.inventory_status,units:options,suggested_unit_id:null};
     });
   }
 

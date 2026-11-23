@@ -6,8 +6,9 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 import SalesOrderForm from "./sales-order-form";
 
 export const metadata={title:"Buat Penjualan | HEXA CORE ERP"};
-export default async function NewSalesPage() {
+export default async function NewSalesPage({searchParams}:{searchParams:Promise<{error?:string}>}) {
  await connection();
+ const notice=await searchParams;
  const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.create");
  if(!user) redirect("/login");
  if(!profile||!authorized) redirect("/sales?error=permission_denied");

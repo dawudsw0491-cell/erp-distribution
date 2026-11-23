@@ -217,3 +217,13 @@ Review confirmed the live inventory movement constraints accept the proposed ret
 ### Serialized supplier return UI refinement
 
 The supplier return composer now supports selecting multiple recorded Goods Receipt unit codes from one source line. Each selected unit is submitted as a separate one-unit return line, preserving Product Unit lineage. For IMEI/Serial GR lines that already contain unit records, the database rejects aggregate return lines without a Product Unit; the UI requires unit selection. Aggregate IMEI remains available only when the source GR line has no serialized unit records. This is source-level implementation only; no functional test has been run.
+
+
+### Latest source refinements
+
+- Return detail links now resolve to the existing parent Sales Order and Purchase Order detail routes while displaying the actual source DO/GR reference.
+- Supplier return composer supports multiple recorded unit codes from one GR line. Each becomes its own one-unit return line.
+- If a GR line has recorded IMEI/Serial unit rows, the database rejects an aggregate return against that line; aggregate IMEI remains available only for GR lines without unit records.
+- Approval and draft cancellation now enforce the user's access to the Return warehouse in addition to the module permission.
+- Posting explicitly requires creator, approver, and poster to be three distinct users.
+- These are source-level changes only. No connected database mutation or functional test has been performed.

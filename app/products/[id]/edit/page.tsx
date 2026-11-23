@@ -76,7 +76,6 @@ export default async function EditProductPage({
         barcode,
         product_name,
         category_id,
-        product_subcategory_id,
         product_condition,
         brand_id,
         model_id,

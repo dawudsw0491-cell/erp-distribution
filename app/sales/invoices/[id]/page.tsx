@@ -4,6 +4,7 @@ import {connection} from "next/server";
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import {getAuthorizationContext} from "@/lib/auth/authorization";
 import {recordInvoicePaymentAction} from "../actions";
+import InvoicePrintButton from "../print-button";
 
 export const metadata={title:"Detail Invoice | HEXA CORE ERP"};
 const money=(v:number|string)=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(Number(v??0));
@@ -26,7 +27,7 @@ export default async function InvoiceDetailPage({params,searchParams}:{params:Pr
  const warehouse=Array.isArray(invoice.warehouses)?invoice.warehouses[0]:invoice.warehouses;
  const balance=Number(invoice.subtotal)-Number(invoice.paid_amount);
  return <div className="min-h-screen bg-slate-100 md:flex print:bg-white"><ErpSidebar activePath="/sales"/><main className="min-w-0 flex-1 p-4 md:p-8"><div className="mx-auto max-w-5xl space-y-5">
- <div className="flex flex-wrap items-center justify-between gap-3 print:hidden"><Link href="/sales/invoices" className="text-sm font-semibold text-blue-700">← Daftar Invoice</Link><button onClick={undefined} className="rounded-lg border bg-white px-4 py-2 text-sm font-semibold" type="button">Cetak / Simpan PDF</button></div>
+ <div className="flex flex-wrap items-center justify-between gap-3 print:hidden"><Link href="/sales/invoices" className="text-sm font-semibold text-blue-700">← Daftar Invoice</Link><InvoicePrintButton/></div>
  {notice.error&&<p className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700">Aksi gagal ({notice.error}).</p>}{notice.created&&<p className="rounded-lg border border-emerald-200 bg-white p-3 text-sm text-emerald-700">Invoice diterbitkan.</p>}{notice.paid&&<p className="rounded-lg border border-emerald-200 bg-white p-3 text-sm text-emerald-700">Pembayaran dicatat.</p>}
  <article className="border bg-white p-8 shadow-sm print:border-0 print:shadow-none">
   <div className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-slate-900 pb-6"><div><p className="text-xs font-bold uppercase tracking-[0.25em] text-slate-500">HEXA CORE</p><h1 className="mt-2 text-3xl font-black tracking-wide">INVOICE</h1><p className="mt-1 text-sm text-slate-500">Dokumen penagihan penjualan</p></div><div className="text-right"><p className="text-sm text-slate-500">Nomor Invoice</p><p className="text-xl font-bold">{invoice.invoice_number}</p><p className="mt-2 text-sm">Tanggal: {invoice.invoice_date}</p><p className="text-sm">Jatuh tempo: {invoice.due_date??"—"}</p><p className="mt-2 text-sm font-semibold">{status[invoice.status]??invoice.status}</p></div></div>

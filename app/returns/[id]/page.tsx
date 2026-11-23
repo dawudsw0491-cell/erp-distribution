@@ -15,7 +15,7 @@ export default async function ReturnDetailPage({params,searchParams}:{params:Pro
   const {supabase,user,profile}=await getAuthorizationContext("sales.view");
   if(!user) redirect("/login");
   if(!profile) redirect("/returns?error=permission_denied");
-  const {data:row,error}=await supabase.from("sales_returns").select("*,customers(customer_code,customer_name),suppliers(supplier_code,supplier_name),warehouses(warehouse_name),delivery_orders(delivery_order_number),goods_receipts(receipt_number)").eq("id",id).maybeSingle();
+  const {data:row,error}=await supabase.from("sales_returns").select("*,customers(customer_code,customer_name),suppliers(supplier_code,supplier_name),warehouses(warehouse_name),delivery_orders(delivery_order_number,sales_order_id),goods_receipts(receipt_number,purchase_order_id)").eq("id",id).maybeSingle();
   if(error) return <div className="p-8 text-red-700">Data retur gagal dimuat. Pastikan akses tabel dan Data API tersedia.</div>;
   if(!row) notFound();
   const [{data:lines,error:linesError},canPost,canApproveCustomer,canApproveSupplier]=await Promise.all([
@@ -41,7 +41,7 @@ export default async function ReturnDetailPage({params,searchParams}:{params:Pro
       <div><p className="text-xs text-slate-500">Pihak</p><p className="mt-1 font-semibold">{party?.customer_name??party?.supplier_name??"—"}</p><p className="text-xs text-slate-500">{party?.customer_code??party?.supplier_code??""}</p></div>
       <div><p className="text-xs text-slate-500">Warehouse</p><p className="mt-1 font-semibold">{warehouse?.warehouse_name??"—"}</p></div>
       <div><p className="text-xs text-slate-500">Tanggal Retur</p><p className="mt-1 font-semibold">{row.return_date}</p></div>
-      <div><p className="text-xs text-slate-500">Dokumen Sumber</p>{row.return_type==="customer"?<Link href={`/sales/delivery-orders/${row.source_delivery_order_id}`} className="mt-1 inline-block font-semibold text-blue-700">{(Array.isArray(row.delivery_orders)?row.delivery_orders[0]:row.delivery_orders)?.delivery_order_number??"Delivery Order"}</Link>:<Link href={`/purchases/goods-receipts/${row.source_goods_receipt_id}`} className="mt-1 inline-block font-semibold text-blue-700">{(Array.isArray(row.goods_receipts)?row.goods_receipts[0]:row.goods_receipts)?.receipt_number??"Goods Receipt"}</Link>}</div>
+      <div><p className="text-xs text-slate-500">Dokumen Sumber</p>{row.return_type==="customer"?<Link href={`/sales/${(Array.isArray(row.delivery_orders)?row.delivery_orders[0]:row.delivery_orders)?.sales_order_id}`} className="mt-1 inline-block font-semibold text-blue-700">{(Array.isArray(row.delivery_orders)?row.delivery_orders[0]:row.delivery_orders)?.delivery_order_number??"Delivery Order"}</Link>:<Link href={`/purchases/${(Array.isArray(row.goods_receipts)?row.goods_receipts[0]:row.goods_receipts)?.purchase_order_id}`} className="mt-1 inline-block font-semibold text-blue-700">{(Array.isArray(row.goods_receipts)?row.goods_receipts[0]:row.goods_receipts)?.receipt_number??"Goods Receipt"}</Link>}</div>
       <div className="sm:col-span-2"><p className="text-xs text-slate-500">Alasan</p><p className="mt-1 font-medium">{row.reason}</p></div>
       <div className="sm:col-span-2"><p className="text-xs text-slate-500">Catatan</p><p className="mt-1">{row.notes??"—"}</p></div>
       <div><p className="text-xs text-slate-500">Dibuat</p><p className="mt-1 text-sm">{row.created_at}</p></div>

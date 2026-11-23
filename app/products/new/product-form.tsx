@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { createBrand, createProduct } from "../actions";
+import { createBrand, createProduct, createProductModelInline } from "../actions";
 import { MAIN_PRODUCT_CATEGORIES } from "@/lib/master-data/categories";
 import { recommendProductCategory, type ProductCategoryOption } from "@/lib/master-data/product-classification";
 
@@ -179,6 +179,138 @@ function BrandSelector({
 }
 
 
+function ProductModelSelector({
+  models,
+  brandId,
+  value,
+  disabled,
+  onChange,
+}: {
+  models: ModelOption[];
+  brandId: string;
+  value: string;
+  disabled: boolean;
+  onChange: (id: string) => void;
+}) {
+  const [items, setItems] = useState(models);
+  const [isManual, setIsManual] = useState(false);
+  const [modelCode, setModelCode] = useState("");
+  const [modelName, setModelName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCreate() {
+    if (!brandId || !modelCode.trim() || !modelName.trim() || isSaving) {
+      setError("Pilih Brand, lalu isi kode dan nama Product Model.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+    try {
+      const result = await createProductModelInline({
+        brandId,
+        modelCode: normalize(modelCode),
+        modelName: normalize(modelName),
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      const created: ModelOption = {
+        id: result.id,
+        brand_id: brandId,
+        model_name: result.name,
+        model_code: normalize(modelCode),
+      };
+      setItems((current) => [...current.filter((item) => item.id !== created.id), created]);
+      onChange(created.id);
+      setIsManual(false);
+      setModelCode("");
+      setModelName("");
+    } catch (caught) {
+      console.error("Create Product Model failed:", caught);
+      setError("Terjadi kesalahan saat menyimpan Product Model.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const availableModels = items.filter((item) => item.brand_id === brandId);
+
+  return (
+    <div>
+      <label className={labelClass}>Product Model</label>
+      <select
+        name="model_id"
+        value={isManual ? "__manual__" : value}
+        disabled={disabled}
+        className={inputClass}
+        onChange={(event) => {
+          if (event.target.value === "__manual__") {
+            setIsManual(true);
+            onChange("");
+            setError("");
+            return;
+          }
+          setIsManual(false);
+          setError("");
+          onChange(event.target.value);
+        }}
+      >
+        <option value="">Tanpa Model</option>
+        {availableModels.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.model_name} ({item.model_code})
+          </option>
+        ))}
+        <option value="__manual__">+ Tambah Product Model</option>
+      </select>
+
+      {isManual && (
+        <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <input
+            value={modelCode}
+            maxLength={50}
+            className={inputClass}
+            placeholder="Kode model, contoh: IPHONE-16"
+            onChange={(event) => {
+              setModelCode(event.target.value.toUpperCase());
+              setError("");
+            }}
+          />
+          <input
+            value={modelName}
+            maxLength={150}
+            className={inputClass}
+            placeholder="Nama Product Model"
+            onChange={(event) => {
+              setModelName(event.target.value.toUpperCase());
+              setError("");
+            }}
+          />
+          <button
+            type="button"
+            disabled={isSaving || !brandId || !modelCode.trim() || !modelName.trim()}
+            onClick={handleCreate}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isSaving ? "Menyimpan..." : "Simpan Product Model"}
+          </button>
+        </div>
+      )}
+
+      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+      <p className="mt-1 text-xs text-slate-500">
+        Model mengikuti Brand yang dipilih dan dapat ditambahkan tanpa keluar dari Product Management.
+      </p>
+    </div>
+  );
+}
+
+
 function SaveProductButton() {
   const { pending } = useFormStatus();
 
@@ -313,26 +445,13 @@ export default function ProductForm({
             }}
           />
 
-          <div>
-            <label className={labelClass}>Product Model</label>
-            <select
-              name="model_id"
-              value={modelId}
-              onChange={(event) => setModelId(event.target.value)}
-              disabled={!brandId || productType === "service"}
-              className={inputClass}
-            >
-              <option value="">Tanpa Model</option>
-              {models.filter((item) => item.brand_id === brandId).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.model_name} ({item.model_code})
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">
-              Model hanya menampilkan pilihan dari Brand yang dipilih.
-            </p>
-          </div>
+          <ProductModelSelector
+            models={models}
+            brandId={brandId}
+            value={modelId}
+            disabled={!brandId || productType === "service"}
+            onChange={setModelId}
+          />
 
           <div>
             <label className={labelClass}>Jenis Produk</label>

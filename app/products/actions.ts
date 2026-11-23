@@ -334,10 +334,6 @@ export async function createProduct(formData: FormData) {
 
   let categoryId = getOptionalUuid(formData.get("category_id"));
 
-  let subcategoryId = getOptionalUuid(
-    formData.get("product_subcategory_id")
-  );
-
   let productCondition = getProductCondition(
     formData.get("product_condition")
   );
@@ -375,7 +371,6 @@ export async function createProduct(formData: FormData) {
 
   if (
     categoryId === undefined ||
-    subcategoryId === undefined ||
     brandId === undefined ||
     modelId === undefined
   ) {
@@ -385,7 +380,6 @@ export async function createProduct(formData: FormData) {
   if (productType === "service") {
     // Layanan tidak memiliki klasifikasi persediaan barang.
     categoryId = null;
-    subcategoryId = null;
     productCondition = null;
     trackingType = "quantity";
     minimumStock = 0;
@@ -398,9 +392,6 @@ export async function createProduct(formData: FormData) {
       redirect("/products/new?error=condition_required");
     }
 
-    if (subcategoryId && !categoryId) {
-      redirect("/products/new?error=invalid_subcategory");
-    }
   }
 
   if (categoryId) {
@@ -420,19 +411,6 @@ export async function createProduct(formData: FormData) {
       )
     ) {
       redirect("/products/new?error=invalid_category");
-    }
-  }
-
-  if (subcategoryId) {
-    const { data: subcategory, error } = await auth.supabase
-      .from("product_categories")
-      .select("id, parent_id")
-      .eq("id", subcategoryId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (error || !subcategory || subcategory.parent_id !== categoryId) {
-      redirect("/products/new?error=invalid_subcategory");
     }
   }
 
@@ -491,7 +469,7 @@ export async function createProduct(formData: FormData) {
     if (variant.barcode) variantBarcodes.add(variant.barcode);
     if ([variant.ram, variant.rom, variant.color, variant.warranty].some((value) => value.length > 100)) redirect("/products/new?error=invalid_variants");
   }
-  const productPayload = { barcode, product_name: productName, category_id: categoryId, product_subcategory_id: subcategoryId, product_condition: productCondition, brand_id: brandId, model_id: productType === "goods" ? modelId : null, product_type: productType, tracking_type: trackingType, unit, description, minimum_stock: minimumStock };
+  const productPayload = { barcode, product_name: productName, category_id: categoryId, product_subcategory_id: null, product_condition: productCondition, brand_id: brandId, model_id: productType === "goods" ? modelId : null, product_type: productType, tracking_type: trackingType, unit, description, minimum_stock: minimumStock };
   const { data, error } = await auth.supabase.rpc("create_product_with_variants", { p_product: productPayload, p_variants: variants });
   if (error || !data?.product_id) {
     console.error("Create product with variants failed:", error);
@@ -554,10 +532,6 @@ export async function updateProduct(formData: FormData) {
 
   let categoryId = getOptionalUuid(formData.get("category_id"));
 
-  let subcategoryId = getOptionalUuid(
-    formData.get("product_subcategory_id")
-  );
-
   let productCondition = getProductCondition(
     formData.get("product_condition")
   );
@@ -595,7 +569,6 @@ export async function updateProduct(formData: FormData) {
 
   if (
     categoryId === undefined ||
-    subcategoryId === undefined ||
     brandId === undefined ||
     modelId === undefined
   ) {
@@ -605,7 +578,6 @@ export async function updateProduct(formData: FormData) {
   if (productType === "service") {
     // Aturan layanan harus konsisten saat create maupun update.
     categoryId = null;
-    subcategoryId = null;
     productCondition = null;
     trackingType = "quantity";
     minimumStock = 0;
@@ -618,9 +590,6 @@ export async function updateProduct(formData: FormData) {
       redirect(`${editPath}?error=condition_required`);
     }
 
-    if (subcategoryId && !categoryId) {
-      redirect(`${editPath}?error=invalid_subcategory`);
-    }
   }
 
   if (categoryId) {
@@ -640,19 +609,6 @@ export async function updateProduct(formData: FormData) {
       )
     ) {
       redirect(`${editPath}?error=invalid_category`);
-    }
-  }
-
-  if (subcategoryId) {
-    const { data: subcategory, error } = await auth.supabase
-      .from("product_categories")
-      .select("id, parent_id")
-      .eq("id", subcategoryId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (error || !subcategory || subcategory.parent_id !== categoryId) {
-      redirect(`${editPath}?error=invalid_subcategory`);
     }
   }
 
@@ -690,7 +646,7 @@ export async function updateProduct(formData: FormData) {
       barcode,
       product_name: productName,
       category_id: categoryId,
-      product_subcategory_id: subcategoryId,
+      product_subcategory_id: null,
       product_condition: productCondition,
       brand_id: brandId,
       model_id: productType === "goods" ? modelId : null,

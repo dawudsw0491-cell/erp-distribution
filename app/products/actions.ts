@@ -210,6 +210,99 @@ export async function createBrand(
   ]);
 }
 
+/**
+ * Create Product Model inline from the consolidated Product Management workspace.
+ */
+export async function createProductModelInline(input: {
+  brandId: string;
+  modelCode: string;
+  modelName: string;
+}): Promise<CreateMasterResult> {
+  const auth = await getAuthorizationContext("master.create");
+
+  if (!auth.user) {
+    return { success: false, error: "Sesi login telah berakhir. Silakan login kembali." };
+  }
+  if (!auth.authorized) {
+    return { success: false, error: "Anda tidak memiliki izin membuat Product Model." };
+  }
+
+  const brandId = input.brandId.trim();
+  const modelCode = normalizeMasterName(input.modelCode);
+  const modelName = normalizeMasterName(input.modelName);
+
+  if (!UUID_REGEX.test(brandId)) {
+    return { success: false, error: "Brand wajib dipilih terlebih dahulu." };
+  }
+  if (!modelCode || !modelName) {
+    return { success: false, error: "Kode dan nama Product Model wajib diisi." };
+  }
+  if (modelCode.length > 50 || modelName.length > 150 || !/^[A-Z0-9_-]+$/.test(modelCode)) {
+    return { success: false, error: "Format kode atau nama Product Model tidak valid." };
+  }
+
+  const { data: brand, error: brandError } = await auth.supabase
+    .from("brands")
+    .select("id")
+    .eq("id", brandId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (brandError || !brand) {
+    return { success: false, error: "Brand tidak ditemukan atau tidak aktif." };
+  }
+
+  const { data: existingCode, error: codeError } = await auth.supabase
+    .from("product_models")
+    .select("id")
+    .eq("brand_id", brandId)
+    .ilike("model_code", modelCode)
+    .maybeSingle();
+
+  if (codeError) {
+    console.error("Product Model code lookup failed:", codeError);
+    return { success: false, error: "Gagal memeriksa kode Product Model." };
+  }
+  if (existingCode) {
+    return { success: false, error: "Kode Product Model sudah digunakan pada Brand ini." };
+  }
+
+  const { data: existingName, error: nameError } = await auth.supabase
+    .from("product_models")
+    .select("id")
+    .eq("brand_id", brandId)
+    .ilike("model_name", modelName)
+    .maybeSingle();
+
+  if (nameError) {
+    console.error("Product Model name lookup failed:", nameError);
+    return { success: false, error: "Gagal memeriksa nama Product Model." };
+  }
+  if (existingName) {
+    return { success: false, error: "Nama Product Model sudah digunakan pada Brand ini." };
+  }
+
+  const { data, error } = await auth.supabase
+    .from("product_models")
+    .insert({
+      brand_id: brandId,
+      model_code: modelCode,
+      model_name: modelName,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    console.error("Create Product Model inline failed:", error);
+    return { success: false, error: "Product Model gagal disimpan." };
+  }
+
+  revalidatePath("/products");
+  revalidatePath("/products/new");
+  return { success: true, id: data.id, name: modelName };
+}
+
 /* =========================================================
    PRODUCT MASTER - CREATE
 ========================================================= */

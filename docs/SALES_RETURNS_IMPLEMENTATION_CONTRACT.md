@@ -166,3 +166,27 @@ The live Development RBAC and inventory movement authorization were inspected to
 - Canonical movement source references are fixed as `source_reference_type = 'customer_return'` or `'supplier_return'`, `source_reference_id = return line id`, and `source_reference_number = return document number`. This keeps the movement traceable to the exact Return line and avoids overloading the original DO/GR source reference.
 
 **Implementation gate:** do not apply a Return migration to connected Development until the scoped posting-authorization bridge and clean-baseline migration replay are in place. This inspection was read-only; no schema, role assignment, or business data was changed.
+
+
+## Source implementation milestone — RET-001B/001C/001D (2026-11-23)
+
+Source files now exist on the implementation branch; they have **not** been applied to Development and have not been functionally tested.
+
+- Migration source: `supabase/migrations/20261123140000_sales_returns_lifecycle.sql`.
+- Tables: `sales_returns`, `sales_return_items`; SELECT-only authenticated grants with RLS policies for Sales and Purchasing visibility.
+- RPCs: `sales_return_create_draft`, `sales_return_approve`, `sales_return_post`, and `sales_return_cancel_draft`.
+- The canonical `post_inventory_movement_unlocked` definition is replaced in the migration with a narrow authorization bridge. Customer return requires `sales.return` and `finance.approve`; supplier return requires `purchasing.approve` and `finance.approve`. Other movement types retain the existing `inventory.update` gate.
+- Movement source refs are Return-line-specific: `customer_return` / `supplier_return` and Return line UUID.
+- Posting serializes on source parent, then source lines, then warehouse. It rechecks remaining source quantity and duplicate serialized-unit returns. Multiple lines for the same source line are cumulatively counted in stable line-ID order.
+- Customer return uses the original DO movement valuation log for aggregate cost, and Product Unit historical cost for tagged units. Supplier return leaves cost null so the existing engine uses current warehouse average cost.
+- Customer return enters quarantine. Supplier return removes the exact selected source inventory bucket. Tagged Product Units are one unit per line; untagged IMEI aggregate quantities remain supported.
+- UI source files: `app/returns/actions.ts`, `app/returns/page.tsx`, `app/returns/new/page.tsx`, `app/returns/return-composer.tsx`, and `app/returns/[id]/page.tsx`. The existing sidebar already contained a single Returns entry.
+
+### Not yet complete / release blockers
+
+- Migration has not been replayed on an isolated clean baseline. It must not be applied to connected Development or Production before that gate.
+- No ad-hoc functional tests, build, lint, browser E2E, or business data creation were run, per the deferred integrated-validation policy.
+- Supabase Data API exposure for newly created public tables still needs confirmation before relying on direct table reads from the UI.
+- Draft edit, document-level cancellation UX is present for draft only; posted reversal is not implemented and must remain unavailable.
+- Source document navigation/reference display can be improved; current detail page identifies source document type but not yet its source number/link.
+- Finance credit/refund, supplier debit/credit, AR/AP and GL remain outside Returns until Accounting contract is approved.

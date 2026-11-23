@@ -106,3 +106,18 @@ The Sales DO line stores its outbound movement ID, and the valuation log stores 
 - Confirm supplier return source-line valuation against Goods Receipt's posted purchase movement and its valuation log, especially if stock has since been transferred or mixed.
 - Confirm the intended approval action and actor permissions in RPC design, including whether supplier return approval should require both `purchasing.approve` and the engine's `finance.approve`.
 - Validate clean-baseline migration replay and browser flows before applying any schema change to connected Development.
+
+
+### Additional source-lineage inspection (Development, read-only)
+
+The current source linkage is asymmetric and must be respected:
+
+- Each posted Delivery Order line stores its exact outbound inventory_movement_id. The DO posting function creates one sale movement per DO line and uses source_reference_type = 'delivery_order' with source_reference_id = delivery_order_items.id. This gives customer returns a deterministic source movement and valuation-log lookup.
+- Goods Receipt lines do not store an inventory movement ID. The Goods Receipt posting function creates one or more purchase movements per receipt header and sets source_reference_type = 'goods_receipt' and source_reference_id = goods_receipts.id. Quantity-tracked GR lines can therefore share the receipt-level source reference; IMEI/serial receipt movements may be split into one movement per tagged unit plus one aggregate movement for untagged quantity.
+- Goods Receipt line cost is computed from net goods value plus proportionally allocated PO shipping, excluding recoverable tax. The movement valuation log records the posted movement value. Supplier-return source attribution cannot safely assume a one-to-one GR-line-to-movement relationship.
+- The movement engine values supplier returns at the current average cost of the exact warehouse/variant balance, not the original GR unit cost. This is the existing live inventory valuation contract and must remain the stock ledger's authoritative result. A supplier-return workflow may preserve original GR cost for traceability, but must not override the movement engine's current-average-cost calculation.
+- The customer return source movement can be resolved through delivery_order_items.inventory_movement_id; source valuation must use its posted valuation log, not invoice price. Partial return quantities must be costed against the original movement's recorded unit value basis, with rounding reconciliation explicitly defined before posting is enabled.
+
+### Implementation gate update
+
+Read-only inspection confirms a deterministic customer-return source movement, but does not resolve the complete supplier-return per-line lineage or the accounting treatment. Therefore RET-001B/RET-001C remain gated: do not create return tables, draft RPCs, posting RPCs, or UI actions until the source-lineage strategy, serialized/aggregate IMEI split rules, return-quantity lock key, approval actor sequence, and reversal contract are finalized. No connected Development schema or business data was changed by this inspection.

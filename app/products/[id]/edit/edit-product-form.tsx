@@ -26,7 +26,6 @@ type ProductData = {
   barcode: string | null;
   product_name: string;
   category_id: string | null;
-  product_subcategory_id: string | null;
   product_condition: string | null;
   brand_id: string | null;
   model_id: string | null;
@@ -72,10 +71,6 @@ export default function EditProductForm({
   const [categoryId, setCategoryId] = useState(
     product.category_id ?? ""
   );
-  const [subcategoryId, setSubcategoryId] = useState(
-    product.product_subcategory_id ?? ""
-  );
-
   const selectedBrandName =
     brands.find((item) => item.id === brandId)?.brand_name ?? "";
 
@@ -88,17 +83,6 @@ export default function EditProductForm({
           item.is_active !== false
       ),
     [categories]
-  );
-
-  const subcategories = useMemo(
-    () =>
-      categories.filter(
-        (item) =>
-          item.parent_id === categoryId &&
-          item.parent_id !== null &&
-          item.is_active !== false
-      ),
-    [categories, categoryId]
   );
 
   const recommendation = useMemo(
@@ -124,7 +108,6 @@ export default function EditProductForm({
     if (!recommendation) return;
 
     setCategoryId(recommendation.categoryId);
-    setSubcategoryId(recommendation.subcategoryId);
   }
 
   return (
@@ -244,7 +227,6 @@ export default function EditProductForm({
 
               if (nextType === "service") {
                 setCategoryId("");
-                setSubcategoryId("");
               }
             }}
             className={inputClass}
@@ -267,7 +249,6 @@ export default function EditProductForm({
                 value={condition}
                 onChange={(event) => {
                   setCondition(event.target.value);
-                  setSubcategoryId("");
                 }}
                 className={inputClass}
               >
@@ -312,47 +293,6 @@ export default function EditProductForm({
               </select>
             </div>
 
-            <div className="min-w-0">
-              <label
-                htmlFor="product_subcategory_id"
-                className={labelClass}
-              >
-                Subkategori
-              </label>
-              <select
-                id="product_subcategory_id"
-                name="product_subcategory_id"
-                value={subcategoryId}
-                onChange={(event) =>
-                  setSubcategoryId(event.target.value)
-                }
-                disabled={!categoryId}
-                className={inputClass}
-              >
-                <option value="">Tanpa Subkategori</option>
-
-                {product.product_subcategory_id &&
-                  !subcategories.some(
-                    (item) =>
-                      item.id === product.product_subcategory_id
-                  ) &&
-                  subcategoryId === product.product_subcategory_id && (
-                    <option value={product.product_subcategory_id}>
-                      Subkategori sebelumnya (Data lama)
-                    </option>
-                  )}
-
-                {subcategories.map((subcategory) => (
-                  <option
-                    key={subcategory.id}
-                    value={subcategory.id}
-                  >
-                    {subcategory.category_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Category Recommendation */}
             <div className="min-w-0 md:col-span-2">
               {recommendation ? (
@@ -363,17 +303,7 @@ export default function EditProductForm({
 
                   <p className="mt-2 text-sm text-slate-700">
                     {recommendation.categoryName}
-                    {recommendation.subcategoryName
-                      ? ` → ${recommendation.subcategoryName}`
-                      : ""}
                   </p>
-
-                  {recommendation.missingSubcategory && (
-                    <p className="mt-1 text-xs text-amber-700">
-                      Subkategori yang sesuai belum tersedia atau tidak
-                      aktif. Kategori utama tetap dapat digunakan.
-                    </p>
-                  )}
 
                   <button
                     type="button"

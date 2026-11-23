@@ -242,6 +242,7 @@ begin
 
   select * into v_return from public.sales_returns where id=p_return_id for update;
   if v_return.status<>'approved' then raise exception 'Retur harus approved dan belum pernah diposting.'; end if;
+  if v_return.created_by=v_user then raise exception 'Pembuat retur tidak boleh menjadi poster.'; end if;
   if v_return.approved_by=v_user then raise exception 'Approver tidak boleh memposting retur yang sama.'; end if;
   if v_return.return_type='customer' and not public.has_permission('sales.return') then raise exception 'Permission sales.return diperlukan.'; end if;
   if v_return.return_type='supplier' and not public.has_permission('purchasing.approve') then raise exception 'Permission purchasing.approve diperlukan.'; end if;

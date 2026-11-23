@@ -34,7 +34,7 @@ export default async function EditSalesOrderPage({params,searchParams}:{params:P
     .eq("sales_order_id",id).order("created_at");
   if(linesResult.error){console.error("Draft SO lines load failed:",linesResult.error);return <div className="p-8">Gagal memuat detail Sales Order.</div>;}
 
-  const productMap=new Map((products.data??[]).map(p=>[p.id,p]));
+  if(customers.error||warehouses.error||products.error||variants.error){\n    console.error("Draft SO master data load failed",{customers:customers.error,warehouses:warehouses.error,products:products.error,variants:variants.error});\n    return <div className="min-h-screen bg-slate-100 p-8"><p className="rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">Form edit tidak dapat dimuat lengkap karena data master gagal dibaca. Draft tidak diubah.</p></div>;\n  }\n  const productMap=new Map((products.data??[]).map(p=>[p.id,p]));
   const variantOptions=(variants.data??[]).flatMap(v=>{
     const p=productMap.get(v.product_id);
     return p?[{id:v.id,variant_sku:v.variant_sku,variant_name:v.variant_name,product_name:p.product_name,tracking_type:p.tracking_type}]:[];

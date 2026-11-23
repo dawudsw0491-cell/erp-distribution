@@ -193,6 +193,11 @@ begin
         select 1 from public.goods_receipt_units gru join public.product_units pu on pu.unit_code=gru.unit_code
         where gru.goods_receipt_item_id=v_source_line and pu.id=v_unit and pu.product_variant_id=v_line.product_variant_id
       ) then raise exception 'Product Unit tidak berasal dari baris Goods Receipt.'; end if;
+      if v_line.tracking_type in ('imei','serial')
+         and exists (select 1 from public.goods_receipt_units gru where gru.goods_receipt_item_id=v_source_line)
+         and (v_unit is null or v_qty<>1) then
+        raise exception 'Goods Receipt yang mencatat unit IMEI/serial wajib diretur per Product Unit.';
+      end if;
       select v_line.quantity_received-coalesce(sum(ri.quantity),0) into v_remaining
       from public.sales_return_items ri join public.sales_returns r on r.id=ri.return_id
       where ri.source_goods_receipt_item_id=v_source_line and r.status='posted';

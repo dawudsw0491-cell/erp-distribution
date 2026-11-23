@@ -98,7 +98,7 @@ create or replace function public.sales_return_create_draft(
 ) returns uuid language plpgsql security definer set search_path='' as $$
 declare
   v_user uuid:=auth.uid(); v_return_id uuid; v_doc record; v_item jsonb; v_line record;
-  v_source_line uuid; v_qty numeric(18,3); v_unit uuid; v_tracking text;
+  v_source_line uuid; v_qty numeric(18,3); v_unit uuid; v_unit_code text; v_tracking text;
   v_remaining numeric(18,3); v_count integer:=0;
 begin
   if v_user is null or p_return_type not in ('customer','supplier') then raise exception 'Jenis retur atau sesi tidak valid.'; end if;
@@ -138,6 +138,7 @@ begin
     v_source_line:=(v_item->>'source_line_id')::uuid;
     v_qty:=(v_item->>'quantity')::numeric;
     v_unit:=nullif(v_item->>'product_unit_id','')::uuid;
+    v_unit_code:=nullif(btrim(v_item->>'product_unit_code'),'');
     if v_qty<=0 then raise exception 'Kuantitas retur harus lebih dari nol.'; end if;
 
     if p_return_type='customer' then
@@ -149,7 +150,12 @@ begin
       join public.product_variants pv on pv.id=doi.product_variant_id
       where doi.id=v_source_line and doi.delivery_order_id=p_source_document_id;
       if not found then raise exception 'Baris bukan bagian dari Delivery Order sumber.'; end if;
-      if v_unit is not null and v_unit is distinct from v_line.source_unit then raise exception 'Product Unit tidak sesuai baris Delivery Order.'; end if;
+      if v_line.source_unit is not null then
+        if v_unit is not null and v_unit is distinct from v_line.source_unit then raise exception 'Product Unit tidak sesuai baris Delivery Order.'; end if;
+        v_unit:=v_line.source_unit;
+      elsif v_unit_code is not null then
+        raise exception 'Customer return mengikuti Product Unit yang tercatat pada Delivery Order.';
+      end if;
       if v_line.tracking_type='serial' and (v_unit is null or v_qty<>1) then raise exception 'Produk serial wajib satu Product Unit per baris.'; end if;
       if v_line.tracking_type in ('imei','serial') and v_qty<>trunc(v_qty) then raise exception 'Kuantitas IMEI/serial harus bulat.'; end if;
       if v_unit is not null and v_qty<>1 then raise exception 'Product Unit individual hanya boleh diretur satu unit per baris.'; end if;
@@ -172,6 +178,17 @@ begin
       if v_line.tracking_type='serial' and (v_unit is null or v_qty<>1) then raise exception 'Produk serial wajib satu Product Unit per baris.'; end if;
       if v_line.tracking_type in ('imei','serial') and v_qty<>trunc(v_qty) then raise exception 'Kuantitas IMEI/serial harus bulat.'; end if;
       if v_line.tracking_type='quantity' and v_unit is not null then raise exception 'Produk quantity tidak menggunakan Product Unit.'; end if;
+      if v_unit_code is not null then
+        select pu.id into v_unit
+        from public.goods_receipt_units gru
+        join public.product_units pu on pu.unit_code=gru.unit_code
+        where gru.goods_receipt_item_id=v_source_line
+          and gru.unit_code=v_unit_code
+          and pu.product_variant_id=v_line.product_variant_id
+          and pu.warehouse_id=(select warehouse_id from public.goods_receipts where id=p_source_document_id)
+          and pu.unit_status=v_line.inventory_status;
+        if not found then raise exception 'Unit code tidak tersedia pada Goods Receipt atau sudah tidak berada pada bucket sumber.'; end if;
+      end if;
       if v_unit is not null and not exists (
         select 1 from public.goods_receipt_units gru join public.product_units pu on pu.unit_code=gru.unit_code
         where gru.goods_receipt_item_id=v_source_line and pu.id=v_unit and pu.product_variant_id=v_line.product_variant_id

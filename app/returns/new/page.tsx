@@ -41,14 +41,10 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   if(selected&&type==="customer"){
     const {data,error}=await supabase.from("delivery_order_items").select("id,quantity,product_unit_id,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("delivery_order_id",selected.id).order("created_at");
     if(error) lineError=error.message;
-    const unitIds=(data??[]).map((row:any)=>row.product_unit_id).filter(Boolean);
-    const {data:units}=unitIds.length?await supabase.from("product_units").select("id,unit_code").in("id",unitIds):{data:[] as any[]};
-    const unitMap=new Map((units??[]).map((unit:any)=>[unit.id,unit]));
     sourceLines=(data??[]).map((row:any)=>{
       const product=Array.isArray(row.products)?row.products[0]:row.products;
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
-      const unit=row.product_unit_id?unitMap.get(row.product_unit_id):null;
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:unit?[unit]:[],suggested_unit_id:unit?.id??null};
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null};
     });
   }
   if(selected&&type==="supplier"){

@@ -10,7 +10,7 @@ export default function SalesOrderForm({customers,warehouses,variants,mode="crea
  const [items,setItems]=useState<Item[]>(initial?.items?.length?initial.items:[{product_variant_id:variants[0]?.id??"",quantity:"1",unit_price:"0"}]);
  const total=useMemo(()=>items.reduce((s,i)=>s+Number(i.quantity||0)*Number(i.unit_price||0),0),[items]);
  const update=(index:number,key:keyof Item,value:string)=>setItems(rows=>rows.map((r,i)=>i===index?{...r,[key]:value}:r));
- const invalid=!customers.length||!warehouses.length||!variants.length||items.some(i=>!i.product_variant_id||!Number.isFinite(Number(i.quantity))||Number(i.quantity)<=0||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0);
+ const invalid=!customers.length||!warehouses.length||!variants.length||items.some(i=>{const variant=variants.find(v=>v.id===i.product_variant_id);const quantity=Number(i.quantity);return !variant||!Number.isFinite(quantity)||quantity<=0||((variant.tracking_type==="imei"||variant.tracking_type==="serial")&&!Number.isInteger(quantity))||!Number.isFinite(Number(i.unit_price))||Number(i.unit_price)<0;});
  return <form action={mode==="edit"?updateDraftSalesOrderAction:createSalesOrderAction} className="space-y-5">\n {mode==="edit"&&salesOrderId&&<input type="hidden" name="sales_order_id" value={salesOrderId}/>}
  <section className="rounded-xl border bg-white p-5"><h2 className="font-semibold">Informasi Penjualan</h2><div className="mt-4 grid gap-4 md:grid-cols-2">
  <label className="text-sm font-medium">Pelanggan<select name="customer_id" required defaultValue={initial?.customerId} className="mt-2 w-full rounded-lg border p-2.5">{customers.map(c=><option key={c.id} value={c.id}>{c.customer_code} — {c.customer_name}</option>)}</select></label>

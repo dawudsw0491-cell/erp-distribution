@@ -145,3 +145,24 @@ The source document lock, quantity recomputation, and valuation source are now d
 `goods_receipt_units` stores `goods_receipt_item_id` and `unit_code`; the Goods Receipt posting function creates `product_units` with the same `unit_code` and `product_variant_id`, then copies identifiers into `product_unit_identifiers`. Therefore a supplier-return tagged unit can be resolved through the source GR item to its Product Variant and the matching Product Unit `unit_code` (with warehouse and identifier consistency checks). The return line must retain both `goods_receipt_item_id` and `product_unit_id`; it must not infer source ownership from an IMEI value alone. A unit is returnable only while it remains in the receipt's warehouse, has an eligible inventory status, and has not already been returned.
 
 This closes the serialized source-lineage question for Goods Receipt. The remaining implementation prerequisites are to inspect exact approval RPC/RBAC conventions and settle the canonical movement source reference convention; both are source-level checks. The final accounting treatment of supplier credit/debit remains separate.
+
+
+### Approval and permission contract verification — 2026-11-23
+
+The live Development RBAC and inventory movement authorization were inspected together:
+
+- `inventory_movements` has RLS enabled, authenticated SELECT only, and no authenticated INSERT/UPDATE/DELETE grant. Its only SELECT policy requires `inventory.view` (or owner) plus warehouse access.
+- Movement draft creation helpers require `inventory.update`. The core posting engine also requires `inventory.update` for every movement except `sale`.
+- Current role permissions relevant to Returns:
+  - Sales: `sales.return`
+  - Manager: `sales.return`, `purchasing.approve`, `finance.approve`
+  - Finance: `finance.approve`
+  - Warehouse: `inventory.update`
+  - Owner: `sales.return`, `purchasing.approve`, `finance.approve`, `inventory.update`
+  - Purchasing: `purchasing.approve`; it does not currently have `inventory.update` in the inspected mapping.
+- Therefore the existing generic movement helpers cannot be called directly by every intended Returns role. Do not silently grant broader `inventory.update` permission to Sales, Purchasing, or Finance.
+- The Returns implementation must use narrowly scoped SECURITY DEFINER RPCs for draft creation, approval, and posting. A narrowly scoped authorization bridge in the inventory posting engine is still required so that customer-return posting accepts the Returns-specific authorization contract (`sales.return` plus the existing maker-checker/finance approval requirements), and supplier-return posting accepts `purchasing.approve` plus those same separation-of-duties requirements. Other movement types must continue to require `inventory.update`.
+- Approval RPC must set `approved_by` and `approved_at` only on draft movements linked to the same draft Return header/line. No direct authenticated table update is allowed.
+- Canonical movement source references are fixed as `source_reference_type = 'customer_return'` or `'supplier_return'`, `source_reference_id = return line id`, and `source_reference_number = return document number`. This keeps the movement traceable to the exact Return line and avoids overloading the original DO/GR source reference.
+
+**Implementation gate:** do not apply a Return migration to connected Development until the scoped posting-authorization bridge and clean-baseline migration replay are in place. This inspection was read-only; no schema, role assignment, or business data was changed.

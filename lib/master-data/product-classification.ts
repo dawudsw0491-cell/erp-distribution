@@ -21,7 +21,6 @@ export function recommendProductCategory(
   if (!name || !condition) return null;
 
   let mainCategory = "";
-  let subcategory = "";
 
   if (/\b(IPAD|TABLET|GALAXY TAB|REDMI PAD|XIAOMI PAD)\b/.test(name)) {
     mainCategory = "TABLET";
@@ -46,7 +45,6 @@ export function recommendProductCategory(
     (brand === "APPLE" && /\b(15|16|17|14|13|12|11)\b/.test(name))
   ) {
     mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE IOS";
   } else if (
     /\b(SMARTPHONE|GALAXY|REDMI|POCO|XIAOMI|OPPO|VIVO|REALME|INFINIX|TECNO)\b/.test(name) ||
     (
@@ -55,14 +53,10 @@ export function recommendProductCategory(
     )
   ) {
     mainCategory = "SMARTPHONE";
-    subcategory = "SMARTPHONE ANDROID";
   }
 
   if (!mainCategory) return null;
 
-  if (condition === "SECOND") {
-    subcategory = `${mainCategory} SECONDHAND`;
-  }
 
   const main = categories.find(
     (item) =>
@@ -73,20 +67,8 @@ export function recommendProductCategory(
 
   if (!main) return null;
 
-  const child = subcategory
-    ? categories.find(
-        (item) =>
-          item.category_name === subcategory &&
-          item.parent_id === main.id &&
-          item.is_active !== false
-      )
-    : undefined;
-
   return {
     categoryId: main.id,
     categoryName: main.category_name,
-    subcategoryId: child?.id ?? "",
-    subcategoryName: child?.category_name ?? "",
-    missingSubcategory: Boolean(subcategory && !child),
   };
 }

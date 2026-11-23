@@ -270,7 +270,6 @@ export default function EditProductForm({
                 value={categoryId}
                 onChange={(event) => {
                   setCategoryId(event.target.value);
-                  setSubcategoryId("");
                 }}
                 className={inputClass}
               >

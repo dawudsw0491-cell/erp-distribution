@@ -60,6 +60,11 @@ export default function ReturnComposer({
     }
     for (const line of chosenLines) {
       const selectedCodes = units[line.id] ?? [];
+      if (line.units.length && line.tracking_type !== "quantity" && selectedCodes.length === 0) {
+        event.preventDefault();
+        setError(`Pilih Product Unit untuk retur ${line.product_name}; sumber mencatat unit individual.`);
+        return;
+      }
       const quantity = line.has_source_unit ? 1 : selectedCodes.length ? selectedCodes.length : Number(quantities[line.id] || "1");
       if (!Number.isFinite(quantity) || quantity <= 0 || quantity > line.source_quantity) {
         event.preventDefault();

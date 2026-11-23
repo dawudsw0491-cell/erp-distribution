@@ -1066,3 +1066,19 @@ BEGIN
 END;
 $function$
 
+
+create or replace function public.sales_return_cancel_draft(p_return_id uuid) returns uuid
+language plpgsql security definer set search_path='' as $$
+declare v_user uuid:=auth.uid(); v_return public.sales_returns%rowtype;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  select * into v_return from public.sales_returns where id=p_return_id for update;
+  if not found or v_return.status<>'draft' then raise exception 'Hanya retur draft yang dapat dibatalkan.'; end if;
+  if v_return.return_type='customer' and not public.has_permission('sales.return') then raise exception 'Permission sales.return diperlukan.'; end if;
+  if v_return.return_type='supplier' and not public.has_permission('purchasing.create') then raise exception 'Permission purchasing.create diperlukan.'; end if;
+  update public.sales_returns set status='cancelled',updated_at=now() where id=p_return_id;
+  return p_return_id;
+end; $$;
+
+revoke all on function public.sales_return_cancel_draft(uuid) from public,anon;
+grant execute on function public.sales_return_cancel_draft(uuid) to authenticated;

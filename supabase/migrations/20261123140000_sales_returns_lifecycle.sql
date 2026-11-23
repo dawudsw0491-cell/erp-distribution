@@ -219,6 +219,7 @@ begin
   if v_user is null then raise exception 'Authentication required.'; end if;
   select * into v_return from public.sales_returns where id=p_return_id for update;
   if not found or v_return.status<>'draft' then raise exception 'Hanya retur draft yang dapat disetujui.'; end if;
+  if not public.has_warehouse_access(v_return.warehouse_id) then raise exception 'Akses warehouse ditolak.'; end if;
   if v_return.created_by=v_user then raise exception 'Pembuat retur tidak boleh menyetujui retur sendiri.'; end if;
   if v_return.return_type='customer' and not public.has_permission('sales.return') then raise exception 'Permission sales.return diperlukan.'; end if;
   if v_return.return_type='supplier' and not public.has_permission('purchasing.approve') then raise exception 'Permission purchasing.approve diperlukan.'; end if;
@@ -1097,6 +1098,7 @@ begin
   if v_user is null then raise exception 'Authentication required.'; end if;
   select * into v_return from public.sales_returns where id=p_return_id for update;
   if not found or v_return.status<>'draft' then raise exception 'Hanya retur draft yang dapat dibatalkan.'; end if;
+  if not public.has_warehouse_access(v_return.warehouse_id) then raise exception 'Akses warehouse ditolak.'; end if;
   if v_return.return_type='customer' and not public.has_permission('sales.return') then raise exception 'Permission sales.return diperlukan.'; end if;
   if v_return.return_type='supplier' and not public.has_permission('purchasing.create') then raise exception 'Permission purchasing.create diperlukan.'; end if;
   update public.sales_returns set status='cancelled',updated_at=now() where id=p_return_id;

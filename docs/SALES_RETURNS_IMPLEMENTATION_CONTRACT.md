@@ -197,3 +197,18 @@ Source files now exist on the implementation branch; they have **not** been appl
 - Customer-return Product Unit is derived server-side from the selected posted DO line; the browser cannot substitute a different unit. This avoids depending on direct Product Unit table visibility for Sales users.
 - Supplier-return unit selection sends the original Goods Receipt `unit_code`; the draft RPC resolves it to the canonical Product Unit and verifies receipt-line ownership, Variant, warehouse and source inventory status.
 - The initial composer exposes one individually tagged unit per source line per draft. The database posting contract supports multiple tagged unit lines; the current UI may require separate drafts for multiple units from one GR line until multi-unit selection is added.
+
+
+### Authorization review refinement — 2026-11-23
+
+Read-only inspection of Development role mappings confirmed:
+- Sales role: `sales.view`, `sales.return`.
+- Purchasing role: `purchasing.view`, `purchasing.create`.
+- Manager: `sales.return`, `purchasing.approve`, `finance.approve`.
+- Finance: `finance.approve`.
+- Warehouse: `inventory.update`.
+- Owner: all relevant permissions.
+
+The source migration uses `purchasing.create` for supplier-return draft creation and `purchasing.approve` for approval/posting authorization. It does not grant or alter any role permission. Posting now explicitly rejects the original draft creator as poster in addition to rejecting the approver, preserving three distinct actors.
+
+Review confirmed the live inventory movement constraints accept the proposed return movement directions and the `(product_variant_id, product_id)` composite FK is backed by a unique constraint. This is read-only schema inspection, not a migration replay or functional test.

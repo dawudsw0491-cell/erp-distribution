@@ -33,8 +33,12 @@ begin
   if v_order.status not in ('confirmed','partially_delivered') then
     raise exception 'Delivery Order hanya dapat dibuat dari Sales Order confirmed.';
   end if;
-  if not public.has_warehouse_access(v_order.warehouse_id) then
-    raise exception 'Akses warehouse ditolak.';
+  if not public.has_warehouse_access(v_order.warehouse_id)
+     or not exists (select 1 from public.warehouses w where w.id=v_order.warehouse_id and w.is_active) then
+    raise exception 'Warehouse tidak aktif atau akses warehouse ditolak.';
+  end if;
+  if not exists (select 1 from public.customers c where c.id=v_order.customer_id and c.is_active) then
+    raise exception 'Pelanggan tidak ditemukan atau tidak aktif.';
   end if;
   perform public.lock_inventory_warehouse(v_order.warehouse_id);
 

@@ -1,7 +1,7 @@
 # Sales Implementation Specification
 
 **Backlog:** SALES-001  
-**Status:** Phase 1 design baseline; implementation not yet applied  
+**Status:** Phase 1 source implementation committed; Development application and functional validation remain gated  
 **Scope:** Existing ERP Sales workflow only. This document does not introduce a separate CRM, fulfillment, or accounting module.
 
 ## 1. Business lifecycle
@@ -304,3 +304,16 @@ These are source-only changes. No Sales migration has been applied to Developmen
 ## 10.13 RPC input-boundary limits — 2026-11-22
 
 Server-side validation now enforces a maximum of 2,000 characters for SO and DO notes in the create/edit RPC paths. The 100-row limit is enforced in the SO create, DO create, and SO draft-edit RPCs; these limits are not dependent solely on browser/server-action validation. Matching client actions already apply the same note length limit.
+
+
+## 10.14 Active master-data revalidation — source committed
+
+The Sales RPC boundary now rechecks master-data activation at transaction time rather than relying only on the UI or the state observed when a draft was first created:
+
+- `sales_create_order` requires the target warehouse to remain active and accessible.
+- `sales_confirm_order` rechecks both active customer and active warehouse before confirmation.
+- `sales_create_delivery_order` rechecks the SO customer and warehouse before creating a draft DO.
+- `sales_update_draft_order` requires the destination warehouse to be active and accessible.
+- `sales_post_delivery_order` rechecks active warehouse status before taking the inventory posting lock.
+
+This prevents a draft or confirmed transaction from progressing against a customer/warehouse that was deactivated after the previous workflow step. These are source migration edits only. No Sales migration was applied to Development or Production; SQL replay, RLS/ACL, role/warehouse, rollback, concurrency, build, and browser verification remain pending.

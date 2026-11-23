@@ -108,7 +108,6 @@ export default async function ProductDetailPage({
       created_at,
       updated_at,
       category_id,
-      product_subcategory_id,
       product_condition,
       brand:brands(brand_name)
     `)
@@ -206,42 +205,19 @@ export default async function ProductDetailPage({
     specificationsByVariant.set(mapping.product_variant_id, current);
   }
 
-  // Ambil nama kategori dan subkategori secara terpisah
-  // untuk menghindari ambiguitas dua foreign key ke tabel yang sama.
-  const categoryIds = [
-    ...new Set(
-      [product.category_id, product.product_subcategory_id].filter(
-        (value): value is string => Boolean(value)
-      )
-    ),
-  ];
-
   let categoryName = "-";
-  let subcategoryName = "-";
 
-  if (categoryIds.length > 0) {
-    const { data: categories, error: categoryError } = await supabase
+  if (product.category_id) {
+    const { data: category, error: categoryError } = await supabase
       .from("product_categories")
-      .select("id, category_name")
-      .in("id", categoryIds);
+      .select("category_name")
+      .eq("id", product.category_id)
+      .maybeSingle();
 
     if (categoryError) {
       console.error("Product category fetch error:", categoryError);
     } else {
-      const categoryMap = new Map(
-        (categories ?? []).map((item) => [
-          item.id,
-          item.category_name,
-        ])
-      );
-
-      categoryName = product.category_id
-        ? categoryMap.get(product.category_id) ?? "-"
-        : "-";
-
-      subcategoryName = product.product_subcategory_id
-        ? categoryMap.get(product.product_subcategory_id) ?? "-"
-        : "-";
+      categoryName = category?.category_name ?? "-";
     }
   }
 
@@ -379,11 +355,6 @@ export default async function ProductDetailPage({
               <DetailItem
                 label="Kategori Utama"
                 value={categoryName}
-              />
-
-              <DetailItem
-                label="Subkategori"
-                value={subcategoryName}
               />
 
               <DetailItem

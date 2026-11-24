@@ -158,6 +158,12 @@ export default function CustomerForm() {
     const parentId = getParentId(level);
 
     if (level !== "province" && !parentId) return;
+    if (keyword.trim().length < 2) {
+      setOptions([]);
+      setSearchError(keyword.trim().length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.");
+      setIsSearching(false);
+      return;
+    }
 
     let cancelled = false;
 

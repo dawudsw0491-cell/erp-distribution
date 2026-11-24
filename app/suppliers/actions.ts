@@ -363,8 +363,7 @@ export async function updateSupplierAction(
 
 
 /**
- * Mengambil rekomendasi kode pos berdasarkan desa/kelurahan terpilih.
- * Sumber data: emsifa API Wilayah Indonesia v2 (data kode pos per desa).
+ * Mengambil kode pos dari master wilayah lokal berdasarkan ID desa/kelurahan.
  */
 export async function searchSupplierPostalCodeAction(villageId: string): Promise<{ postalCode: string; error: string }> {
   const auth = await getAuthorizationContext("suppliers.create");

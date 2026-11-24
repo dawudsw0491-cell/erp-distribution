@@ -455,9 +455,11 @@ export default function SupplierEditForm({
               name="postal_code"
               type="text"
               maxLength={10}
-              defaultValue={initialData.postal_code ?? ""}
+              value={postalCode}
+              onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, "").slice(0, 10))}
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-slate-500">{isPostalLookupLoading ? "Mencari rekomendasi kode pos..." : postalSuggestion ? `Kode pos wilayah terpilih: ${postalSuggestion}` : postalLookupError}</p>
           </div>
         </div>
 

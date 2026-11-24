@@ -127,7 +127,9 @@ function RegionField({
         }}
         onChange={(event) => {
           setKeyword(event.target.value);
+          setOptions([]);
           setError("");
+          setIsSearching(event.target.value.trim().length >= 2);
           setIsOpen(true);
         }}
       />

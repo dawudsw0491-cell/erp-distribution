@@ -372,12 +372,12 @@ export async function searchSupplierPostalCodeAction(villageId: string): Promise
     return { postalCode: "", error: "Anda tidak memiliki izin mengakses rekomendasi kode pos." };
   }
 
-  const match = villageId.trim().match(/^(\\d{2})(\\d{2})(\\d{2})(\\d{4})$/);
+  const match = villageId.trim().match(/^(\d{2})(\d{2})(\d{2})(\d{4})$/);
   if (!match) return { postalCode: "", error: "Kode wilayah desa/kelurahan tidak valid." };
 
   const apiVillageId = `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
   try {
-    const response = await fetch("https://www.emsifa.com/api-wilayah-indonesia/v2/villages/${apiVillageId}.json", {
+    const response = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/v2/villages/${apiVillageId}.json`, {
       next: { revalidate: 86400 },
       headers: { Accept: "application/json" },
     });
@@ -388,7 +388,7 @@ export async function searchSupplierPostalCodeAction(villageId: string): Promise
     }
     const data = (result as { data?: { postal_code?: unknown } }).data;
     const postalCode = typeof data?.postal_code === "string" ? data.postal_code : "";
-    if (!/^\\d{5}$/.test(postalCode)) return { postalCode: "", error: "Kode pos belum tersedia untuk desa/kelurahan ini." };
+    if (!/^\d{5}$/.test(postalCode)) return { postalCode: "", error: "Kode pos belum tersedia untuk desa/kelurahan ini." };
     return { postalCode, error: "" };
   } catch (error) {
     console.error("Postal code lookup failed:", error);

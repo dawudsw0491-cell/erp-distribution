@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import {
   searchSupplierRegionsAction,
+  searchSupplierPostalCodeAction,
   updateSupplierAction,
   type CreateSupplierState,
   type RegionLevel,
@@ -95,7 +96,7 @@ function RegionField({
       } finally {
         setIsSearching(false);
       }
-    }, 250);
+    }, 120);
 
     return () => clearTimeout(timeout);
   }, [keyword, parentId, level, isOpen, disabled]);
@@ -206,6 +207,10 @@ export default function SupplierEditForm({
   const [village, setVillage] = useState<SelectedRegion>(
     initialData.village
   );
+  const [postalCode, setPostalCode] = useState(initialData.postal_code ?? "");
+  const [postalSuggestion, setPostalSuggestion] = useState("");
+  const [postalLookupError, setPostalLookupError] = useState("");
+  const [isPostalLookupLoading, setIsPostalLookupLoading] = useState(false);
 
   return (
     <form action={formAction} className="space-y-8">
@@ -423,7 +428,25 @@ export default function SupplierEditForm({
             selected={village}
             parentId={district?.id ?? ""}
             disabled={!district || isPending}
-            onSelect={setVillage}
+            onSelect={(value) => {
+              setVillage(value);
+              setPostalCode("");
+              setPostalSuggestion("");
+              setPostalLookupError("");
+              setIsPostalLookupLoading(true);
+              void searchSupplierPostalCodeAction(value.id).then((result) => {
+                setIsPostalLookupLoading(false);
+                if (result.postalCode) {
+                  setPostalCode(result.postalCode);
+                  setPostalSuggestion(result.postalCode);
+                } else {
+                  setPostalLookupError(result.error);
+                }
+              }).catch(() => {
+                setIsPostalLookupLoading(false);
+                setPostalLookupError("Gagal mengambil rekomendasi kode pos.");
+              });
+            }}
           />
 
           <div>

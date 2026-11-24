@@ -6,6 +6,7 @@ import { useActionState, useCallback, useEffect, useState } from "react";
 import {
   createSupplierAction,
   searchSupplierRegionsAction,
+  searchSupplierPostalCodeAction,
   type RegionLevel,
   type RegionOption,
 } from "../actions";
@@ -50,6 +51,9 @@ export default function SupplierForm() {
   const [isSearching, setIsSearching] = useState(false);
   const [addressDetail, setAddressDetail] = useState("");
   const [postalCode, setPostalCode] = useState("");
+  const [postalSuggestion, setPostalSuggestion] = useState("");
+  const [postalLookupError, setPostalLookupError] = useState("");
+  const [isPostalLookupLoading, setIsPostalLookupLoading] = useState(false);
 
   const getParentId = useCallback((level: RegionLevel): string => {
     if (level === "province") return "";
@@ -79,6 +83,9 @@ export default function SupplierForm() {
   }
 
   function handleSearch(level: RegionLevel, value: string) {
+    setPostalCode("");
+    setPostalSuggestion("");
+    setPostalLookupError("");
     setActiveLevel(level);
     setSearchQuery(value);
 
@@ -131,6 +138,24 @@ export default function SupplierForm() {
 
     if (level === "village") {
       setVillage(selected);
+      setPostalCode("");
+      setPostalSuggestion("");
+      setPostalLookupError("");
+      setIsPostalLookupLoading(true);
+      void searchSupplierPostalCodeAction(item.id).then((result) => {
+        setIsPostalLookupLoading(false);
+        if (result.postalCode) {
+          setPostalSuggestion(result.postalCode);
+          setPostalCode(result.postalCode);
+          setPostalLookupError("");
+        } else {
+          setPostalSuggestion("");
+          setPostalLookupError(result.error || "Kode pos belum tersedia untuk wilayah ini.");
+        }
+      }).catch(() => {
+        setIsPostalLookupLoading(false);
+        setPostalLookupError("Gagal mengambil rekomendasi kode pos.");
+      });
     }
 
     setSearchQuery("");
@@ -179,7 +204,7 @@ export default function SupplierForm() {
       } finally {
         if (!cancelled) setIsSearching(false);
       }
-    }, 250);
+    }, 120);
 
     return () => {
       cancelled = true;
@@ -504,6 +529,9 @@ export default function SupplierForm() {
             placeholder="Contoh: 64111"
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-slate-500">
+            {isPostalLookupLoading ? "Mencari rekomendasi kode pos..." : postalSuggestion ? `Kode pos wilayah terpilih: ${postalSuggestion}` : postalLookupError}
+          </p>
         </div>
 
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-4">

@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { createClient } from "@/lib/supabase/server";
 
 export type CustomerType = "individual" | "company";
 
@@ -243,20 +244,16 @@ export async function updateCustomerStatusAction(
 /**
  * Pencarian wilayah Indonesia secara bertingkat.
  */
+/**
+ * Pencarian wilayah Indonesia melalui satu RPC database.
+ * Autentikasi dan pemeriksaan izin dilakukan di dalam RPC yang sama
+ * dengan query wilayah, sehingga tidak ada lookup profil/izin terpisah.
+ */
 export async function searchCustomerRegionsAction(
   level: RegionLevel,
   keyword: string,
   parentId: string
 ): Promise<RegionSearchResult> {
-  const auth = await getAuthorizationContext("master.create");
-
-  if (!auth.user || !auth.authorized) {
-    return {
-      data: [],
-      error: "Anda tidak memiliki izin untuk mencari data wilayah.",
-    };
-  }
-
   const searchKeyword = keyword.trim().slice(0, 80);
   if (searchKeyword.length < 2) {
     return {
@@ -264,126 +261,37 @@ export async function searchCustomerRegionsAction(
       error: searchKeyword.length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.",
     };
   }
-  const searchPattern = `${searchKeyword}%`;
+
+  if (!["province", "regency", "district", "village"].includes(level)) {
+    return { data: [], error: "Tingkat wilayah tidak valid." };
+  }
 
   if (level !== "province" && !parentId.trim()) {
-    return {
-      data: [],
-      error: "Pilih wilayah induk terlebih dahulu.",
-    };
+    return { data: [], error: "Pilih wilayah induk terlebih dahulu." };
   }
 
-  if (level === "province") {
-    const { data, error } = await auth.supabase
-      .from("indonesia_provinces")
-      .select("code, name")
-      .eq("is_active", true)
-      .ilike("name", searchPattern)
-      .order("name", { ascending: true })
-      .limit(50);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("search_indonesia_regions", {
+    p_level: level,
+    p_keyword: searchKeyword,
+    p_parent_id: parentId,
+    p_required_permission: "master.create",
+  });
 
-    if (error) {
-      return { data: [], error: "Gagal mencari data provinsi." };
-    }
-
-    return {
-      data: (data ?? []).map(
-        (item: { code: string; name: string }) => ({
-          id: item.code,
-          name: item.name,
-        })
-      ),
-      error: "",
-    };
-  }
-
-  if (level === "regency") {
-    const { data, error } = await auth.supabase
-      .from("indonesia_regencies")
-      .select("code, name")
-      .eq("province_code", parentId)
-      .eq("is_active", true)
-      .ilike("name", searchPattern)
-      .order("name", { ascending: true })
-      .limit(50);
-
-    if (error) {
-      return {
-        data: [],
-        error: "Gagal mencari data kabupaten/kota.",
-      };
-    }
-
-    return {
-      data: (data ?? []).map(
-        (item: { code: string; name: string }) => ({
-          id: item.code,
-          name: item.name,
-        })
-      ),
-      error: "",
-    };
-  }
-
-  if (level === "district") {
-    const { data, error } = await auth.supabase
-      .from("indonesia_districts")
-      .select("id, name")
-      .eq("regency_id", parentId)
-      .eq("is_active", true)
-      .ilike("name", searchPattern)
-      .order("name", { ascending: true })
-      .limit(50);
-
-    if (error) {
-      return {
-        data: [],
-        error: "Gagal mencari data kecamatan.",
-      };
-    }
-
-    return {
-      data: (data ?? []).map(
-        (item: { id: string; name: string }) => ({
-          id: item.id,
-          name: item.name,
-        })
-      ),
-      error: "",
-    };
-  }
-
-  if (level === "village") {
-    const { data, error } = await auth.supabase
-      .from("indonesia_villages")
-      .select("id, name")
-      .eq("district_id", parentId)
-      .eq("is_active", true)
-      .ilike("name", searchPattern)
-      .order("name", { ascending: true })
-      .limit(50);
-
-    if (error) {
-      return {
-        data: [],
-        error: "Gagal mencari data desa/kelurahan.",
-      };
-    }
-
-    return {
-      data: (data ?? []).map(
-        (item: { id: string; name: string }) => ({
-          id: item.id,
-          name: item.name,
-        })
-      ),
-      error: "",
-    };
+  if (error) {
+    console.error("Region search RPC failed:", error);
+    const message = error.code === "42501"
+      ? "Anda tidak memiliki izin untuk mencari data wilayah."
+      : "Gagal mencari data wilayah. Silakan coba kembali.";
+    return { data: [], error: message };
   }
 
   return {
-    data: [],
-    error: "Tingkat wilayah tidak valid.",
+    data: (data ?? []).map((item: { id: string; name: string }) => ({
+      id: item.id,
+      name: item.name,
+    })),
+    error: "",
   };
 }
 

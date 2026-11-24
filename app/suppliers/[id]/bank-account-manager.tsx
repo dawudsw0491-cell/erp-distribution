@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createSupplierBankAccountAction,
-  deleteSupplierBankAccountAction,
   getSupplierBankAccountsAction,
   setPrimarySupplierBankAccountAction,
   updateSupplierBankAccountAction,
@@ -195,72 +194,6 @@ export default function BankAccountManager({ supplierId }: Props) {
       await loadAccounts();
     } catch {
       setError("Terjadi kesalahan saat menyimpan rekening bank.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleSetPrimary(accountId: string) {
-    if (saving) return;
-
-    const confirmed = window.confirm(
-      "Tetapkan rekening ini sebagai rekening utama supplier?"
-    );
-
-    if (!confirmed) return;
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const result = await setPrimarySupplierBankAccountAction(
-        supplierId,
-        accountId
-      );
-
-      if (!result.success) {
-        setError(result.message);
-        return;
-      }
-
-      setMessage(result.message);
-      await loadAccounts();
-    } catch {
-      setError("Gagal menetapkan rekening utama.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(account: BankAccount) {
-    if (saving) return;
-
-    const confirmed = window.confirm(
-      `Hapus rekening ${account.bank_name} - ${account.account_number}?`
-    );
-
-    if (!confirmed) return;
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const result = await deleteSupplierBankAccountAction(
-        supplierId,
-        account.id
-      );
-
-      if (!result.success) {
-        setError(result.message);
-        return;
-      }
-
-      setMessage(result.message);
-      await loadAccounts();
-    } catch {
-      setError("Gagal menghapus rekening bank.");
     } finally {
       setSaving(false);
     }

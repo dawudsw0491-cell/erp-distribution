@@ -36,7 +36,7 @@
 ## Live database snapshot
 
 - Current read-only table inventory: 54 public tables, all reported with RLS enabled.
-- The Development migration ledger contains 26 applied migrations through `20261124025800`; this supersedes the four-entry historical snapshot below.
+- The Development migration ledger contains 27 applied migrations through `20261124025800`; this supersedes the four-entry historical snapshot below.
 - Current Security Advisor reports four RLS-enabled tables without policies, 38 authenticated-executable SECURITY DEFINER functions, and one leaked-password protection warning. Findings require separate intent/permission review; no blanket privilege revocation was performed.
 - Current Performance Advisor reports 46 unused-index findings and missing FK covering indexes. No indexes were removed or added.
 - Live schema confirms `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values` exist. This resolves the previous source-only uncertainty about table existence, but not their full provenance or canonical semantics.
@@ -161,3 +161,15 @@ The historical status sections above preserve prior implementation evidence and 
 - User previously validated local lint/build at commit `831f7c3`. No application source files changed in this execution, so that result still applies to the application source at that commit; the current docs/migration commits have not been locally pulled or rebuilt.
 - No Vercel deployment was requested or triggered. Production was not accessed or modified.
 - Next Point 1 work remains: trace Product/Model/Brand/category/attribute dependencies against all downstream transaction consumers; complete serialized IMEI/Serial lifecycle review; reconcile migration provenance; then update the same MD-003/MD-004/MD-006/MD-011/MD-013/MD-014 backlog rows with evidence.
+
+
+## Execution note — 2026-11-24 (Point 1: serialized unit lifecycle review)
+
+- Read-only inspection of Development confirms `product_unit_identifiers.normalized_value` is a stored generated column using `upper(trim(identifier_value))`; its global unique constraint therefore protects case-normalized IMEI/Serial values without caller-supplied normalized data.
+- `goods_receipt_unit_identifiers.normalized_value` is an ordinary required column populated by the Goods Receipt draft RPC; permanent unit identifiers are copied into the generated-column table without explicitly writing normalized_value. This is correct and needs no patch.
+- Goods Receipt posting supports optional IMEI identification (identified units plus aggregate SKU quantity), while Serial tracking requires one serialized unit per received quantity. The live `post_goods_receipt` function also validates PO/Variant parent consistency and uses atomic posting.
+- Transfer posting validates paired movements, equal quantity/status/unit identity, source stock/status, unit identifier, and updates the Product Unit warehouse to the destination. The outer transfer RPC locks movements and warehouse rows deterministically.
+- Movement posting validates unit/warehouse/status and updates unit status; aggregate IMEI movements leave unit identity null and continue to use Variant-level aggregate balances.
+- No new database trigger, constraint, or schema change was justified by this review. Production untouched; no business/test data created.
+- Confirmed optimization candidate: `app/inventory/units/page.tsx` loads up to 5,000 Product Units and performs search/filter/count/pagination in application memory. This can truncate counts/results beyond the cap and increases server memory/query transfer as unit history grows. A safe server-side search/count/pagination replacement needs a source-controlled RPC/query contract and role/warehouse validation; it is not changed without a verified query contract.
+- Remaining Point 1 exit gates: trace Product/Model/Brand/Attribute consumers through all downstream transactions; finish Product Model lifecycle and Product Variant CRUD verification; validate serialized Stock Opname and downstream Sales/Returns linkage; reconcile full migration history for clean-baseline replay; then run the user-directed isolated final test suite. No Development operational data created, no Production mutation, no Vercel deployment attempted.

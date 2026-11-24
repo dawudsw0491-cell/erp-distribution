@@ -142,10 +142,27 @@ async function PurchaseOrderPageContent() {
 
 function PurchaseOrderLoading() {
   return (
-    <div className="mx-auto max-w-6xl rounded-xl border border-slate-200 bg-white p-6">
-      <p className="text-sm text-slate-600">
-        Memuat data Purchase Order...
-      </p>
+    <div className="mx-auto max-w-6xl space-y-6" role="status" aria-live="polite">
+      <header className="space-y-2">
+        <Link href="/purchases" className="text-sm font-medium text-blue-700 hover:underline">
+          ← Kembali ke Purchase Order
+        </Link>
+        <h1 className="mt-3 text-2xl font-bold text-slate-900">Buat Purchase Order</h1>
+        <p className="text-sm text-slate-600">Masukkan informasi supplier dan daftar produk yang akan dibeli.</p>
+      </header>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-slate-600">Memuat data master...</p>
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+        </div>
+      </section>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="h-5 w-48 animate-pulse rounded bg-slate-100" />
+        <div className="mt-5 h-24 animate-pulse rounded-lg bg-slate-100" />
+      </section>
     </div>
   );
 }

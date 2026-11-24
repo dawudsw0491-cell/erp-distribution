@@ -711,6 +711,18 @@ export async function getProductModelDeletionPreview(
         label: "Purchase Order Items",
       },
       {
+        table: "sales_order_items" as const,
+        label: "Sales Order Items",
+      },
+      {
+        table: "delivery_order_items" as const,
+        label: "Delivery Order Items",
+      },
+      {
+        table: "sales_invoice_items" as const,
+        label: "Sales Invoice Items",
+      },
+      {
         table: "stock_opname_items" as const,
         label: "Stock Opname Items",
       },

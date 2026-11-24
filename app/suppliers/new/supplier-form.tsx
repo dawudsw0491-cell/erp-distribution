@@ -496,6 +496,7 @@ export default function SupplierForm() {
         <div className="max-w-md">
           <label className={labelClass}>Kode Pos</label>
           <input
+            name="postal_code"
             value={postalCode}
             onChange={(event) => setPostalCode(event.target.value.replace(/\\D/g, "").slice(0, 10))}
             inputMode="numeric"

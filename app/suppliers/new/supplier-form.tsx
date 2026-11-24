@@ -523,7 +523,7 @@ export default function SupplierForm() {
           <input
             name="postal_code"
             value={postalCode}
-            onChange={(event) => setPostalCode(event.target.value.replace(/\\D/g, "").slice(0, 10))}
+            onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, "").slice(0, 10))}
             inputMode="numeric"
             maxLength={10}
             placeholder="Contoh: 64111"

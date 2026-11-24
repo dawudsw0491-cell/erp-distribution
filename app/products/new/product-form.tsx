@@ -23,7 +23,7 @@ type ModelOption = {
 };
 
 type VariantDraft = {
-  variant_name: string;
+  network: string;
   barcode: string;
   ram: string;
   rom: string;
@@ -350,7 +350,7 @@ export default function ProductForm({
   const [productType, setProductType] = useState("goods");
   const [categoryId, setCategoryId] = useState("");
   const [variants, setVariants] = useState<VariantDraft[]>([{
-    variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "",
+    network: "", barcode: "", ram: "", rom: "", color: "", warranty: "",
   }]);
 
   function updateVariant(index: number, field: keyof VariantDraft, value: string) {
@@ -602,7 +602,7 @@ export default function ProductForm({
                 <div className="flex items-center justify-between"><h3 className="font-medium text-slate-800">Varian {index + 1}</h3>
                   {variants.length > 1 && <button type="button" onClick={() => setVariants((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="text-xs text-red-600 hover:underline">Hapus varian</button>}</div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div><label className={labelClass}>Nama Varian <span className="text-red-600">*</span></label><input required maxLength={200} value={variant.variant_name} onChange={(event) => updateVariant(index, "variant_name", event.target.value)} className={inputClass} placeholder="Contoh: REGULER / DUAL SIM" /><p className="mt-1 text-xs text-slate-500">Isi hanya pembeda varian. RAM, ROM, dan warna diisi pada kolom masing-masing.</p></div>
+                  <div><label className={labelClass}>Network <span className="text-red-600">*</span></label><select required value={variant.network} onChange={(event) => updateVariant(index, "network", event.target.value)} className={inputClass}><option value="">Pilih Network</option><option value="4G">4G</option><option value="5G">5G</option><option value="WIFI ONLY">WIFI ONLY</option></select><p className="mt-1 text-xs text-slate-500">Pilih konektivitas produk. RAM, ROM, dan warna tetap diisi terpisah.</p></div>
                   <div><label className={labelClass}>Barcode</label><input maxLength={100} value={variant.barcode} onChange={(event) => updateVariant(index, "barcode", event.target.value)} className={inputClass} placeholder="Barcode (opsional)" /></div>
                   <div><label className={labelClass}>RAM</label><input maxLength={100} list="variant-ram-options" value={variant.ram} onChange={(event) => updateVariant(index, "ram", event.target.value)} className={inputClass} placeholder="Contoh: 8 GB" /></div>
                   <div><label className={labelClass}>ROM / Penyimpanan</label><input maxLength={100} list="variant-rom-options" value={variant.rom} onChange={(event) => updateVariant(index, "rom", event.target.value)} className={inputClass} placeholder="Contoh: 256 GB" /></div>

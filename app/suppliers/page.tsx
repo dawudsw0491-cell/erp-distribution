@@ -1,5 +1,6 @@
 
 import { Suspense } from "react";
+import RealtimeFilterBar from "@/components/filters/realtime-filter-bar";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -330,97 +331,37 @@ async function SuppliersContent({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4">
-              <h2 className="font-semibold text-slate-900">
-                Pencarian dan Filter
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Cari supplier berdasarkan kode, nama, telepon, atau email.
-              </p>
-            </div>
-
-            <form
-              action="/suppliers"
-              method="GET"
-              className="grid grid-cols-1 gap-4 md:grid-cols-4"
-            >
-              <div className="md:col-span-2">
-                <label
-                  htmlFor="supplier-search"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Kata Kunci
-                </label>
-
-                <input
-                  id="supplier-search"
-                  name="q"
-                  type="search"
-                  defaultValue={keyword}
-                  placeholder="Kode, nama, telepon, atau email..."
-                  maxLength={100}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="supplier-type"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Jenis Supplier
-                </label>
-
-                <select
-                  id="supplier-type"
-                  name="type"
-                  defaultValue={supplierType}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Jenis</option>
-                  <option value="company">Perusahaan</option>
-                  <option value="individual">Perorangan</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="supplier-status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status
-                </label>
-
-                <select
-                  id="supplier-status"
-                  name="status"
-                  defaultValue={status}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Semua Status</option>
-                  <option value="active">Aktif</option>
-                  <option value="inactive">Nonaktif</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2 md:col-span-4">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-                >
-                  Terapkan Filter
-                </button>
-
-                <Link
-                  href="/suppliers"
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Reset
-                </Link>
-              </div>
-            </form>
-          </section>
+          <Suspense fallback={<div className="h-36 animate-pulse rounded-xl border border-slate-200 bg-white" />}>
+            <RealtimeFilterBar
+              key={`${keyword}|${supplierType}|${status}`}
+              initialKeyword={keyword}
+              searchLabel="Kata Kunci"
+              searchPlaceholder="Kode, nama, telepon, atau email..."
+              filters={[
+                {
+                  param: "type",
+                  label: "Jenis Supplier",
+                  initialValue: supplierType,
+                  options: [
+                    { value: "", label: "Semua Jenis" },
+                    { value: "company", label: "Perusahaan" },
+                    { value: "individual", label: "Perorangan" },
+                  ],
+                },
+                {
+                  param: "status",
+                  label: "Status",
+                  initialValue: status,
+                  options: [
+                    { value: "", label: "Semua Status" },
+                    { value: "active", label: "Aktif" },
+                    { value: "inactive", label: "Nonaktif" },
+                  ],
+                },
+              ]}
+              helperText="Hasil diperbarui otomatis saat kata kunci, jenis, atau status berubah. Filter yang dipilih tetap dipertahankan."
+            />
+          </Suspense>
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col justify-between gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">

@@ -594,7 +594,7 @@ export default function ProductForm({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
             <div><h2 className="font-semibold text-slate-800">Varian, SKU, Spesifikasi & Garansi</h2>
             <p className="mt-1 text-xs text-slate-500">Semua varian dibuat bersama produk. SKU varian dibuat otomatis setelah penyimpanan.</p></div>
-            <button type="button" onClick={() => setVariants((current) => [...current, { variant_name: "", barcode: "", ram: "", rom: "", color: "", warranty: "" }])} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">+ Tambah Varian</button>
+            <button type="button" onClick={() => setVariants((current) => [...current, { network: "", barcode: "", ram: "", rom: "", color: "", warranty: "" }])} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">+ Tambah Varian</button>
           </div>
           <div className="space-y-4">
             {variants.map((variant, index) => (

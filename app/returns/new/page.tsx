@@ -8,6 +8,8 @@ import ReturnComposer from "../return-composer";
 export const metadata = { title: "Buat Retur | HEXA CORE ERP" };
 type Params = { type?: string; source_document_id?: string; error?: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type ReturnSourceDocument = { id: string; documentNumber: string; documentDate: string; partyName: string };
+type ReturnSourceLine = { id: string; product_name: string; tracking_type: "quantity" | "imei" | "serial"; variant_sku: string; variant_name: string; source_quantity: number; inventory_status: string; units: { id: string; unit_code: string }[]; suggested_unit_id: string | null; has_source_unit?: boolean };
 
 export default async function NewReturnPage({searchParams}:{searchParams:Promise<Params>}) {
   await connection();
@@ -33,10 +35,22 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
       : Promise.resolve({data:[],error:null})
   ]);
   const sourceError=type==="customer"?doError:grError;
-  const sourceDocs=type==="customer"?(deliveryOrders??[]):(goodsReceipts??[]);
+  const sourceDocs: ReturnSourceDocument[] = type === "customer"
+    ? (deliveryOrders ?? []).map((doc) => ({
+        id: doc.id,
+        documentNumber: doc.delivery_order_number,
+        documentDate: doc.delivery_date,
+        partyName: (Array.isArray(doc.customers) ? doc.customers[0] : doc.customers)?.customer_name ?? "—",
+      }))
+    : (goodsReceipts ?? []).map((doc) => ({
+        id: doc.id,
+        documentNumber: doc.receipt_number,
+        documentDate: doc.receipt_date,
+        partyName: (Array.isArray(doc.suppliers) ? doc.suppliers[0] : doc.suppliers)?.supplier_name ?? "—",
+      }));
   const sourceId=params.source_document_id??"";
   const selected=uuid.test(sourceId)?sourceDocs.find((row)=>row.id===sourceId):null;
-  let sourceLines=[];
+  let sourceLines: ReturnSourceLine[] = [];
   let lineError="";
   if(selected&&type==="customer"){
     const {data,error}=await supabase.from("delivery_order_items").select("id,quantity,product_unit_id,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("delivery_order_id",selected.id).order("created_at");
@@ -44,7 +58,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
     sourceLines=(data??[]).map((row)=>{
       const product=Array.isArray(row.products)?row.products[0]:row.products;
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null,has_source_unit:Boolean(row.product_unit_id)};
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type === "imei" || product?.tracking_type === "serial" ? product.tracking_type : "quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null,has_source_unit:Boolean(row.product_unit_id)};
     });
   }
   if(selected&&type==="supplier"){
@@ -64,11 +78,11 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
     {params.error&&<p className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700">Permintaan gagal ({params.error}).</p>}
     <form className="grid gap-4 rounded-xl border bg-white p-5 sm:grid-cols-2">
       <label className="text-sm font-medium">Jenis Retur<select name="type" defaultValue={type} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="customer" disabled={canCustomer!==true}>Customer Return</option><option value="supplier" disabled={canSupplier!==true}>Supplier Return</option></select></label>
-      <label className="text-sm font-medium">Dokumen Sumber<select name="source_document_id" defaultValue={sourceId} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="">Pilih dokumen posted</option>{sourceDocs.map((doc)=>{const party=type==="customer"?(Array.isArray(doc.customers)?doc.customers[0]:doc.customers)?.customer_name:(Array.isArray(doc.suppliers)?doc.suppliers[0]:doc.suppliers)?.supplier_name;const number=type==="customer"?doc.delivery_order_number:doc.receipt_number;const date=type==="customer"?doc.delivery_date:doc.receipt_date;return <option key={doc.id} value={doc.id}>{number} · {date} · {party??"—"}</option>})}</select></label>
+      <label className="text-sm font-medium">Dokumen Sumber<select name="source_document_id" defaultValue={sourceId} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="">Pilih dokumen posted</option>{sourceDocs.map((doc)=><option key={doc.id} value={doc.id}>{doc.documentNumber} · {doc.documentDate} · {doc.partyName}</option>)}</select></label>
       <div className="sm:col-span-2"><button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Muat Dokumen Sumber</button></div>
     </form>
     {sourceError?<p className="rounded-lg border border-red-200 bg-white p-4 text-sm text-red-700">Daftar dokumen sumber gagal dimuat.</p>:!sourceDocs.length?<p className="rounded-lg border bg-white p-5 text-sm text-slate-500">Tidak ada dokumen posted yang dapat dipilih atau akses data tidak tersedia.</p>:null}
     {selected&&lineError?<p className="rounded-lg border border-red-200 bg-white p-4 text-sm text-red-700">Detail sumber gagal dimuat. {lineError}</p>:null}
-    {selected&&!lineError&&<><div className="rounded-xl border bg-white p-4 text-sm"><strong>{type==="customer"?selected.delivery_order_number:selected.receipt_number}</strong><p className="mt-1 text-slate-500">{type==="customer"?"Delivery Order":"Goods Receipt"} · {type==="customer"?selected.delivery_date:selected.receipt_date}</p></div><ReturnComposer returnType={type} sourceDocumentId={selected.id} sourceLines={sourceLines}/></>}
+    {selected&&!lineError&&<><div className="rounded-xl border bg-white p-4 text-sm"><strong>{selected.documentNumber}</strong><p className="mt-1 text-slate-500">{type==="customer"?"Delivery Order":"Goods Receipt"} · {selected.documentDate}</p></div><ReturnComposer returnType={type} sourceDocumentId={selected.id} sourceLines={sourceLines}/></>}
   </div></main></div>;
 }

@@ -27,21 +27,21 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   const [{data:deliveryOrders,error:doError},{data:goodsReceipts,error:grError}]=await Promise.all([
     type==="customer"
       ? supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,customers(customer_name)").eq("status","posted").order("delivery_date",{ascending:false}).limit(100)
-      : Promise.resolve({data:[],error:null} as any),
+      : Promise.resolve({data:[],error:null}),
     type==="supplier"
       ? supabase.from("goods_receipts").select("id,receipt_number,receipt_date,warehouse_id,suppliers(supplier_name)").eq("status","posted").order("receipt_date",{ascending:false}).limit(100)
-      : Promise.resolve({data:[],error:null} as any)
+      : Promise.resolve({data:[],error:null})
   ]);
   const sourceError=type==="customer"?doError:grError;
-  const sourceDocs:any[]=type==="customer"?(deliveryOrders??[]):(goodsReceipts??[]);
+  const sourceDocs=type==="customer"?(deliveryOrders??[]):(goodsReceipts??[]);
   const sourceId=params.source_document_id??"";
-  const selected=uuid.test(sourceId)?sourceDocs.find((row:any)=>row.id===sourceId):null;
-  let sourceLines:any[]=[];
+  const selected=uuid.test(sourceId)?sourceDocs.find((row)=>row.id===sourceId):null;
+  let sourceLines=[];
   let lineError="";
   if(selected&&type==="customer"){
     const {data,error}=await supabase.from("delivery_order_items").select("id,quantity,product_unit_id,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("delivery_order_id",selected.id).order("created_at");
     if(error) lineError=error.message;
-    sourceLines=(data??[]).map((row:any)=>{
+    sourceLines=(data??[]).map((row)=>{
       const product=Array.isArray(row.products)?row.products[0]:row.products;
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
       return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null,has_source_unit:Boolean(row.product_unit_id)};
@@ -50,11 +50,11 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   if(selected&&type==="supplier"){
     const {data,error}=await supabase.from("goods_receipt_items").select("id,quantity_received,inventory_status,purchase_order_items(product_variant_id,product_variants(id,variant_sku,variant_name,products(product_name,tracking_type))),goods_receipt_units(unit_code)").eq("goods_receipt_id",selected.id).order("created_at");
     if(error) lineError=error.message;
-    sourceLines=(data??[]).map((row:any)=>{
+    sourceLines=(data??[]).map((row)=>{
       const poi=Array.isArray(row.purchase_order_items)?row.purchase_order_items[0]:row.purchase_order_items;
       const variant=Array.isArray(poi?.product_variants)?poi.product_variants[0]:poi?.product_variants;
       const product=Array.isArray(variant?.products)?variant.products[0]:variant?.products;
-      const options=(row.goods_receipt_units??[]).map((unit:any)=>({id:unit.unit_code,unit_code:unit.unit_code}));
+      const options=(row.goods_receipt_units??[]).map((unit)=>({id:unit.unit_code,unit_code:unit.unit_code}));
       return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type??"quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity_received),inventory_status:row.inventory_status,units:options,suggested_unit_id:null};
     });
   }
@@ -64,7 +64,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
     {params.error&&<p className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700">Permintaan gagal ({params.error}).</p>}
     <form className="grid gap-4 rounded-xl border bg-white p-5 sm:grid-cols-2">
       <label className="text-sm font-medium">Jenis Retur<select name="type" defaultValue={type} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="customer" disabled={canCustomer!==true}>Customer Return</option><option value="supplier" disabled={canSupplier!==true}>Supplier Return</option></select></label>
-      <label className="text-sm font-medium">Dokumen Sumber<select name="source_document_id" defaultValue={sourceId} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="">Pilih dokumen posted</option>{sourceDocs.map((doc:any)=>{const party=type==="customer"?(Array.isArray(doc.customers)?doc.customers[0]:doc.customers)?.customer_name:(Array.isArray(doc.suppliers)?doc.suppliers[0]:doc.suppliers)?.supplier_name;const number=type==="customer"?doc.delivery_order_number:doc.receipt_number;const date=type==="customer"?doc.delivery_date:doc.receipt_date;return <option key={doc.id} value={doc.id}>{number} · {date} · {party??"—"}</option>})}</select></label>
+      <label className="text-sm font-medium">Dokumen Sumber<select name="source_document_id" defaultValue={sourceId} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="">Pilih dokumen posted</option>{sourceDocs.map((doc)=>{const party=type==="customer"?(Array.isArray(doc.customers)?doc.customers[0]:doc.customers)?.customer_name:(Array.isArray(doc.suppliers)?doc.suppliers[0]:doc.suppliers)?.supplier_name;const number=type==="customer"?doc.delivery_order_number:doc.receipt_number;const date=type==="customer"?doc.delivery_date:doc.receipt_date;return <option key={doc.id} value={doc.id}>{number} · {date} · {party??"—"}</option>})}</select></label>
       <div className="sm:col-span-2"><button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Muat Dokumen Sumber</button></div>
     </form>
     {sourceError?<p className="rounded-lg border border-red-200 bg-white p-4 text-sm text-red-700">Daftar dokumen sumber gagal dimuat.</p>:!sourceDocs.length?<p className="rounded-lg border bg-white p-5 text-sm text-slate-500">Tidak ada dokumen posted yang dapat dipilih atau akses data tidak tersedia.</p>:null}

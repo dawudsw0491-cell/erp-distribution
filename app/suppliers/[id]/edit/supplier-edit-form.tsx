@@ -96,7 +96,7 @@ function RegionField({
       } finally {
         setIsSearching(false);
       }
-    }, 120);
+    }, 80);
 
     return () => clearTimeout(timeout);
   }, [keyword, parentId, level, isOpen, disabled]);

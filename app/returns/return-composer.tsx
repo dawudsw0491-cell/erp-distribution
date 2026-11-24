@@ -17,6 +17,13 @@ type SourceLine = {
   has_source_unit?: boolean;
 };
 
+type ReturnItem = {
+  source_line_id: string;
+  quantity: string;
+  product_unit_code?: string;
+  product_unit_id?: string;
+};
+
 export default function ReturnComposer({
   returnType,
   sourceDocumentId,
@@ -34,7 +41,7 @@ export default function ReturnComposer({
   const [returnDate, setReturnDate] = useState(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
   const [error, setError] = useState("");
 
-  const payload = useMemo(() => sourceLines.flatMap((line) => {
+  const payload = useMemo(() => sourceLines.flatMap<ReturnItem>((line) => {
     if (!selected[line.id]) return [];
     const selectedCodes = units[line.id] ?? [];
     if (selectedCodes.length) {

@@ -450,7 +450,7 @@ export async function createProduct(formData: FormData) {
       if (!item || typeof item !== "object") throw new Error("Invalid variant");
       const row = item as Record<string, unknown>;
       return {
-        variant_name: String(row.variant_name ?? "").trim().replace(/\s+/g, " "),
+        variant_name: String(row.network ?? "").trim().toUpperCase(),
         barcode: String(row.barcode ?? "").trim() || null,
         ram: String(row.ram ?? "").trim(), rom: String(row.rom ?? "").trim(),
         color: String(row.color ?? "").trim(), warranty: String(row.warranty ?? "").trim(),
@@ -459,12 +459,14 @@ export async function createProduct(formData: FormData) {
   } catch { redirect("/products/new?error=invalid_variants"); }
   if (productType === "goods" && (variants.length < 1 || variants.length > 100)) redirect("/products/new?error=variant_required");
   if (productType === "service" && variants.length > 0) redirect("/products/new?error=service_variants");
-  const variantNames = new Set<string>();
+  const variantCombinations = new Set<string>();
   const variantBarcodes = new Set<string>();
   for (const variant of variants) {
-    const normalizedName = variant.variant_name.toLocaleLowerCase("id-ID");
-    if (!variant.variant_name || variant.variant_name.length > 200 || variantNames.has(normalizedName)) redirect("/products/new?error=invalid_variants");
-    variantNames.add(normalizedName);
+    const normalizedNetwork = variant.variant_name.toUpperCase();
+    if (!["4G", "5G", "WIFI ONLY"].includes(normalizedNetwork)) redirect("/products/new?error=invalid_variants");
+    const combination = [normalizedNetwork, variant.ram, variant.rom, variant.color].map((value) => value.trim().toLocaleLowerCase("id-ID")).join("|");
+    if (variantCombinations.has(combination)) redirect("/products/new?error=invalid_variants");
+    variantCombinations.add(combination);
     if (variant.barcode && (variant.barcode.length > 100 || variantBarcodes.has(variant.barcode))) redirect("/products/new?error=invalid_variants");
     if (variant.barcode) variantBarcodes.add(variant.barcode);
     if ([variant.ram, variant.rom, variant.color, variant.warranty].some((value) => value.length > 100)) redirect("/products/new?error=invalid_variants");

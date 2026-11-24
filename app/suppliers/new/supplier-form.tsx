@@ -88,7 +88,7 @@ export default function SupplierForm() {
     setActiveLevel(level);
     setSearchQuery(value);
     setOptions([]);
-    setSearchError("");
+    setSearchError(value.trim().length === 1 ? "Ketik minimal 2 huruf atau pilih dari daftar wilayah." : "");
     setIsSearching(value.trim().length >= 2);
 
     if (level === "province") {
@@ -174,12 +174,7 @@ export default function SupplierForm() {
     const keyword = searchQuery;
 
     if (level !== "province" && !parentId) return;
-    if (keyword.trim().length === 1) {
-      setOptions([]);
-      setSearchError("Ketik minimal 2 huruf atau pilih dari daftar wilayah.");
-      setIsSearching(false);
-      return;
-    }
+    if (keyword.trim().length === 1) return;
 
     let cancelled = false;
 

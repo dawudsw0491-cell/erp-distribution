@@ -96,6 +96,9 @@ export default function CustomerForm() {
     setPostalLookupError("");
     setActiveLevel(level);
     setSearchQuery(value);
+    setOptions([]);
+    setSearchError("");
+    setIsSearching(value.trim().length >= 2);
 
     if (level === "province") {
       setProvince(null);
@@ -215,7 +218,7 @@ export default function CustomerForm() {
           setIsSearching(false);
         }
       }
-    }, 120);
+    }, 80);
 
     return () => {
       cancelled = true;

@@ -372,7 +372,7 @@ export async function searchSupplierPostalCodeAction(villageId: string): Promise
   }
 
   const normalizedVillageId = villageId.trim();
-  if (!/^\\d{10}$/.test(normalizedVillageId)) {
+  if (!/^\d{10}$/.test(normalizedVillageId)) {
     return { postalCode: "", error: "Kode wilayah desa/kelurahan tidak valid." };
   }
 
@@ -388,7 +388,7 @@ export async function searchSupplierPostalCodeAction(villageId: string): Promise
   }
 
   const postalCode = typeof data?.postal_code === "string" ? data.postal_code : "";
-  if (!/^\\d{5}$/.test(postalCode)) {
+  if (!/^\d{5}$/.test(postalCode)) {
     return { postalCode: "", error: "Kode pos belum tersedia untuk desa/kelurahan ini." };
   }
 

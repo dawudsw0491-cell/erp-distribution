@@ -121,23 +121,6 @@ export default function BankAccountManager({ supplierId }: Props) {
     setShowForm(true);
   }
 
-  function openEditForm(account: BankAccount) {
-    setEditingId(account.id);
-    setForm({
-      bankName: account.bank_name,
-      bankBranch: account.bank_branch ?? "",
-      accountName: account.account_name,
-      accountNumber: account.account_number,
-      currencyCode: account.currency_code,
-      isPrimary: account.is_primary,
-      isActive: account.is_active,
-      notes: account.notes ?? "",
-    });
-    setMessage("");
-    setError("");
-    setShowForm(true);
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 

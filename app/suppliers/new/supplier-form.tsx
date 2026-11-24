@@ -48,6 +48,8 @@ export default function SupplierForm() {
   const [options, setOptions] = useState<RegionOption[]>([]);
   const [searchError, setSearchError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [addressDetail, setAddressDetail] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
   const getParentId = useCallback((level: RegionLevel): string => {
     if (level === "province") return "";
@@ -145,6 +147,12 @@ export default function SupplierForm() {
     const keyword = searchQuery;
 
     if (level !== "province" && !parentId) return;
+    if (keyword.trim().length < 2) {
+      setOptions([]);
+      setSearchError(keyword.trim().length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.");
+      setIsSearching(false);
+      return;
+    }
 
     let cancelled = false;
 
@@ -152,16 +160,24 @@ export default function SupplierForm() {
       setIsSearching(true);
       setSearchError("");
 
-      const result = await searchSupplierRegionsAction(
-        level,
-        keyword,
-        parentId
-      );
+      try {
+        const result = await searchSupplierRegionsAction(
+          level,
+          keyword,
+          parentId
+        );
 
-      if (!cancelled) {
-        setOptions(result.data);
-        setSearchError(result.error);
-        setIsSearching(false);
+        if (!cancelled) {
+          setOptions(result.data);
+          setSearchError(result.error);
+        }
+      } catch {
+        if (!cancelled) {
+          setOptions([]);
+          setSearchError("Gagal menghubungi layanan data wilayah. Coba kembali.");
+        }
+      } finally {
+        if (!cancelled) setIsSearching(false);
       }
     }, 250);
 
@@ -305,6 +321,15 @@ export default function SupplierForm() {
     );
   }
 
+  const fullAddress = [
+    addressDetail.trim(),
+    village?.name,
+    district?.name,
+    regency?.name,
+    province?.name,
+    postalCode.trim() ? `Kode Pos ${postalCode.trim()}` : "",
+  ].filter(Boolean).join(", ");
+
   return (
     <form action={formAction} className="space-y-6">
       {state.error && (
@@ -445,7 +470,8 @@ export default function SupplierForm() {
             Alamat Jalan dan Detail <span className="text-red-600">*</span>
           </label>
           <textarea
-            name="address"
+            value={addressDetail}
+            onChange={(event) => setAddressDetail(event.target.value)}
             required
             maxLength={2000}
             rows={3}
@@ -461,6 +487,7 @@ export default function SupplierForm() {
           {renderRegionField("village")}
         </div>
 
+        <input type="hidden" name="address" value={fullAddress} />
         <input type="hidden" name="province_code" value={province?.id ?? ""} />
         <input type="hidden" name="regency_code" value={regency?.id ?? ""} />
         <input type="hidden" name="district_id" value={district?.id ?? ""} />
@@ -469,7 +496,8 @@ export default function SupplierForm() {
         <div className="max-w-md">
           <label className={labelClass}>Kode Pos</label>
           <input
-            name="postal_code"
+            value={postalCode}
+            onChange={(event) => setPostalCode(event.target.value.replace(/\\D/g, "").slice(0, 10))}
             inputMode="numeric"
             maxLength={10}
             placeholder="Contoh: 64111"
@@ -477,20 +505,10 @@ export default function SupplierForm() {
           />
         </div>
 
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-slate-800 shadow-sm">
-  <p className="font-semibold text-blue-900">
-    Ringkasan Wilayah
-  </p>
-  <p className="mt-1 leading-relaxed text-slate-700">
-            {[
-              village?.name,
-              district?.name,
-              regency?.name,
-              province?.name,
-            ]
-              .filter(Boolean)
-              .join(", ") || "Belum ada wilayah yang dipilih."}
-          </p>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-4">
+          <p className="text-sm font-semibold text-blue-900">Ringkasan Alamat Lengkap</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-800">{fullAddress || "Alamat belum diisi."}</p>
+          <p className="mt-2 text-xs text-blue-700">Alamat diperbarui otomatis dari detail jalan, desa/kelurahan, kecamatan, kabupaten/kota, provinsi, dan kode pos.</p>
         </div>
       </section>
 

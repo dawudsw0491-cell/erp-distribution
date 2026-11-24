@@ -16,7 +16,7 @@ export default async function NewInvoicePage({searchParams}:{searchParams:Promis
  const {data:orders,error:ordersError}=await supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,customers(customer_name),sales_orders(sales_order_number)").eq("status","posted").order("delivery_date",{ascending:false}).limit(100);
  const selectedId=params.delivery_order_id??"";
  const selected=orders?.find((order)=>order.id===selectedId);
- let lines=[];
+ let lines: InvoiceLine[] = [];
  let lineError=false;
  if(selected){
   const {data,error}=await supabase.from("delivery_order_items").select("id,quantity,sales_order_item_id,sales_order_items(unit_price,products(product_name),product_variants(variant_sku,variant_name)),sales_invoice_items(quantity,sales_invoices(status))").eq("delivery_order_id",selected.id);

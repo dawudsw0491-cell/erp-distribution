@@ -36,7 +36,7 @@
 ## Live database snapshot
 
 - Current read-only table inventory: 54 public tables, all reported with RLS enabled.
-- The Development migration ledger contains 26 applied migrations through `20261124062000`; this supersedes the four-entry historical snapshot below.
+- The Development migration ledger contains 26 applied migrations through `20261124025800`; this supersedes the four-entry historical snapshot below.
 - Current Security Advisor reports four RLS-enabled tables without policies, 38 authenticated-executable SECURITY DEFINER functions, and one leaked-password protection warning. Findings require separate intent/permission review; no blanket privilege revocation was performed.
 - Current Performance Advisor reports 46 unused-index findings and missing FK covering indexes. No indexes were removed or added.
 - Live schema confirms `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values` exist. This resolves the previous source-only uncertainty about table existence, but not their full provenance or canonical semantics.
@@ -155,8 +155,8 @@ The historical status sections above preserve prior implementation evidence and 
 
 - Active branch at start of this execution: `fix/ui-masterdata-region-and-table-consistency-20261124`, commit `831f7c3d027f619735a831cbd882131977d6712b`.
 - Confirmed the current Supabase Development inventory includes Product, Variant, Model, Brand, Category, Attribute, Product Unit/Identifier, Inventory Balance, Movement, Valuation, Purchasing, Goods Receipt, Sales Order, Delivery Order, Invoice and Payment tables. Transaction tables checked in the initial inventory were empty.
-- Confirmed `private.enforce_warehouse_scope()` already protects `inventory_movements` on INSERT/UPDATE/DELETE by validating both OLD and NEW warehouse rows and preserving the trusted service-role path. A proposed duplicate public trigger was therefore immediately superseded by migration `20261124062000`; final database state has no duplicate public trigger/function. No business data was changed.
-- Development migration ledger now has 26 entries through `20261124062000`. Source/ledger provenance remains open under GOV-001.
+- Confirmed `private.enforce_warehouse_scope()` already protects `inventory_movements` on INSERT/UPDATE/DELETE by validating both OLD and NEW warehouse rows and preserving the trusted service-role path. A proposed duplicate public trigger was therefore immediately superseded by migration `20261124025800`; final database state has no duplicate public trigger/function. No business data was changed.
+- Development migration ledger now has 27 entries through `20261124025800`; the three newly committed source migration filenames do not match the three ledger versions assigned by the migration API, reinforcing GOV-001. Source/ledger provenance remains open under GOV-001.
 - Current Product/Variant UI and server action use the existing atomic `create_product_with_variants` RPC; no replacement CRUD or schema redesign was introduced.
 - User previously validated local lint/build at commit `831f7c3`. No application source files changed in this execution, so that result still applies to the application source at that commit; the current docs/migration commits have not been locally pulled or rebuilt.
 - No Vercel deployment was requested or triggered. Production was not accessed or modified.

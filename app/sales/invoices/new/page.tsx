@@ -6,6 +6,7 @@ import {getAuthorizationContext} from "@/lib/auth/authorization";
 import InvoiceComposer from "../invoice-composer";
 
 export const metadata={title:"Buat Invoice | HEXA CORE ERP"};
+type InvoiceLine = { id: string; delivered: number; already_invoiced: number; product_name: string; variant_sku: string; variant_name: string; unit_price: number };
 export default async function NewInvoicePage({searchParams}:{searchParams:Promise<{delivery_order_id?:string}>}) {
  await connection();
  const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.create");

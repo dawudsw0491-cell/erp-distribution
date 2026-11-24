@@ -55,6 +55,12 @@ export async function searchSupplierRegionsAction(
   }
 
   const searchKeyword = keyword.trim().slice(0, 80);
+  if (searchKeyword.length < 2) {
+    return {
+      data: [],
+      error: searchKeyword.length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.",
+    };
+  }
   const searchPattern = `%${searchKeyword}%`;
 
   if (level !== "province" && !parentId.trim()) {

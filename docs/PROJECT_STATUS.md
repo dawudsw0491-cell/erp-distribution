@@ -1,10 +1,10 @@
 # Project Status — HEXA CORE ERP Distribution
 
-**Current implementation branch:** `fix/engineering-governance-masterdata-consolidation-20261120`  
+**Current implementation branch:** `fix/ui-masterdata-region-and-table-consistency-20261124`  
 **Branch base:** `work/master-data-baseline-20261119` at `bb2d212bf375a9941d695486137301712f4ddd40`  
 **Protected baseline:** `master` at `8eadef2a0cb7e03fa2eb3fdb194dee4987af2bfa`  
 **Supabase:** `erp-distribution-dev`, PostgreSQL 17.11, ACTIVE_HEALTHY  
-**Last live inspection:** 2026-11-22 (see `docs/PROJECT_AUDIT_2026-11-22.md` for reconciled current snapshot)
+**Last live inspection:** 2026-11-24; see the dated execution note below. Historical sections below retain earlier snapshots and must not be treated as current without revalidation.
 
 ## Module status (current evidence)
 
@@ -35,9 +35,10 @@
 
 ## Live database snapshot
 
-- 47 tables in schema `public`; all reported with RLS enabled.
-- 73 public functions, 44 SECURITY DEFINER functions, 20 non-internal triggers, 102 RLS policies, 189 indexes.
-- Supabase migration ledger contains four applied migrations: `20261120012027 hexa_core_harden_public_definer_function_execute`, `20261120023844 seed_product_warranty_templates`, `20261120031233 seed_ram_rom_variant_specifications_and_delete_policy`, and `20261120031359 save_product_variant_specifications_rpc`.
+- Current read-only table inventory: 54 public tables, all reported with RLS enabled.
+- The Development migration ledger contains 26 applied migrations through `20261124062000`; this supersedes the four-entry historical snapshot below.
+- Current Security Advisor reports four RLS-enabled tables without policies, 38 authenticated-executable SECURITY DEFINER functions, and one leaked-password protection warning. Findings require separate intent/permission review; no blanket privilege revocation was performed.
+- Current Performance Advisor reports 46 unused-index findings and missing FK covering indexes. No indexes were removed or added.
 - Live schema confirms `product_models`, `product_attribute_assignments`, and `product_variant_attribute_values` exist. This resolves the previous source-only uncertainty about table existence, but not their full provenance or canonical semantics.
 - Security advisor initially reported seven SECURITY DEFINER functions executable by anon. A migration has been applied and verified: anon execution is false for all seven; authenticated execution remains true for six application/RLS functions. Trigger function `generate_customer_code()` is not directly executable by authenticated.
 - Security advisor reports four RLS-enabled tables without policies and four overlapping permissive policy cases.
@@ -148,3 +149,15 @@ Evidence: user-provided localhost screenshots and source file `app/page.tsx`.
 ## Current audit reconciliation — 2026-11-22
 
 The historical status sections above preserve prior implementation evidence and earlier snapshots. The current consolidated audit is now recorded in `docs/PROJECT_AUDIT_2026-11-22.md`. The live Development catalog was re-read on 2026-11-22: 47 public tables (all RLS-enabled), 77 public functions, 44 SECURITY DEFINER functions, 33 non-internal triggers, 103 RLS policies, and 189 indexes. The applied migration ledger has eight entries through `20261121050458 rbac_warehouse_scope_alignment`. MD-014 remains unapplied and blocked by 154/188 NULL Variant IDs across six tables. Latest Vercel Preview is READY on commit `9dc9df91456a57b62b69318ea8d59c61ee79b6f0`. The audit is read-only; no database or Production mutation occurred.
+
+
+## Execution note — 2026-11-24 (Point 1: Master Data + Inventory Foundation)
+
+- Active branch at start of this execution: `fix/ui-masterdata-region-and-table-consistency-20261124`, commit `831f7c3d027f619735a831cbd882131977d6712b`.
+- Confirmed the current Supabase Development inventory includes Product, Variant, Model, Brand, Category, Attribute, Product Unit/Identifier, Inventory Balance, Movement, Valuation, Purchasing, Goods Receipt, Sales Order, Delivery Order, Invoice and Payment tables. Transaction tables checked in the initial inventory were empty.
+- Confirmed `private.enforce_warehouse_scope()` already protects `inventory_movements` on INSERT/UPDATE/DELETE by validating both OLD and NEW warehouse rows and preserving the trusted service-role path. A proposed duplicate public trigger was therefore immediately superseded by migration `20261124062000`; final database state has no duplicate public trigger/function. No business data was changed.
+- Development migration ledger now has 26 entries through `20261124062000`. Source/ledger provenance remains open under GOV-001.
+- Current Product/Variant UI and server action use the existing atomic `create_product_with_variants` RPC; no replacement CRUD or schema redesign was introduced.
+- User previously validated local lint/build at commit `831f7c3`. No application source files changed in this execution, so that result still applies to the application source at that commit; the current docs/migration commits have not been locally pulled or rebuilt.
+- No Vercel deployment was requested or triggered. Production was not accessed or modified.
+- Next Point 1 work remains: trace Product/Model/Brand/category/attribute dependencies against all downstream transaction consumers; complete serialized IMEI/Serial lifecycle review; reconcile migration provenance; then update the same MD-003/MD-004/MD-006/MD-011/MD-013/MD-014 backlog rows with evidence.

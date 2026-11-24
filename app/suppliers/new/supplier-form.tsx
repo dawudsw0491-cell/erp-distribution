@@ -74,10 +74,9 @@ export default function SupplierForm() {
 
     if (level !== "province" && !parentId) return;
 
-    const selected = getSelectedRegion(level);
-
     setActiveLevel(level);
-    setSearchQuery(selected?.name ?? "");
+    // Saat dropdown dibuka, tampilkan daftar pilihan awal tanpa harus mengetik.
+    setSearchQuery("");
     setOptions([]);
     setSearchError("");
   }
@@ -175,9 +174,9 @@ export default function SupplierForm() {
     const keyword = searchQuery;
 
     if (level !== "province" && !parentId) return;
-    if (keyword.trim().length < 2) {
+    if (keyword.trim().length === 1) {
       setOptions([]);
-      setSearchError(keyword.trim().length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.");
+      setSearchError("Ketik minimal 2 huruf atau pilih dari daftar wilayah.");
       setIsSearching(false);
       return;
     }

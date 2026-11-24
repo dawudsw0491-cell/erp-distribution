@@ -52,10 +52,10 @@ export async function searchSupplierRegionsAction(
   parentId: string
 ): Promise<RegionSearchResult> {
   const searchKeyword = keyword.trim().slice(0, 80);
-  if (searchKeyword.length < 2) {
+  if (searchKeyword.length === 1) {
     return {
       data: [],
-      error: searchKeyword.length === 0 ? "" : "Ketik minimal 2 huruf untuk mencari wilayah.",
+      error: "Ketik minimal 2 huruf atau pilih dari daftar wilayah.",
     };
   }
 

@@ -372,26 +372,26 @@ export async function searchSupplierPostalCodeAction(villageId: string): Promise
     return { postalCode: "", error: "Anda tidak memiliki izin mengakses rekomendasi kode pos." };
   }
 
-  const match = villageId.trim().match(/^(\d{2})(\d{2})(\d{2})(\d{4})$/);
-  if (!match) return { postalCode: "", error: "Kode wilayah desa/kelurahan tidak valid." };
-
-  const apiVillageId = `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
-  try {
-    const response = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/v2/villages/${apiVillageId}.json`, {
-      next: { revalidate: 86400 },
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) return { postalCode: "", error: "Rekomendasi kode pos tidak tersedia untuk wilayah ini." };
-    const result: unknown = await response.json();
-    if (!result || typeof result !== "object" || !("data" in result)) {
-      return { postalCode: "", error: "Format data kode pos tidak valid." };
-    }
-    const data = (result as { data?: { postal_code?: unknown } }).data;
-    const postalCode = typeof data?.postal_code === "string" ? data.postal_code : "";
-    if (!/^\d{5}$/.test(postalCode)) return { postalCode: "", error: "Kode pos belum tersedia untuk desa/kelurahan ini." };
-    return { postalCode, error: "" };
-  } catch (error) {
-    console.error("Postal code lookup failed:", error);
-    return { postalCode: "", error: "Gagal mengambil rekomendasi kode pos. Silakan coba kembali." };
+  const normalizedVillageId = villageId.trim();
+  if (!/^\\d{10}$/.test(normalizedVillageId)) {
+    return { postalCode: "", error: "Kode wilayah desa/kelurahan tidak valid." };
   }
+
+  const { data, error } = await auth.supabase
+    .from("indonesia_villages")
+    .select("postal_code")
+    .eq("id", normalizedVillageId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Local postal code lookup failed:", error);
+    return { postalCode: "", error: "Gagal mengambil kode pos dari database lokal." };
+  }
+
+  const postalCode = typeof data?.postal_code === "string" ? data.postal_code : "";
+  if (!/^\\d{5}$/.test(postalCode)) {
+    return { postalCode: "", error: "Kode pos belum tersedia untuk desa/kelurahan ini." };
+  }
+
+  return { postalCode, error: "" };
 }

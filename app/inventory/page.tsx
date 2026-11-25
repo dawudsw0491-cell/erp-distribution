@@ -198,11 +198,6 @@ async function InventoryContent() {
       href: "/inventory/balances",
     },
     {
-      title: "IMEI Registry",
-      description: "Pelacakan unit berdasarkan IMEI dan serial.",
-      href: "/inventory/units",
-    },
-    {
       title: "Stock Transfer",
       description: "Pemindahan persediaan antar gudang.",
       href: "/inventory/transfers",
@@ -211,11 +206,6 @@ async function InventoryContent() {
       title: "Stock Opname",
       description: "Pemeriksaan fisik dan pencocokan stok.",
       href: "/inventory/opname",
-    },
-    {
-      title: "Stock Adjustment",
-      description: "Penyesuaian saldo persediaan.",
-      href: "/inventory/adjustments",
     },
   ];
 

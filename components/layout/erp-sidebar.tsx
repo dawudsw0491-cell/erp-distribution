@@ -13,7 +13,6 @@ import {
   Warehouse,
   ShoppingCart,
   Boxes,
-  ArrowLeftRight,
   ChevronDown,
   ClipboardList,
   Smartphone,

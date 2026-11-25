@@ -240,6 +240,7 @@ export default function GoodsReceiptForm({
         };
       })
     );
+    setClientError("");
   }
 
   function validate(): string | null {

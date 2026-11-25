@@ -197,7 +197,6 @@ export default async function GoodsReceiptDetailPage({
   if (!data) notFound();
 
   const receipt = data as unknown as ReceiptDetail;
-  const variantIds = [...new Set(receipt.items.map((item) => item.purchase_order_item?.product_variant ? item.purchase_order_item.product_variant.variant_sku : null).filter((value): value is string => Boolean(value)))];
   const itemVariantIdsResult = await supabase
     .from("goods_receipt_items")
     .select("id, purchase_order_item:purchase_order_items!goods_receipt_items_purchase_order_item_id_fkey(product_variant_id)")

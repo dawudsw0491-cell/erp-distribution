@@ -137,7 +137,7 @@ export async function createInventoryTransferAction(
   redirect("/inventory/transfers?created=1");
 }
 
-export async function postInventoryTransferAction(
+export async function processInventoryTransferAction(
   formData: FormData
 ): Promise<never> {
   const movementGroupId = getString(

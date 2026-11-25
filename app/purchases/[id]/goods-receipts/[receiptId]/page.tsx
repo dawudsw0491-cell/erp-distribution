@@ -460,7 +460,7 @@ export default async function GoodsReceiptDetailPage({
               </p>
               <div className="mt-4 space-y-3">
                 {receipt.items.filter((item) =>
-                  item.purchase_order_item?.product?.tracking_type === "imei" &&
+                  item.purchase_order_item?.product_variant?.product?.tracking_type === "imei" &&
                   Number(item.quantity_received) > item.units.length
                 ).map((item) => (
                   <form key={item.id} action={recoverPostedGoodsReceiptImeiAction}

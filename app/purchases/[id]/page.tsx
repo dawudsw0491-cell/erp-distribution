@@ -76,6 +76,7 @@ type PurchaseOrderDetail = {
       variant_sku: string;
       variant_name: string | null;
     } | null;
+    variant_attributes?: { name: string; value: string }[];
   }[];
 };
 

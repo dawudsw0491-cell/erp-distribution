@@ -801,22 +801,32 @@ export async function createProductVariant(formData: FormData) {
 
   const productId = String(formData.get("product_id") ?? "").trim();
   if (!UUID_REGEX.test(productId)) redirect("/products?error=invalid_id");
-
-  const variantName = String(formData.get("variant_name") ?? "").trim().replace(/\\s+/g, " ");
+  const returnPath = `/products/${productId}/variants/new`;
+  const network = String(formData.get("network") ?? "").trim().toUpperCase();
   const barcode = String(formData.get("barcode") ?? "").trim() || null;
-  if (!variantName) redirect(`/products/${productId}/variants/new?error=required`);
-  if (variantName.length > 200) redirect(`/products/${productId}/variants/new?error=invalid_name`);
-  if (barcode !== null && barcode.length > 100) redirect(`/products/${productId}/variants/new?error=invalid_barcode`);
-
   const specifications = {
     RAM: String(formData.get("spec_RAM") ?? "").trim(),
     ROM: String(formData.get("spec_ROM") ?? "").trim(),
     COLOR: String(formData.get("spec_COLOR") ?? "").trim(),
     WARRANTY: String(formData.get("spec_WARRANTY") ?? "").trim(),
   };
-  if (Object.values(specifications).some((value) => value.length > 100)) {
-    redirect(`/products/${productId}/variants/new?error=invalid_specification`);
+  if (!["4G", "5G", "WIFI ONLY"].includes(network) ||
+      (barcode !== null && barcode.length > 100) ||
+      Object.values(specifications).some(value => value.length > 100)) {
+    redirect(`${returnPath}?error=invalid_variants`);
   }
+  const variantName = [network, specifications.RAM, specifications.ROM, specifications.COLOR]
+    .filter(Boolean).join(" / ").toUpperCase();
+  if (!variantName || variantName.length > 200) redirect(`${returnPath}?error=invalid_variants`);
+
+  const { data: existing, error: lookupError } = await auth.supabase
+    .from("product_variants").select("id").eq("product_id", productId)
+    .ilike("variant_name", variantName).limit(1).maybeSingle();
+  if (lookupError) {
+    console.error("Variant combination lookup failed:", lookupError);
+    redirect(`${returnPath}?error=save_failed`);
+  }
+  if (existing) redirect(`${returnPath}?error=duplicate`);
 
   const { data, error } = await auth.supabase.rpc("create_product_variant_with_specs", {
     p_product_id: productId,
@@ -824,15 +834,12 @@ export async function createProductVariant(formData: FormData) {
     p_barcode: barcode,
     p_specifications: specifications,
   });
-
   if (error || !data?.id) {
     console.error("Create product variant failed:", error);
-    if (error?.code === "23505") redirect(`/products/${productId}/variants/new?error=duplicate`);
-    if (error?.message?.toLowerCase().includes("permission")) redirect(`/products/${productId}/variants/new?error=forbidden`);
-    if (error?.message?.toLowerCase().includes("barcode")) redirect(`/products/${productId}/variants/new?error=duplicate`);
-    redirect(`/products/${productId}/variants/new?error=save_failed`);
+    if (error?.code === "23505") redirect(`${returnPath}?error=duplicate`);
+    if (error?.message?.toLowerCase().includes("permission")) redirect(`${returnPath}?error=forbidden`);
+    redirect(`${returnPath}?error=save_failed`);
   }
-
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/products/${productId}/variants`);
   redirect(`/products/${productId}/variants?created=1&id=${data.id}`);
@@ -840,171 +847,80 @@ export async function createProductVariant(formData: FormData) {
 
 export async function updateProductVariant(formData: FormData) {
   const auth = await getAuthorizationContext("master.update");
-
   if (!auth.user) redirect("/login");
   if (!auth.authorized) redirect("/products?error=forbidden");
 
   const productId = String(formData.get("product_id") ?? "").trim();
   const variantId = String(formData.get("variant_id") ?? "").trim();
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(variantId)) redirect("/products?error=invalid_id");
+  const editPath = `/products/${productId}/variants/${variantId}/edit`;
 
-  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(variantId)) {
-    redirect("/products?error=invalid_id");
-  }
-
-  const { data: existingVariant, error: lookupError } =
-    await auth.supabase
-      .from("product_variants")
-      .select("id, product_id, variant_sku")
-      .eq("id", variantId)
-      .eq("product_id", productId)
-      .maybeSingle();
-
-  if (lookupError) {
+  const { data: existingVariant, error: lookupError } = await auth.supabase
+    .from("product_variants").select("id, product_id, variant_sku")
+    .eq("id", variantId).eq("product_id", productId).maybeSingle();
+  if (lookupError || !existingVariant) {
     console.error("Variant lookup failed:", lookupError);
-    redirect(
-      `/products/${productId}/variants/${variantId}?error=lookup_failed`
-    );
+    redirect(`/products/${productId}/variants?error=not_found`);
   }
 
-  if (!existingVariant) {
-    redirect("/products?error=not_found");
-  }
-
-  const variantName = String(formData.get("variant_name") ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-
+  const network = String(formData.get("network") ?? "").trim().toUpperCase();
   const barcode = String(formData.get("barcode") ?? "").trim() || null;
-
-  if (!variantName) {
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=required`
-    );
+  const specifications = {
+    RAM: String(formData.get("spec_RAM") ?? "").trim(),
+    ROM: String(formData.get("spec_ROM") ?? "").trim(),
+    COLOR: String(formData.get("spec_COLOR") ?? "").trim(),
+    WARRANTY: String(formData.get("spec_WARRANTY") ?? "").trim(),
+  };
+  if (!["4G", "5G", "WIFI ONLY"].includes(network) ||
+      (barcode !== null && barcode.length > 100) ||
+      Object.values(specifications).some(value => value.length > 100)) {
+    redirect(`${editPath}?error=invalid_specification`);
   }
+  const variantName = [network, specifications.RAM, specifications.ROM, specifications.COLOR]
+    .filter(Boolean).join(" / ").toUpperCase();
+  if (!variantName || variantName.length > 200) redirect(`${editPath}?error=invalid_specification`);
 
-  if (variantName.length > 200) {
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=invalid_name`
-    );
-  }
-
-  if (barcode !== null && barcode.length > 100) {
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=invalid_barcode`
-    );
-  }
-
-  const { data: duplicateName, error: nameLookupError } =
-    await auth.supabase
-      .from("product_variants")
-      .select("id")
-      .eq("product_id", productId)
-      .ilike("variant_name", variantName)
-      .neq("id", variantId)
-      .limit(1)
-      .maybeSingle();
-
+  const { data: duplicateName, error: nameLookupError } = await auth.supabase
+    .from("product_variants").select("id").eq("product_id", productId)
+    .ilike("variant_name", variantName).neq("id", variantId).limit(1).maybeSingle();
   if (nameLookupError) {
-    console.error("Variant name lookup failed:", nameLookupError);
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
-    );
+    console.error("Variant combination lookup failed:", nameLookupError);
+    redirect(`${editPath}?error=lookup_failed`);
   }
-
-  if (duplicateName) {
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=duplicate_name`
-    );
-  }
+  if (duplicateName) redirect(`${editPath}?error=duplicate_name`);
 
   if (barcode !== null) {
-    const { data: duplicateBarcode, error: barcodeLookupError } =
-      await auth.supabase
-        .from("product_variants")
-        .select("id")
-        .eq("barcode", barcode)
-        .neq("id", variantId)
-        .limit(1)
-        .maybeSingle();
-
-    if (barcodeLookupError) {
-      console.error("Variant barcode lookup failed:", barcodeLookupError);
-      redirect(
-        `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
-      );
+    const { data: duplicateBarcode, error: barcodeError } = await auth.supabase
+      .from("product_variants").select("id").eq("barcode", barcode)
+      .neq("id", variantId).limit(1).maybeSingle();
+    if (barcodeError) {
+      console.error("Variant barcode lookup failed:", barcodeError);
+      redirect(`${editPath}?error=lookup_failed`);
     }
-
-    if (duplicateBarcode) {
-      redirect(
-        `/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`
-      );
-    }
-
-    const { data: duplicateProductBarcode, error: productBarcodeError } =
-      await auth.supabase
-        .from("products")
-        .select("id")
-        .eq("barcode", barcode)
-        .limit(1)
-        .maybeSingle();
-
-    if (productBarcodeError) {
-      console.error("Product barcode lookup failed:", productBarcodeError);
-      redirect(
-        `/products/${productId}/variants/${variantId}/edit?error=lookup_failed`
-      );
-    }
-
-    if (duplicateProductBarcode) {
-      redirect(
-        `/products/${productId}/variants/${variantId}/edit?error=duplicate_barcode`
-      );
-    }
+    const { data: productBarcode, error: productBarcodeError } = await auth.supabase
+      .from("products").select("id").eq("barcode", barcode).limit(1).maybeSingle();
+    if (productBarcodeError) redirect(`${editPath}?error=lookup_failed`);
+    if (duplicateBarcode || productBarcode) redirect(`${editPath}?error=duplicate_barcode`);
   }
 
-  const { error: updateError } = await auth.supabase
-    .from("product_variants")
-    .update({
-      variant_name: variantName,
-      barcode,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", variantId)
-    .eq("product_id", productId);
-
+  const { error: updateError } = await auth.supabase.from("product_variants")
+    .update({ variant_name: variantName, barcode, updated_at: new Date().toISOString() })
+    .eq("id", variantId).eq("product_id", productId);
   if (updateError) {
     console.error("Update product variant failed:", updateError);
-
-    if (updateError.code === "23505") {
-      redirect(
-        `/products/${productId}/variants/${variantId}/edit?error=duplicate`
-      );
-    }
-
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=save_failed`
-    );
+    redirect(`${editPath}?error=save_failed`);
   }
 
   try {
-    await saveVariantSpecifications(
-      auth.supabase,
-      productId,
-      variantId,
-      formData
-    );
+    await saveVariantSpecifications(auth.supabase, productId, variantId, formData);
   } catch (specificationError) {
     console.error("Update variant specifications failed:", specificationError);
-    redirect(
-      `/products/${productId}/variants/${variantId}/edit?error=specifications_save_failed`
-    );
+    redirect(`${editPath}?error=specifications_save_failed`);
   }
-
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/products/${productId}/variants`);
   revalidatePath(`/products/${productId}/variants/${variantId}`);
-  revalidatePath(`/products/${productId}/variants/${variantId}/edit`);
-
+  revalidatePath(editPath);
   redirect(`/products/${productId}/variants/${variantId}?updated=1`);
 }
 

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import { postGoodsReceiptAction } from "../../../actions";
+import { confirmGoodsReceiptAction } from "../../../actions";
 
 export const instant = false;
 
@@ -246,7 +246,7 @@ export default async function GoodsReceiptDetailPage({
 
           {query.receipt_posted === "1" && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-              Goods Receipt berhasil diposting dan inventory telah diperbarui.
+              Penerimaan barang berhasil dikonfirmasi dan saldo persediaan telah diperbarui.
             </div>
           )}
 
@@ -457,7 +457,7 @@ export default async function GoodsReceiptDetailPage({
                 </p>
               </div>
 
-              <form action={postGoodsReceiptAction}>
+              <form action={confirmGoodsReceiptAction}>
                 <input
                   type="hidden"
                   name="goods_receipt_id"

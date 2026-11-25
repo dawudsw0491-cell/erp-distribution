@@ -684,6 +684,7 @@ async function StockBalanceContent({
                       <col style={{ width: "300px" }} />
                       <col style={{ width: "190px" }} />
                       <col style={{ width: "190px" }} />
+                      <col style={{ width: "280px" }} />
                       <col style={{ width: "105px" }} />
                       <col style={{ width: "105px" }} />
                       <col style={{ width: "105px" }} />
@@ -698,6 +699,7 @@ async function StockBalanceContent({
                         <th className="px-4 py-4 text-left font-semibold">Produk</th>
                         <th className="px-4 py-4 text-left font-semibold">SKU</th>
                         <th className="px-4 py-4 text-left font-semibold">Gudang</th>
+                        <th className="px-4 py-4 text-left font-semibold">IMEI / Serial</th>
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Available</th>
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Reserved</th>
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Damaged</th>
@@ -748,28 +750,6 @@ async function StockBalanceContent({
                                 </p>
                               )}
 
-                              {row.product.tracking_type !== "quantity" && (
-                                <details className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-                                  <summary className="cursor-pointer select-none text-xs font-semibold text-blue-700">
-                                    Lihat IMEI / Serial ({row.units?.length ?? 0})
-                                  </summary>
-                                  {(row.units?.length ?? 0) > 0 ? (
-                                    <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                                      {row.units?.map((unit) => (
-                                        <li key={unit.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-1.5">
-                                          <span className="font-mono">{(unit.product_unit_identifiers ?? []).map((identifier) => identifier.identifier_value).join(" / ") || unit.unit_code}</span>
-                                          <span className="text-slate-500">{unit.unit_status}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <p className="mt-2 text-xs text-amber-700">Belum ada unit/IMEI individual pada database untuk varian dan gudang ini.</p>
-                                  )}
-                                  {row.unitDataMismatch && (
-                                    <p className="mt-2 text-xs font-medium text-amber-700">Peringatan: saldo agregat tercatat {numberFormat(row.onHand)} unit, tetapi belum ada data unit/IMEI. Saldo agregat tidak diubah otomatis.</p>
-                                  )}
-                                </details>
-                              )}
                             </td>
 
                             <td className="px-4 py-4 text-left align-top font-medium text-slate-800">
@@ -785,6 +765,32 @@ async function StockBalanceContent({
                               <p className="mt-1 whitespace-normal break-all text-xs leading-4 text-slate-400">
                                 {row.warehouse.warehouse_code}
                               </p>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                              {row.product.tracking_type === "quantity" ? (
+                                <span className="text-xs text-slate-400">—</span>
+                              ) : (
+                                <details className="rounded-md border border-slate-200 bg-slate-50 p-2">
+                                  <summary className="cursor-pointer select-none text-xs font-semibold text-blue-700">
+                                    {row.units?.length ?? 0} unit terdaftar · Lihat IMEI
+                                  </summary>
+                                  {(row.units?.length ?? 0) > 0 ? (
+                                    <ul className="mt-2 max-h-48 min-w-[220px] space-y-1 overflow-y-auto text-xs text-slate-700">
+                                      {row.units?.map((unit) => (
+                                        <li key={unit.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-1.5">
+                                          <span className="font-mono">{(unit.product_unit_identifiers ?? []).map((identifier) => identifier.identifier_value).join(" / ") || unit.unit_code}</span>
+                                          <span className="text-slate-500">{unit.unit_status}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="mt-2 min-w-[220px] text-xs text-amber-700">Belum ada IMEI/unit tersimpan untuk varian dan gudang ini.</p>
+                                  )}
+                                  {row.unitDataMismatch && (
+                                    <p className="mt-2 min-w-[220px] text-xs font-medium text-amber-700">Saldo agregat {numberFormat(row.onHand)} unit, tetapi data IMEI belum tersedia.</p>
+                                  )}
+                                </details>
+                              )}
                             </td>
 
                             <td className="whitespace-nowrap px-3 py-4 text-right align-top font-semibold tabular-nums text-emerald-700">

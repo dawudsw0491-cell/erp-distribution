@@ -198,11 +198,6 @@ async function InventoryContent() {
       href: "/inventory/balances",
     },
     {
-      title: "Stock Movement",
-      description: "Riwayat barang masuk dan keluar.",
-      href: "/inventory/movements",
-    },
-    {
       title: "IMEI Registry",
       description: "Pelacakan unit berdasarkan IMEI dan serial.",
       href: "/inventory/units",
@@ -361,7 +356,7 @@ async function InventoryContent() {
                 </strong>
               </div>
               <div className="text-slate-600">
-                Transaksi Posted:
+                Perubahan Stok Tercatat:
                 <strong className="ml-2 text-slate-900">
                   {formatNumber(movementResult.count ?? 0)}
                 </strong>

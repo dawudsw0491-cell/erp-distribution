@@ -544,6 +544,7 @@ export default function GoodsReceiptForm({
                     <UniversalScanner
                       label="Scanner IMEI Unit"
                       placeholder="Scan IMEI 1 atau masukkan manual"
+                      commitOnBlur
                       onScan={(rawValue) => {
                         const value = rawValue.replace(/\D/g, "");
                         if (!isValidImei(value)) {

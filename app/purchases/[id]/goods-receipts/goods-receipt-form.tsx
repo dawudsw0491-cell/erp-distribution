@@ -576,26 +576,9 @@ export default function GoodsReceiptForm({
                           updateUnit(index, targetIndex, { imei1: value });
                         }}
                       />
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {state.units.map((unit, unitIndex) => (
-                          <label key={`${product.id}-imei-${unitIndex}`} className="block rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <span className="mb-1 block text-xs font-semibold text-slate-600">
-                              {product.variant_attributes?.find((attribute) => /warna|color/i.test(attribute.name))?.value || product.variant_name || "Varian"} · Unit {unitIndex + 1}
-                            </span>
-                            <input
-                              value={unit.imei1}
-                              inputMode="numeric"
-                              maxLength={15}
-                              onChange={(event) => updateUnit(index, unitIndex, { imei1: event.target.value.replace(/\D/g, "").slice(0, 15) })}
-                              placeholder="15 digit IMEI"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono"
-                            />
-                            <span className="mt-1 block text-xs text-slate-500">
-                              {unit.imei1 ? (isValidImei(unit.imei1) ? "Format IMEI valid" : "Periksa 15 digit dan checksum") : "Belum diisi"}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                      <p className="text-xs text-slate-500">
+                        Gunakan satu kolom scanner di atas untuk kamera, input manual, USB, atau Bluetooth. Data yang lolos validasi otomatis mengisi slot unit berikutnya pada varian ini.
+                      </p>
                     </>
                   )}
 

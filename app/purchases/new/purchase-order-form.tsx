@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { createPurchaseOrderAction } from "../actions";
 
@@ -37,6 +38,21 @@ type PurchaseItem = {
   tax_amount: string;
   notes: string;
 };
+
+function PurchaseSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={disabled || pending}
+      aria-disabled={disabled || pending}
+      className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {pending ? "Menyimpan Purchase Order..." : "Simpan sebagai Draft"}
+    </button>
+  );
+}
 
 type Props = {
   suppliers: Supplier[];
@@ -616,13 +632,7 @@ export default function PurchaseOrderForm({
           Batal
         </Link>
 
-        <button
-          type="submit"
-          disabled={items.length === 0 || hasInvalidItems}
-          className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Simpan sebagai Draft
-        </button>
+        <PurchaseSubmitButton disabled={items.length === 0 || hasInvalidItems} />
       </div>
     </form>
   );

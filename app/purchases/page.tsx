@@ -29,10 +29,39 @@ type PurchasesPageProps = {
     q?: string;
     status?: string;
     page?: string;
+    created?: string;
+    approved?: string;
+    rejected?: string;
+    cancelled?: string;
+    receipt_posted?: string;
+    error?: string;
   }>;
 };
 
 const PAGE_SIZE = 10;
+
+function purchaseErrorMessage(code: string) {
+  const messages: Record<string, string> = {
+    permission_denied: "Akses ditolak. Periksa hak akses Purchasing dan warehouse.",
+    invalid_id: "Referensi Purchase Order tidak valid.",
+    invalid_reference: "Supplier atau warehouse tidak valid.",
+    invalid_order_date: "Tanggal Purchase Order tidak valid.",
+    invalid_expected_date: "Tanggal estimasi penerimaan tidak valid.",
+    invalid_date_range: "Tanggal estimasi tidak boleh lebih awal dari tanggal pesanan.",
+    invalid_shipping_cost: "Biaya pengiriman tidak valid.",
+    notes_too_long: "Catatan melebihi batas karakter.",
+    invalid_items: "Rincian produk belum valid. Periksa kembali item pembelian.",
+    invalid_item_data: "Data rincian pembelian tidak valid.",
+    invalid_quantity: "Kuantitas harus lebih besar dari nol.",
+    invalid_item_notes: "Catatan item melebihi batas karakter.",
+    save_failed: "Purchase Order gagal disimpan. Tidak ada konfirmasi penyimpanan dari server.",
+    approve_failed: "Purchase Order gagal disetujui. Periksa status dokumen dan hak akses.",
+    reject_failed: "Purchase Order gagal ditolak.",
+    cancel_failed: "Purchase Order gagal dibatalkan.",
+    post_failed: "Penerimaan barang gagal diproses. Periksa stok, unit, dan status dokumen.",
+  };
+  return messages[code] ?? "Permintaan Purchase Order gagal diproses. Periksa data dan hak akses.";
+}
 
 function formatCurrency(value: number | null) {
   if (value === null) return "-";
@@ -134,6 +163,20 @@ async function PurchasesContent({
   }
 
   const params = await searchParams;
+
+  const notice = params.created === "1"
+    ? { type: "success", message: "Purchase Order berhasil disimpan sebagai draft." }
+    : params.approved === "1"
+      ? { type: "success", message: "Purchase Order berhasil disetujui." }
+      : params.rejected === "1"
+        ? { type: "success", message: "Purchase Order berhasil ditolak." }
+        : params.cancelled === "1"
+          ? { type: "success", message: "Purchase Order berhasil dibatalkan." }
+          : params.receipt_posted === "1"
+            ? { type: "success", message: "Penerimaan barang berhasil dikonfirmasi dan saldo persediaan diperbarui." }
+            : params.error
+              ? { type: "error", message: purchaseErrorMessage(params.error) }
+              : null;
 
   const keyword = (params.q ?? "").trim().slice(0, 100);
 
@@ -298,6 +341,12 @@ async function PurchasesContent({
               + Buat Purchase Order
             </Link>
           </header>
+
+{notice && (
+            <div role="status" aria-live="polite" className={`rounded-lg border px-4 py-3 text-sm font-medium ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+              {notice.message}
+            </div>
+          )}
 
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[

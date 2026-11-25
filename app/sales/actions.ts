@@ -118,7 +118,7 @@ export async function createDeliveryOrderAction(form: FormData): Promise<never> 
   redirect(`/sales/${id}?delivery_order=${data}`);
 }
 
-export async function postDeliveryOrderAction(form: FormData): Promise<never> {
+export async function completeDeliveryOrderAction(form: FormData): Promise<never> {
   const id=value(form,"delivery_order_id"), soId=value(form,"sales_order_id");
   if(!uuid(id)||!uuid(soId)) redirect("/sales?error=invalid_id");
   const {supabase,user,profile,authorized}=await getAuthorizationContext("sales.create");

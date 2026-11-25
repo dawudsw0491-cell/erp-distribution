@@ -90,3 +90,30 @@ export async function getAuthorizationContext(
     authorized: profileIsValid && permissionIsValid,
   };
 }
+
+
+/**
+ * Authenticates the current request and verifies that the user profile is active.
+ * Use only when the called database RPC performs its own permission check.
+ * The RPC remains the authorization boundary; this avoids a duplicate
+ * has_permission round-trip before the atomic database operation.
+ */
+export type AuthenticatedContext = Pick<AuthorizationContext, "supabase" | "user" | "profile">;
+
+export async function getAuthenticatedContext(): Promise<AuthenticatedContext> {
+  const [supabase, authResult] = await Promise.all([getRequestSupabase(), getRequestUser()]);
+  const { user, error: authError } = authResult;
+  if (authError || !user) return { supabase, user: null, profile: null };
+
+  const profileResult = await getRequestProfile(user.id);
+  const profile = profileResult.data;
+  const profileIsValid = !profileResult.error && Boolean(profile?.is_active);
+
+  return {
+    supabase,
+    user: { id: user.id, email: user.email },
+    profile: profileIsValid && profile
+      ? { full_name: profile.full_name, is_active: profile.is_active }
+      : null,
+  };
+}

@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { getAuthenticatedContext } from "@/lib/auth/authorization";
 
 type PurchaseOrderItemInput = {
   product_variant_id: string;
@@ -108,14 +108,13 @@ export async function createPurchaseOrderAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.create");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect("/purchases?error=permission_denied");
   }
 
@@ -256,14 +255,13 @@ export async function approvePurchaseOrderAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.approve");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect("/purchases?error=permission_denied");
   }
 
@@ -319,14 +317,13 @@ export async function rejectPurchaseOrderAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.approve");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect("/purchases?error=permission_denied");
   }
 
@@ -387,14 +384,13 @@ export async function cancelPurchaseOrderAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.update");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect(
       `/purchases/${purchaseOrderId}?error=permission_denied`
     );
@@ -616,14 +612,13 @@ export async function createGoodsReceiptAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.create");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect(
       `/purchases/${purchaseOrderId}?error=permission_denied`
     );
@@ -680,8 +675,7 @@ export async function confirmGoodsReceiptAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("purchasing.approve");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
@@ -689,7 +683,7 @@ export async function confirmGoodsReceiptAction(
 
   const returnUrl = `/purchases/${purchaseOrderId}`;
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect(`${returnUrl}?error=permission_denied`);
   }
 

@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { getAuthenticatedContext, getAuthorizationContext } from "@/lib/auth/authorization";
 
 function getString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -26,14 +26,16 @@ function isValidQuantity(value: string): boolean {
   return Number.isFinite(quantity) && quantity >= 0;
 }
 
-async function authorizeOpname() {
-  const context = await getAuthorizationContext("inventory.opname");
+async function authorizeOpname(databaseChecksPermission = true) {
+  const context = databaseChecksPermission
+    ? await getAuthenticatedContext()
+    : await getAuthorizationContext("inventory.opname");
 
   if (!context.user) {
     redirect("/login");
   }
 
-  if (!context.profile || !context.authorized) {
+  if (!context.profile || ("authorized" in context && !context.authorized)) {
     redirect("/inventory/opname?error=permission_denied");
   }
 
@@ -455,7 +457,7 @@ export async function postStockOpnameAction(
     redirect("/inventory/opname?error=invalid_id");
   }
 
-  const { supabase } = await authorizeOpname();
+  const { supabase } = await authorizeOpname(false);
 
   const { error } = await supabase.rpc(
     "post_stock_opname",

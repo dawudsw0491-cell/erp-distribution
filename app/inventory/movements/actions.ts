@@ -3,7 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { getAuthenticatedContext, getAuthorizationContext } from "@/lib/auth/authorization";
 
 function getString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -30,9 +30,10 @@ function redirectWithError(message: string): never {
 export async function createInventoryMovementAction(
   formData: FormData
 ): Promise<never> {
-  const { supabase } = await getAuthorizationContext(
-    "inventory.update"
-  );
+  const { supabase, user, profile } = await getAuthenticatedContext();
+
+  if (!user) redirect("/login");
+  if (!profile) redirectWithError("Akun tidak aktif atau profil tidak tersedia.");
 
   const productVariantId = getString(formData, "product_variant_id");
   const warehouseId = getString(formData, "warehouse_id");
@@ -111,9 +112,14 @@ export async function createInventoryMovementAction(
 export async function postInventoryMovementAction(
   formData: FormData
 ): Promise<never> {
-  const { supabase } = await getAuthorizationContext(
+  const { supabase, user, profile, authorized } = await getAuthorizationContext(
     "inventory.update"
   );
+
+  if (!user) redirect("/login");
+  if (!profile || !authorized) {
+    redirectWithError("Anda tidak memiliki izin untuk memposting mutasi persediaan.");
+  }
 
   const movementId = getString(formData, "movement_id");
 

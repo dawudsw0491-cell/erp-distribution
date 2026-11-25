@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
 import MasterDataLoading from "@/components/layout/master-data-loading";
+import ActionFeedback from "@/components/feedback/action-feedback";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,10 @@ export default function RootLayout({
     >
       <body className="min-h-screen w-full">
         <Suspense fallback={<MasterDataLoading />}>
-          <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
+          <>
+            <ActionFeedback />
+            <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
+          </>
         </Suspense>
       </body>
     </html>

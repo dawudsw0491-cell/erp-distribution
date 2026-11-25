@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getAuthorizationContext } from "@/lib/auth/authorization";
+import { getAuthenticatedContext, getAuthorizationContext } from "@/lib/auth/authorization";
 
 function getString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -98,14 +98,13 @@ export async function createInventoryTransferAction(
     supabase,
     user,
     profile,
-    authorized,
-  } = await getAuthorizationContext("inventory.transfer");
+  } = await getAuthenticatedContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  if (!profile || !authorized) {
+  if (!profile) {
     redirect("/inventory/transfers?error=permission_denied");
   }
 

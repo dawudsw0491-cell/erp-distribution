@@ -83,6 +83,8 @@ type StockDisplayRow = {
   value: number;
   averageCost: number;
   minimumStock: number;
+  units?: UnitDetailRow[];
+  unitDataMismatch?: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -495,41 +497,49 @@ async function StockBalanceContent({
     }
   );
 
-  const selectedUnitVariantId = params.unit_variant ?? "";
-  const selectedUnitWarehouseId = params.unit_warehouse ?? "";
-  const selectedUnitRow = rows.find(
-    (row) =>
-      row.product.id === selectedUnitVariantId &&
-      row.warehouse.id === selectedUnitWarehouseId &&
-      row.product.tracking_type !== "quantity"
-  );
-
-  const selectedUnitResult = selectedUnitRow
-    ? await supabase
-        .from("product_units")
+  const serializedVariantIds = [...new Set(
+    paginatedRows
+      .filter((row) => row.product.tracking_type !== "quantity")
+      .map((row) => row.product.id)
+  )];
+  const unitResult = serializedVariantIds.length
+    ? await supabase.from("product_units")
         .select(`
-          id,
-          unit_code,
-          unit_status,
-          received_at,
-          unit_cost,
-          product_unit_identifiers (
-            identifier_type,
-            identifier_value
-          )
+          id, product_variant_id, warehouse_id, unit_code, unit_status,
+          received_at, unit_cost,
+          product_unit_identifiers ( identifier_type, identifier_value )
         `)
-        .eq("product_variant_id", selectedUnitVariantId)
-        .eq("warehouse_id", selectedUnitWarehouseId)
+        .in("product_variant_id", serializedVariantIds)
         .order("unit_code", { ascending: true })
-        .limit(500)
-    : null;
-
-  if (selectedUnitResult?.error) {
-    return <StockBalanceError message={selectedUnitResult.error.message} />;
+        .limit(5000)
+    : { data: [], error: null };
+  if (unitResult.error) {
+    return <StockBalanceError message={unitResult.error.message} />;
   }
-
-  const selectedUnits =
-    (selectedUnitResult?.data ?? []) as UnitDetailRow[];
+  const unitRows = (unitResult.data ?? []) as (UnitDetailRow & {
+    product_variant_id: string; warehouse_id: string;
+  })[];
+  const displayRows = paginatedRows.map((row) => {
+    const units = unitRows.filter((unit) =>
+      unit.product_variant_id === row.product.id &&
+      unit.warehouse_id === row.warehouse.id
+    );
+    if (row.product.tracking_type === "quantity" || units.length === 0) {
+      return { ...row, units, unitDataMismatch: row.product.tracking_type !== "quantity" && row.onHand > 0 };
+    }
+    const availableUnits = units.filter((unit) => unit.unit_status === "available").length;
+    const onHandUnits = units.filter((unit) => !["sold", "in_transit", "returned_to_supplier"].includes(unit.unit_status)).length;
+    const costedUnits = units.filter((unit) => unit.unit_cost !== null);
+    const totalUnitCost = costedUnits.reduce((sum, unit) => sum + Number(unit.unit_cost), 0);
+    const averageUnitCost = costedUnits.length
+      ? totalUnitCost / costedUnits.length
+      : row.averageCost;
+    return {
+      ...row, units, available: availableUnits, onHand: onHandUnits,
+      value: costedUnits.length === units.length ? totalUnitCost : row.value,
+      averageCost: averageUnitCost, unitDataMismatch: false,
+    };
+  });
 
   return (
     <div className="flex min-h-screen bg-slate-100 md:h-screen md:min-h-0 md:overflow-hidden">
@@ -641,8 +651,7 @@ async function StockBalanceContent({
             ]}
           />
 
-          {selectedUnitRow && (
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
                 <div>
                   <h2 className="font-semibold text-slate-900">
@@ -777,13 +786,13 @@ async function StockBalanceContent({
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Damaged</th>
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Repair</th>
                         <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">On Hand</th>
-                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Avg. Cost</th>
-                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Inventory Value</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Harga Modal / Unit</th>
+                        <th className="whitespace-nowrap px-3 py-4 text-right font-semibold">Total Value</th>
                       </tr>
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedRows.map((row) => {
+                      {displayRows.map((row) => {
                         const belowMinimum =
                           row.minimumStock > 0 &&
                           row.onHand < row.minimumStock;
@@ -823,19 +832,26 @@ async function StockBalanceContent({
                               )}
 
                               {row.product.tracking_type !== "quantity" && (
-                                <Link
-                                  href={`/inventory/balances?${new URLSearchParams({
-                                    q: keyword,
-                                    warehouse: effectiveWarehouseFilter,
-                                    status: statusFilter,
-                                    page: String(currentPage),
-                                    unit_variant: row.product.id,
-                                    unit_warehouse: row.warehouse.id,
-                                  }).toString()}`}
-                                  className="mt-2 inline-flex text-xs font-semibold text-blue-700 hover:underline"
-                                >
-                                  Lihat detail unit / IMEI
-                                </Link>
+                                <details className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+                                  <summary className="cursor-pointer select-none text-xs font-semibold text-blue-700">
+                                    Lihat IMEI / Serial ({row.units?.length ?? 0})
+                                  </summary>
+                                  {(row.units?.length ?? 0) > 0 ? (
+                                    <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                                      {row.units?.map((unit) => (
+                                        <li key={unit.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-1.5">
+                                          <span className="font-mono">{(unit.product_unit_identifiers ?? []).map((identifier) => identifier.identifier_value).join(" / ") || unit.unit_code}</span>
+                                          <span className="text-slate-500">{unit.unit_status}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="mt-2 text-xs text-amber-700">Belum ada unit/IMEI individual pada database untuk varian dan gudang ini.</p>
+                                  )}
+                                  {row.unitDataMismatch && (
+                                    <p className="mt-2 text-xs font-medium text-amber-700">Peringatan: saldo agregat tercatat {numberFormat(row.onHand)} unit, tetapi belum ada data unit/IMEI. Saldo agregat tidak diubah otomatis.</p>
+                                  )}
+                                </details>
                               )}
                             </td>
 

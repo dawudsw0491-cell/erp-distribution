@@ -708,3 +708,50 @@ export async function confirmGoodsReceiptAction(
 
   redirect(`${returnUrl}?receipt_posted=1`);
 }
+
+
+/**
+ * Restore a missing IMEI identity for an already-posted Goods Receipt.
+ * This action creates unit identity records and links the existing stock
+ * movement; it does not post or increment inventory quantity.
+ */
+export async function recoverPostedGoodsReceiptImeiAction(
+  formData: FormData
+): Promise<never> {
+  const itemId = getString(formData, "goods_receipt_item_id");
+  const purchaseOrderId = getString(formData, "purchase_order_id");
+  const imei = getString(formData, "imei_1");
+
+  if (!isValidUUID(itemId) || !isValidUUID(purchaseOrderId)) {
+    redirect("/purchases?error=invalid_id");
+  }
+
+  const returnUrl = `/purchases/${purchaseOrderId}/goods-receipts`;
+  if (!/^\\d{15}$/.test(imei)) {
+    redirect(`${returnUrl}?error=invalid_imei`);
+  }
+
+  const { supabase, user, profile } = await getAuthenticatedContext();
+  if (!user) redirect("/login");
+  if (!profile) redirect(`${returnUrl}?error=permission_denied`);
+
+  const { error } = await supabase.rpc(
+    "recover_posted_goods_receipt_imei",
+    {
+      p_goods_receipt_item_id: itemId,
+      p_imei_1: imei,
+    }
+  );
+
+  if (error) {
+    console.error("Recover posted Goods Receipt IMEI failed:", error);
+    redirect(`${returnUrl}?error=imei_recovery_failed`);
+  }
+
+  revalidatePath(returnUrl);
+  revalidatePath("/inventory/balances");
+  revalidatePath("/inventory/movements");
+  revalidatePath("/inventory/units");
+
+  redirect(`${returnUrl}?imei_recovered=1`);
+}

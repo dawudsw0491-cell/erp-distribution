@@ -92,11 +92,6 @@ const menuGroups: MenuGroup[] = [
         icon: <Package size={16} />,
       },
       {
-        label: "Stock Movements",
-        href: "/inventory/movements",
-        icon: <ArrowLeftRight size={16} />,
-      },
-      {
         label: "Stock Transfers",
         href: "/inventory/transfers",
         icon: <Truck size={16} />,

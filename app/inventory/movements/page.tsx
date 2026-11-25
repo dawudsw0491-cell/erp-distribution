@@ -72,15 +72,15 @@ const PAGE_SIZE = 10;
 const MAX_RECORDS = 5000;
 
 const movementLabels: Record<string, string> = {
-  purchase: "Purchase",
-  sale: "Sale",
-  transfer_in: "Transfer Masuk",
-  transfer_out: "Transfer Keluar",
-  adjustment: "Adjustment",
-  customer_return: "Customer Return",
-  supplier_return: "Supplier Return",
-  opening_balance: "Opening Balance",
-  status_change: "Status Change",
+  purchase: "Pembelian",
+  sale: "Penjualan",
+  transfer_in: "Barang Masuk",
+  transfer_out: "Barang Keluar",
+  adjustment: "Penyesuaian",
+  customer_return: "Retur Pelanggan",
+  supplier_return: "Retur Pemasok",
+  opening_balance: "Stok Awal",
+  status_change: "Perubahan Status",
 };
 
 const statusLabels: Record<string, string> = {
@@ -489,7 +489,7 @@ async function StockMovementContent({
 
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Total Movement</p>
+              <p className="text-sm text-slate-500">Total Transaksi</p>
               <p className="mt-2 text-2xl font-bold text-slate-900">
                 {formatNumber(totalRows)}
               </p>
@@ -610,13 +610,13 @@ async function StockMovementContent({
                   required
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                 >
-                  <option value="">Pilih Jenis Movement</option>
-                  <option value="purchase">Purchase (Barang Masuk)</option>
-                  <option value="sale">Sale (Barang Keluar)</option>
-                  <option value="adjustment">Adjustment</option>
-                  <option value="customer_return">Customer Return</option>
-                  <option value="supplier_return">Supplier Return</option>
-                  <option value="opening_balance">Opening Balance</option>
+                  <option value="">Pilih Jenis</option>
+                  <option value="purchase">Pembelian</option>
+                  <option value="sale">Penjualan</option>
+                  <option value="adjustment">Penyesuaian</option>
+                  <option value="customer_return">Retur Pelanggan</option>
+                  <option value="supplier_return">Retur Pemasok</option>
+                  <option value="opening_balance">Stok Awal</option>
                 </select>
               </div>
 
@@ -674,7 +674,7 @@ async function StockMovementContent({
                   type="text"
                   name="notes"
                   maxLength={500}
-                  placeholder="Masukkan keterangan movement"
+                  placeholder="Catatan (opsional)"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 />
               </div>

@@ -61,7 +61,7 @@ export async function approveReturnAction(form: FormData): Promise<never> {
   redirect(`/returns/${id}?approved=1`);
 }
 
-export async function postReturnAction(form: FormData): Promise<never> {
+export async function processReturnAction(form: FormData): Promise<never> {
   const id = field(form, "return_id");
   if (!uuid(id)) redirect("/returns?error=invalid_id");
   const { supabase, user, profile, authorized } = await getAuthorizationContext("finance.approve");

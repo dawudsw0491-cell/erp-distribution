@@ -299,11 +299,8 @@ export default function GoodsReceiptForm({
           if (!unit.imei1.trim()) continue;
 
           if (!isValidImei(unit.imei1.trim())) {
-            return `IMEI 1 unit ${unitIndex + 1} pada ${product.product_name} harus 15 digit dan valid.`;
+            return `IMEI unit ${unitIndex + 1} pada ${product.product_name} harus 15 digit dan valid.`;
           }
-
-        }
-
         }
 
         if (

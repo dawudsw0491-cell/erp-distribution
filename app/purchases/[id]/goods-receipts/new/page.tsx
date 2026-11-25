@@ -301,7 +301,7 @@ export default async function NewGoodsReceiptPage({
   if (variantIds.length > 0) {
     const { data, error } = await supabase
       .from("product_variant_attribute_values")
-      .select("product_variant_id, product_attributes(attribute_name), product_attribute_values(value_name)")
+      .select("product_variant_id, product_attributes!fk_variant_attribute_values_attribute(attribute_name), product_attribute_values!fk_variant_attribute_values_value(value_name)")
       .in("product_variant_id", variantIds);
     if (error) {
       throw new Error(`Gagal mengambil atribut varian: ${error.message}`);

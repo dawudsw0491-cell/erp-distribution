@@ -56,7 +56,9 @@ type ReceiptDetail = {
       product: {
         sku: string;
         product_name: string;
-        tracking_type: string;
+      } | null;
+      product_variant: {
+        product: { tracking_type: string } | null;
       } | null;
     } | null;
     units: {
@@ -162,8 +164,10 @@ export default async function GoodsReceiptDetailPage({
         purchase_order_item:purchase_order_items!goods_receipt_items_purchase_order_item_id_fkey (
           product:products!fk_purchase_order_items_product_id (
             sku,
-            product_name,
-            tracking_type
+            product_name
+          ),
+          product_variant:product_variants!purchase_order_items_product_variant_id_fkey (
+            product:products ( tracking_type )
           )
         ),
         units:goods_receipt_units (
@@ -375,9 +379,6 @@ export default async function GoodsReceiptDetailPage({
                           <p className="mt-1 text-xs text-slate-500">
                             SKU: {product?.sku || "-"}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Tracking: {product?.tracking_type || "-"}
-                          </p>
                         </td>
 
                         <td className="px-5 py-4 text-right tabular-nums">
@@ -449,7 +450,7 @@ export default async function GoodsReceiptDetailPage({
           )}
 
           {receipt.status === "posted" && receipt.items.some((item) =>
-            item.purchase_order_item?.product?.tracking_type === "imei" &&
+            item.purchase_order_item?.product_variant?.product?.tracking_type === "imei" &&
             Number(item.quantity_received) > item.units.length
           ) && (
             <section className="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">

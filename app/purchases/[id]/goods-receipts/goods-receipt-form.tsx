@@ -545,7 +545,7 @@ export default function GoodsReceiptForm({
                       label="Scanner IMEI Unit"
                       placeholder="Scan IMEI 1 atau masukkan manual"
                       onScan={(rawValue) => {
-                        const value = rawValue.replace(/\\D/g, "");
+                        const value = rawValue.replace(/\D/g, "");
                         if (!isValidImei(value)) {
                           setClientError("IMEI harus tepat 15 digit dan lolos checksum. Periksa kembali input.");
                           return;

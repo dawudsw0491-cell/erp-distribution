@@ -128,6 +128,15 @@ export default function ActionFeedback() {
     }
   }, [pathname, search, restorePending]);
 
+  // Terminal feedback is transient: success/error auto-dismiss without user interaction.
+  useEffect(() => {
+    if (!notice) return;
+
+    const duration = notice.type === "success" ? 4000 : notice.type === "error" ? 5000 : 7000;
+    const timer = window.setTimeout(() => setNotice(null), duration);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   useEffect(() => {
     const handleSubmit = (event: Event) => {
       const form = event.target;
@@ -198,7 +207,7 @@ export default function ActionFeedback() {
           <span aria-hidden="true" className="mt-0.5 shrink-0 font-bold">{visible.type === "success" ? "✓" : visible.type === "error" ? "!" : "•"}</span>
         )}
         <p className="min-w-0 flex-1">{visible.message}</p>
-        {notice && <button type="button" onClick={() => setNotice(null)} className="shrink-0 rounded px-2 py-0.5 text-base leading-none opacity-70 hover:opacity-100" aria-label="Tutup notifikasi">×</button>}
+
       </div>
     </div>
   );

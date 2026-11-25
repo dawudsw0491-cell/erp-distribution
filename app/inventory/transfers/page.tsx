@@ -10,7 +10,7 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 
 import {
   createInventoryTransferAction,
-  postInventoryTransferAction,
+  processInventoryTransferAction,
 } from "./actions";
 
 export const metadata = {
@@ -937,7 +937,7 @@ async function StockTransferContent({
                         <td className="px-4 py-4">
                           {transfer.status === "draft" &&
                           transfer.consistent ? (
-                            <form action={postInventoryTransferAction}>
+                            <form action={processInventoryTransferAction}>
                               <input
                                 type="hidden"
                                 name="movement_group_id"

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import ErpSidebar from "@/components/layout/erp-sidebar";
 import { getAuthorizationContext } from "@/lib/auth/authorization";
-import { confirmGoodsReceiptAction } from "../../../actions";
+import { confirmGoodsReceiptAction, recoverPostedGoodsReceiptImeiAction } from "../../../actions";
 
 export const instant = false;
 
@@ -17,6 +17,7 @@ type PageProps = {
     error?: string;
     created?: string;
     receipt_posted?: string;
+    imei_recovered?: string;
   }>;
 };
 
@@ -250,11 +251,21 @@ export default async function GoodsReceiptDetailPage({
             </div>
           )}
 
+          {query.imei_recovered === "1" && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+              Identitas IMEI berhasil dipulihkan dan ditautkan ke pergerakan stok yang sudah ada. Kuantitas persediaan tidak ditambah.
+            </div>
+          )}
+
           {query.error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               {query.error === "post_failed"
                 ? "Proses penerimaan barang gagal. Periksa data penerimaan dan hak akses."
-                : "Terjadi kesalahan saat memuat atau memproses Goods Receipt."}
+                : query.error === "imei_recovery_failed"
+                  ? "Pemulihan IMEI gagal. Pastikan IMEI benar, belum digunakan unit lain, dan item memenuhi syarat pemulihan."
+                  : query.error === "invalid_imei"
+                    ? "IMEI harus terdiri dari 15 digit."
+                    : "Terjadi kesalahan saat memuat atau memproses Goods Receipt."}
             </div>
           )}
 
@@ -433,6 +444,48 @@ export default async function GoodsReceiptDetailPage({
                     </div>
                   ))
                 )}
+              </div>
+            </section>
+          )}
+
+          {receipt.status === "posted" && receipt.items.some((item) =>
+            item.purchase_order_item?.product?.tracking_type === "imei" &&
+            Number(item.quantity_received) > item.units.length
+          ) && (
+            <section className="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+              <h2 className="font-semibold text-slate-900">Pemulihan Identitas IMEI</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Gunakan hanya IMEI asli dari unit fisik yang diterima. Pemulihan ini melengkapi identitas unit pada Goods Receipt yang sudah diposting dan menautkannya ke movement stok yang ada, tanpa menambah kuantitas persediaan.
+              </p>
+              <div className="mt-4 space-y-3">
+                {receipt.items.filter((item) =>
+                  item.purchase_order_item?.product?.tracking_type === "imei" &&
+                  Number(item.quantity_received) > item.units.length
+                ).map((item) => (
+                  <form key={item.id} action={recoverPostedGoodsReceiptImeiAction}
+                    className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[1fr_260px_auto] sm:items-end">
+                    <input type="hidden" name="goods_receipt_item_id" value={item.id} />
+                    <input type="hidden" name="goods_receipt_id" value={receipt.id} />
+                    <input type="hidden" name="purchase_order_id" value={receipt.purchase_order_id} />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{item.purchase_order_item?.product?.product_name || "Produk IMEI"}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Unit terdaftar: {item.units.length} / {formatQuantity(item.quantity_received)}
+                      </p>
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-slate-600">IMEI asli (15 digit)</span>
+                      <input name="imei_1" type="text" inputMode="numeric" autoComplete="off"
+                        maxLength={15} pattern="[0-9]{15}" required
+                        placeholder="Masukkan IMEI perangkat"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </label>
+                    <button type="submit"
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                      Pulihkan IMEI
+                    </button>
+                  </form>
+                ))}
               </div>
             </section>
           )}

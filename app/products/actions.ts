@@ -449,11 +449,21 @@ export async function createProduct(formData: FormData) {
     variants = parsed.map((item: unknown) => {
       if (!item || typeof item !== "object") throw new Error("Invalid variant");
       const row = item as Record<string, unknown>;
+      const network = String(row.network ?? "").trim().toUpperCase();
+      const ram = String(row.ram ?? "").trim();
+      const rom = String(row.rom ?? "").trim();
+      const color = String(row.color ?? "").trim();
+      const warranty = String(row.warranty ?? "").trim();
+      // A variant is identified by its actual network + RAM + ROM + color
+      // combination. Network alone is not unique (e.g. multiple 5G capacities).
+      const variantName = [network, ram, rom, color]
+        .filter(Boolean)
+        .join(" / ")
+        .toUpperCase();
       return {
-        variant_name: String(row.network ?? "").trim().toUpperCase(),
+        variant_name: variantName,
         barcode: String(row.barcode ?? "").trim() || null,
-        ram: String(row.ram ?? "").trim(), rom: String(row.rom ?? "").trim(),
-        color: String(row.color ?? "").trim(), warranty: String(row.warranty ?? "").trim(),
+        ram, rom, color, warranty,
       };
     });
   } catch { redirect("/products/new?error=invalid_variants"); }
@@ -475,7 +485,16 @@ export async function createProduct(formData: FormData) {
   const { data, error } = await auth.supabase.rpc("create_product_with_variants", { p_product: productPayload, p_variants: variants });
   if (error || !data?.product_id) {
     console.error("Create product with variants failed:", error);
-    if (error?.code === "23505") redirect("/products/new?error=duplicate");
+    if (error?.code === "23505") {
+      const constraint = String(error.message ?? "");
+      if (constraint.includes("uq_product_variant_name")) {
+        redirect("/products/new?error=duplicate_variant");
+      }
+      if (constraint.includes("barcode")) {
+        redirect("/products/new?error=duplicate_barcode");
+      }
+      redirect("/products/new?error=duplicate");
+    }
     if (error?.code === "23503") redirect("/products/new?error=invalid_reference");
     if (error?.message?.toLowerCase().includes("permission")) redirect("/products/new?error=forbidden");
     redirect("/products/new?error=save_failed");

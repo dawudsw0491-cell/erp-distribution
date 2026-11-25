@@ -28,6 +28,7 @@ type PurchaseOrderRow = {
 type PurchaseOrderItemRow = {
   id: string;
   product_id: string;
+  product_variant_id: string | null;
   quantity: number;
   received_quantity: number;
   unit_cost: number;
@@ -40,6 +41,19 @@ type ProductRow = {
   sku: string;
   product_name: string;
   tracking_type: string;
+  model_id: string | null;
+};
+
+type ProductVariantRow = {
+  id: string;
+  variant_sku: string;
+  variant_name: string;
+};
+type ProductModelRow = { id: string; model_name: string };
+type VariantAttributeRow = {
+  product_variant_id: string;
+  product_attributes: { attribute_name: string } | null;
+  product_attribute_values: { value_name: string } | null;
 };
 
 type SupplierRow = {
@@ -162,7 +176,7 @@ export default async function NewGoodsReceiptPage({
   const { data: itemData, error: itemError } = await supabase
     .from("purchase_order_items")
     .select(
-      "id, product_id, quantity, received_quantity, unit_cost, discount_amount, tax_amount"
+      "id, product_id, product_variant_id, quantity, received_quantity, unit_cost, discount_amount, tax_amount"
     )
     .eq("purchase_order_id", id)
     .order("created_at", { ascending: true });
@@ -233,7 +247,7 @@ export default async function NewGoodsReceiptPage({
   if (productIds.length > 0) {
     const { data, error } = await supabase
       .from("products")
-      .select("id, sku, product_name, tracking_type")
+      .select("id, sku, product_name, tracking_type, model_id")
       .in("id", productIds);
 
     if (error) {
@@ -248,6 +262,62 @@ export default async function NewGoodsReceiptPage({
   const productMap = new Map<string, ProductRow>(
     products.map((product) => [product.id, product])
   );
+
+  const variantIds = [...new Set(
+    poItems.map((item) => item.product_variant_id)
+      .filter((value): value is string => Boolean(value))
+  )];
+  const modelIds = [...new Set(
+    products.map((product) => product.model_id)
+      .filter((value): value is string => Boolean(value))
+  )];
+
+  const [variantResult, modelResult] = await Promise.all([
+    variantIds.length
+      ? supabase.from("product_variants")
+          .select("id, variant_sku, variant_name").in("id", variantIds)
+      : Promise.resolve({ data: [], error: null }),
+    modelIds.length
+      ? supabase.from("product_models")
+          .select("id, model_name").in("id", modelIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (variantResult.error) {
+    throw new Error(`Gagal mengambil detail varian produk: ${variantResult.error.message}`);
+  }
+  if (modelResult.error) {
+    throw new Error(`Gagal mengambil model produk: ${modelResult.error.message}`);
+  }
+
+  const variantMap = new Map<string, ProductVariantRow>(
+    ((variantResult.data ?? []) as ProductVariantRow[]).map((variant) => [variant.id, variant])
+  );
+  const modelMap = new Map<string, ProductModelRow>(
+    ((modelResult.data ?? []) as ProductModelRow[]).map((model) => [model.id, model])
+  );
+
+  let variantAttributes: VariantAttributeRow[] = [];
+  if (variantIds.length > 0) {
+    const { data, error } = await supabase
+      .from("product_variant_attribute_values")
+      .select("product_variant_id, product_attributes(attribute_name), product_attribute_values(value_name)")
+      .in("product_variant_id", variantIds);
+    if (error) {
+      throw new Error(`Gagal mengambil atribut varian: ${error.message}`);
+    }
+    variantAttributes = (data ?? []) as unknown as VariantAttributeRow[];
+  }
+
+  const variantAttributesMap = new Map<string, { name: string; value: string }[]>();
+  for (const row of variantAttributes) {
+    const name = row.product_attributes?.attribute_name;
+    const value = row.product_attribute_values?.value_name;
+    if (!name || !value) continue;
+    const current = variantAttributesMap.get(row.product_variant_id) ?? [];
+    current.push({ name, value });
+    variantAttributesMap.set(row.product_variant_id, current);
+  }
 
   // Bentuk data untuk komponen Goods Receipt Form
   const receiptItems: GoodsReceiptFormItem[] = poItems
@@ -273,11 +343,20 @@ export default async function NewGoodsReceiptPage({
 
       return {
         id: item.id,
-        product_variant_id: "",
         product_name: product?.product_name ?? "Unknown Product",
         product_sku: product?.sku ?? "-",
-        variant_name: "",
-        variant_sku: "",
+        product_model: product?.model_id
+          ? modelMap.get(product.model_id)?.model_name
+          : undefined,
+        variant_sku: item.product_variant_id
+          ? variantMap.get(item.product_variant_id)?.variant_sku
+          : undefined,
+        variant_name: item.product_variant_id
+          ? variantMap.get(item.product_variant_id)?.variant_name
+          : undefined,
+        variant_attributes: item.product_variant_id
+          ? variantAttributesMap.get(item.product_variant_id) ?? []
+          : [],
         tracking_type: trackingType,
         ordered_quantity: orderedQuantity,
         received_quantity: receivedQuantity,

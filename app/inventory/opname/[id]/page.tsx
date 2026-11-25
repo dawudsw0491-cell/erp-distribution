@@ -72,7 +72,10 @@ type OpnameItemRow = {
   snapshot_aggregate_quantity: number;
   counted_quantity: number | null;
   counted_aggregate_quantity: number | null;
-  variance_quantity: number | null;
+  reconciliation_variance: number | null;
+  aggregate_reconciliation_variance: number | null;
+  book_quantity_at_count: number | null;
+  book_aggregate_quantity_at_count: number | null;
   snapshot_average_unit_cost: number;
   snapshot_inventory_value: number;
   notes: string | null;
@@ -365,7 +368,10 @@ async function StockOpnameDetailContent({
         snapshot_aggregate_quantity,
         counted_quantity,
         counted_aggregate_quantity,
-        variance_quantity,
+        reconciliation_variance,
+        aggregate_reconciliation_variance,
+        book_quantity_at_count,
+        book_aggregate_quantity_at_count,
         snapshot_average_unit_cost,
         snapshot_inventory_value,
         notes,
@@ -500,9 +506,13 @@ async function StockOpnameDetailContent({
               ? null
               : Number(item.counted_quantity),
         variance_quantity:
-          item.variance_quantity === null
-            ? null
-            : Number(item.variance_quantity),
+          product?.tracking_type === "imei"
+            ? item.aggregate_reconciliation_variance === null
+              ? null
+              : Number(item.aggregate_reconciliation_variance)
+            : item.reconciliation_variance === null
+              ? null
+              : Number(item.reconciliation_variance),
         notes: item.notes,
         product: product
           ? {
@@ -641,7 +651,7 @@ async function StockOpnameDetailContent({
 
   const totalVariance = items.reduce(
     (sum, item) =>
-      sum + Number(item.variance_quantity ?? 0),
+      sum + Number(item.reconciliation_variance ?? 0),
     0
   );
 
@@ -1057,9 +1067,9 @@ async function StockOpnameDetailContent({
                           : Number(item.counted_quantity);
 
                       const variance =
-                        item.variance_quantity === null
+                        item.reconciliation_variance === null
                           ? null
-                          : Number(item.variance_quantity);
+                          : Number(item.reconciliation_variance);
 
                       const itemUnits = units.filter(
                         (unit) =>

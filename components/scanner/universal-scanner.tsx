@@ -26,6 +26,7 @@ interface UniversalScannerProps {
   label?: string;
   placeholder?: string;
   disabled?: boolean;
+  commitOnBlur?: boolean;
 }
 
 const FORMATS = [
@@ -48,6 +49,7 @@ export default function UniversalScanner({
   label = "Universal Scanner",
   placeholder = "Scan atau masukkan IMEI / barcode",
   disabled = false,
+  commitOnBlur = false,
 }: UniversalScannerProps) {
   const generatedId = useId();
   const scannerId = `hexa-scanner-${generatedId.replace(/:/g, "")}`;
@@ -356,6 +358,9 @@ export default function UniversalScanner({
               setManualValue(event.target.value)
             }
             onKeyDown={handleManualKeyDown}
+            onBlur={() => {
+              if (commitOnBlur && manualValue.trim()) emitScan(manualValue);
+            }}
             placeholder={placeholder}
             disabled={disabled}
             autoComplete="off"

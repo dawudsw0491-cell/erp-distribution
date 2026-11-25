@@ -580,7 +580,7 @@ async function StockMovementContent({
                   htmlFor="movement-warehouse-create"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Warehouse
+                  Gudang
                 </label>
                 <select
                   id="movement-warehouse-create"
@@ -602,7 +602,7 @@ async function StockMovementContent({
                   htmlFor="movement-type-create"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Jenis Movement
+                  Jenis Pergerakan
                 </label>
                 <select
                   id="movement-type-create"
@@ -625,7 +625,7 @@ async function StockMovementContent({
                   htmlFor="movement-quantity"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Quantity Delta
+                  Jumlah
                 </label>
                 <input
                   id="movement-quantity"
@@ -646,7 +646,7 @@ async function StockMovementContent({
                   htmlFor="movement-inventory-status"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Inventory Status
+                  Kondisi Stok
                 </label>
                 <select
                   id="movement-inventory-status"

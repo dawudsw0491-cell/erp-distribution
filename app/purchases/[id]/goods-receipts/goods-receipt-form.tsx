@@ -7,24 +7,12 @@ import UniversalScanner from "@/components/scanner/universal-scanner";
 
 type TrackingType = "quantity" | "imei" | "serial";
 
-type InventoryStatus =
-  | "available"
-  | "reserved"
-  | "quarantine"
-  | "damaged"
-  | "repair";
-
 type ReceiptIdentifier = {
-  identifier_type: "IMEI_1" | "IMEI_2" | "SERIAL_NUMBER";
+  identifier_type: "IMEI_1" | "SERIAL_NUMBER";
   identifier_value: string;
 };
 
-type ReceiptUnit = {
-  unit_code: string;
-  imei1: string;
-  imei2: string;
-  serialNumber: string;
-};
+type ReceiptUnit = { imei1: string; serialNumber: string; };
 
 export type GoodsReceiptFormItem = {
   id: string;
@@ -40,12 +28,7 @@ export type GoodsReceiptFormItem = {
   tax_amount: number;
 };
 
-type ItemState = {
-  quantity: string;
-  inventoryStatus: InventoryStatus;
-  notes: string;
-  units: ReceiptUnit[];
-};
+type ItemState = { quantity: string; units: ReceiptUnit[]; };
 
 type Props = {
   purchaseOrderId: string;
@@ -54,24 +37,8 @@ type Props = {
   errorMessage?: string;
 };
 
-const inventoryStatuses: {
-  value: InventoryStatus;
-  label: string;
-}[] = [
-  { value: "available", label: "Available" },
-  { value: "reserved", label: "Reserved" },
-  { value: "quarantine", label: "Quarantine" },
-  { value: "damaged", label: "Damaged" },
-  { value: "repair", label: "Repair" },
-];
-
 function emptyUnit(): ReceiptUnit {
-  return {
-    unit_code: "",
-    imei1: "",
-    imei2: "",
-    serialNumber: "",
-  };
+  return { imei1: "", serialNumber: "" };
 }
 
 function createInitialState(
@@ -82,8 +49,6 @@ function createInitialState(
       item.tracking_type === "quantity"
         ? String(item.remaining_quantity)
         : String(Math.floor(item.remaining_quantity)),
-    inventoryStatus: "available",
-    notes: "",
     units:
       item.tracking_type === "quantity"
         ? []
@@ -160,12 +125,6 @@ export default function GoodsReceiptForm({
                       identifier_value: unit.imei1.trim(),
                     });
 
-                    if (unit.imei2.trim()) {
-                      identifiers.push({
-                        identifier_type: "IMEI_2",
-                        identifier_value: unit.imei2.trim(),
-                      });
-                    }
                   }
 
                   if (item.tracking_type === "serial") {
@@ -176,10 +135,9 @@ export default function GoodsReceiptForm({
                   }
 
                   const unitCode =
-                    unit.unit_code.trim() ||
-                    (item.tracking_type === "imei"
+                    item.tracking_type === "imei"
                       ? unit.imei1.trim()
-                      : unit.serialNumber.trim());
+                      : unit.serialNumber.trim();
 
                   return { unit_code: unitCode, identifiers };
                 });
@@ -190,8 +148,8 @@ export default function GoodsReceiptForm({
           unit_cost: item.unit_cost,
           discount_amount: item.discount_amount,
           tax_amount: item.tax_amount,
-          inventory_status: state.inventoryStatus,
-          notes: state.notes.trim(),
+          inventory_status: "available",
+          notes: "",
           units,
         };
       })
@@ -338,30 +296,14 @@ export default function GoodsReceiptForm({
         const unit = state.units[unitIndex];
 
         if (product.tracking_type === "imei") {
-          if (!unit.imei1.trim()) {
-            if (unit.imei2.trim()) {
-              return `IMEI 2 unit ${unitIndex + 1} harus disertai IMEI 1.`;
-            }
-            continue;
-          }
+          if (!unit.imei1.trim()) continue;
 
           if (!isValidImei(unit.imei1.trim())) {
             return `IMEI 1 unit ${unitIndex + 1} pada ${product.product_name} harus 15 digit dan valid.`;
           }
 
-          if (
-            unit.imei2.trim() &&
-            !isValidImei(unit.imei2.trim())
-          ) {
-            return `IMEI 2 unit ${unitIndex + 1} pada ${product.product_name} tidak valid.`;
-          }
+        }
 
-          if (
-            unit.imei2.trim() &&
-            unit.imei1.trim() === unit.imei2.trim()
-          ) {
-            return "IMEI 1 dan IMEI 2 tidak boleh sama.";
-          }
         }
 
         if (
@@ -372,21 +314,9 @@ export default function GoodsReceiptForm({
         }
 
         const unitCode =
-          unit.unit_code.trim() ||
-          (product.tracking_type === "imei"
+          product.tracking_type === "imei"
             ? unit.imei1.trim()
-            : unit.serialNumber.trim());
-
-        if (
-          product.tracking_type === "serial" &&
-          (!unitCode || unitCode.length > 100)
-        ) {
-          return `Unit Code unit ${unitIndex + 1} pada ${product.product_name} wajib diisi dan maksimal 100 karakter.`;
-        }
-
-        if (product.tracking_type === "imei" && unitCode.length > 100) {
-          return `Unit Code unit ${unitIndex + 1} maksimal 100 karakter.`;
-        }
+            : unit.serialNumber.trim();
 
         const normalizedCode = unitCode.toUpperCase();
 
@@ -554,91 +484,23 @@ export default function GoodsReceiptForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {product.tracking_type === "quantity" ? (
               <div>
-                <label
-                  htmlFor={`quantity-${product.id}`}
-                  className="mb-1 block text-sm font-medium text-slate-700"
-                >
+                <label htmlFor={`quantity-${product.id}`} className="mb-1 block text-sm font-medium text-slate-700">
                   Quantity Received
                 </label>
-
-                <input
-                  id={`quantity-${product.id}`}
-                  type="number"
-                  min="0"
-                  max={product.remaining_quantity}
-                  step={
-                    product.tracking_type === "quantity"
-                      ? "0.001"
-                      : "1"
-                  }
-                  value={state.quantity}
-                  onChange={(event) =>
-                    updateQuantity(index, event.target.value)
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                />
+                <input id={`quantity-${product.id}`} type="number" min="0" max={product.remaining_quantity} step="0.001" value={state.quantity} onChange={(event) => updateQuantity(index, event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
               </div>
-
-              <div>
-                <label
-                  htmlFor={`status-${product.id}`}
-                  className="mb-1 block text-sm font-medium text-slate-700"
-                >
-                  Inventory Status
-                </label>
-
-                <select
-                  id={`status-${product.id}`}
-                  value={state.inventoryStatus}
-                  onChange={(event) =>
-                    updateItem(index, {
-                      inventoryStatus: event.target.value as InventoryStatus,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {inventoryStatuses.map((status) => (
-                    <option
-                      key={status.value}
-                      value={status.value}
-                    >
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`item-notes-${product.id}`}
-                  className="mb-1 block text-sm font-medium text-slate-700"
-                >
-                  Item Notes
-                </label>
-
-                <input
-                  id={`item-notes-${product.id}`}
-                  type="text"
-                  maxLength={500}
-                  value={state.notes}
-                  onChange={(event) =>
-                    updateItem(index, {
-                      notes: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
+            ) : (
+              <p className="text-sm text-slate-600">Jumlah diterima: <strong>{formatNumber(quantity)} unit</strong></p>
+            )}
 
             {product.tracking_type !== "quantity" &&
               quantity > 0 && (
                 <div className="space-y-4 border-t border-slate-200 pt-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-slate-900">
-                      Identitas Unit (Opsional untuk IMEI)
+                      Identitas Unit
                     </h4>
 
                     <span className="text-xs text-slate-500">
@@ -677,36 +539,15 @@ export default function GoodsReceiptForm({
                         Unit {unitIndex + 1}
                       </p>
 
-                      <div>
-                        <label
-                          htmlFor={`unit-code-${product.id}-${unitIndex}`}
-                          className="mb-1 block text-xs font-medium text-slate-600"
-                        >
-                          Unit Code (opsional, untuk unit ber-IMEI)
-                        </label>
-
-                        <input
-                          id={`unit-code-${product.id}-${unitIndex}`}
-                          value={unit.unit_code}
-                          maxLength={100}
-                          onChange={(event) =>
-                            updateUnit(index, unitIndex, {
-                              unit_code: event.target.value,
-                            })
-                          }
-                          placeholder="Kosongkan untuk menggunakan IMEI 1"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        />
-                      </div>
-
                       {product.tracking_type === "imei" && (
+                        <div>                      {product.tracking_type === "imei" && (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
                             <label
                               htmlFor={`imei1-${product.id}-${unitIndex}`}
                               className="mb-1 block text-xs font-medium text-slate-600"
                             >
-                              IMEI 1 (opsional)
+                              IMEI (opsional)
                             </label>
 
                             <input
@@ -727,31 +568,6 @@ export default function GoodsReceiptForm({
                             />
                           </div>
 
-                          <div>
-                            <label
-                              htmlFor={`imei2-${product.id}-${unitIndex}`}
-                              className="mb-1 block text-xs font-medium text-slate-600"
-                            >
-                              IMEI 2 (opsional)
-                            </label>
-
-                            <input
-                              id={`imei2-${product.id}-${unitIndex}`}
-                              value={unit.imei2}
-                              inputMode="numeric"
-                              maxLength={15}
-                              onChange={(event) =>
-                                updateUnit(index, unitIndex, {
-                                  imei2: event.target.value.replace(
-                                    /\D/g,
-                                    ""
-                                  ),
-                                })
-                              }
-                              placeholder="15 digit IMEI"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            />
-                          </div>
                         </div>
                       )}
 

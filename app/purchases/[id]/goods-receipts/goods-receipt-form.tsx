@@ -18,6 +18,10 @@ export type GoodsReceiptFormItem = {
   id: string;
   product_name: string;
   product_sku: string;
+  product_model?: string;
+  variant_sku?: string;
+  variant_name?: string;
+  variant_attributes?: { name: string; value: string }[];
   tracking_type: TrackingType;
   ordered_quantity: number;
   received_quantity: number;
@@ -443,8 +447,38 @@ export default function GoodsReceiptForm({
                 </h3>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  SKU: {product.product_sku}
+                  SKU Produk: {product.product_sku}
                 </p>
+                {product.product_model && (
+                  <p className="mt-1 text-sm text-slate-700">
+                    Model: {product.product_model}
+                  </p>
+                )}
+                {product.variant_name && (
+                  <div className="mt-2 rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Detail varian PO
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {product.variant_name}
+                    </p>
+                    {product.variant_sku && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        SKU Varian: {product.variant_sku}
+                      </p>
+                    )}
+                    {product.variant_attributes && product.variant_attributes.length > 0 && (
+                      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {product.variant_attributes.map((attribute) => (
+                          <div key={attribute.name}>
+                            <dt className="text-xs text-slate-500">{attribute.name}</dt>
+                            <dd className="text-sm font-medium text-slate-800">{attribute.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                  </div>
+                )}
               </div>
 
               <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
@@ -510,89 +544,58 @@ export default function GoodsReceiptForm({
                     <UniversalScanner
                       label="Scanner IMEI Unit"
                       placeholder="Scan IMEI 1 atau masukkan manual"
-                      onScan={(value) => {
+                      onScan={(rawValue) => {
+                        const value = rawValue.replace(/\\D/g, "");
                         if (!isValidImei(value)) {
-                          setClientError("IMEI hasil scan harus 15 digit dan valid.");
+                          setClientError("IMEI harus tepat 15 digit dan lolos checksum. Periksa kembali input.");
                           return;
                         }
                         const targetIndex = state.units.findIndex(
                           (unit) => !unit.imei1.trim()
                         );
                         if (targetIndex < 0) {
-                          setClientError("Semua baris IMEI unit sudah terisi.");
+                          setClientError("Semua slot IMEI pada baris PO ini sudah terisi.");
                           return;
                         }
                         updateUnit(index, targetIndex, { imei1: value });
-                        setClientError("");
                       }}
                     />
                   )}
 
-                  {state.units.map((unit, unitIndex) => (
-                    <div
-                      key={`${product.id}-${unitIndex}`}
-                      className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <p className="text-sm font-semibold text-slate-800">
-                        Unit {unitIndex + 1}
-                      </p>
-
-                      {product.tracking_type === "imei" && (
-                        <div className="grid grid-cols-1 gap-3">
-                          <div>
-                            <label
-                              htmlFor={`imei1-${product.id}-${unitIndex}`}
-                              className="mb-1 block text-xs font-medium text-slate-600"
-                            >
-                              IMEI (opsional)
-                            </label>
-
-                            <input
-                              id={`imei1-${product.id}-${unitIndex}`}
-                              value={unit.imei1}
-                              inputMode="numeric"
-                              maxLength={15}
-                              onChange={(event) =>
-                                updateUnit(index, unitIndex, {
-                                  imei1: event.target.value.replace(
-                                    /\D/g,
-                                    ""
-                                  ),
-                                })
-                              }
-                              placeholder="15 digit IMEI"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            />
-                          </div>
-
-                        </div>
-                      )}
-
-                      {product.tracking_type === "serial" && (
-                        <div>
-                          <label
-                            htmlFor={`serial-${product.id}-${unitIndex}`}
-                            className="mb-1 block text-xs font-medium text-slate-600"
-                          >
-                            Serial Number *
-                          </label>
-
-                          <input
-                            id={`serial-${product.id}-${unitIndex}`}
-                            value={unit.serialNumber}
-                            maxLength={255}
-                            onChange={(event) =>
-                              updateUnit(index, unitIndex, {
-                                serialNumber: event.target.value,
-                              })
-                            }
-                            placeholder="Masukkan serial number"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {product.tracking_type === "imei" ? (
+                    <p className="text-xs text-slate-500">
+                      IMEI tercatat: {state.units.filter((unit) => unit.imei1.trim()).length} / {state.units.length} unit. Scan berulang atau ketik nomor pada kolom scanner yang sama.
+                    </p>
+                  ) : (
+                    state.units.map((unit, unitIndex) => (
+                      <div
+                        key={`${product.id}-${unitIndex}`}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <p className="mb-2 text-sm font-semibold text-slate-800">
+                          Unit {unitIndex + 1}
+                        </p>
+                        <label
+                          htmlFor={`serial-${product.id}-${unitIndex}`}
+                          className="mb-1 block text-xs font-medium text-slate-600"
+                        >
+                          Serial Number *
+                        </label>
+                        <input
+                          id={`serial-${product.id}-${unitIndex}`}
+                          value={unit.serialNumber}
+                          maxLength={255}
+                          onChange={(event) =>
+                            updateUnit(index, unitIndex, {
+                              serialNumber: event.target.value,
+                            })
+                          }
+                          placeholder="Masukkan serial number"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        />
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
           </section>

@@ -926,7 +926,7 @@ async function StockTransferContent({
                               transfer.status
                             )}`}
                           >
-                            {transfer.status.toUpperCase()}
+                            {transfer.status === "posted" ? "Selesai" : transfer.status === "cancelled" ? "Dibatalkan" : "Draft"}
                           </span>
                         </td>
 

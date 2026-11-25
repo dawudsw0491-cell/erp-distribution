@@ -602,7 +602,7 @@ async function StockMovementContent({
                   htmlFor="movement-type-create"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Jenis Pergerakan
+                  Aktivitas Stok
                 </label>
                 <select
                   id="movement-type-create"
@@ -611,11 +611,7 @@ async function StockMovementContent({
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
                 >
                   <option value="">Pilih Jenis</option>
-                  <option value="purchase">Pembelian</option>
-                  <option value="sale">Penjualan</option>
                   <option value="adjustment">Penyesuaian</option>
-                  <option value="customer_return">Retur Pelanggan</option>
-                  <option value="supplier_return">Retur Pemasok</option>
                   <option value="opening_balance">Stok Awal</option>
                 </select>
               </div>

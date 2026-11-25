@@ -441,7 +441,7 @@ export async function createProduct(formData: FormData) {
   }
 
   let variants: Array<{
-    variant_name: string; barcode: string | null; ram: string; rom: string; color: string; warranty: string;
+    network: string; variant_name: string; barcode: string | null; ram: string; rom: string; color: string; warranty: string;
   }>;
   try {
     const parsed: unknown = JSON.parse(String(formData.get("variants_json") ?? "[]"));
@@ -461,6 +461,7 @@ export async function createProduct(formData: FormData) {
         .join(" / ")
         .toUpperCase();
       return {
+        network,
         variant_name: variantName,
         barcode: String(row.barcode ?? "").trim() || null,
         ram, rom, color, warranty,
@@ -472,7 +473,7 @@ export async function createProduct(formData: FormData) {
   const variantCombinations = new Set<string>();
   const variantBarcodes = new Set<string>();
   for (const variant of variants) {
-    const normalizedNetwork = variant.variant_name.toUpperCase();
+    const normalizedNetwork = variant.network.toUpperCase();
     if (!["4G", "5G", "WIFI ONLY"].includes(normalizedNetwork)) redirect("/products/new?error=invalid_variants");
     const combination = [normalizedNetwork, variant.ram, variant.rom, variant.color].map((value) => value.trim().toLocaleLowerCase("id-ID")).join("|");
     if (variantCombinations.has(combination)) redirect("/products/new?error=invalid_variants");

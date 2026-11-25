@@ -252,6 +252,26 @@ export default async function PurchaseOrderDetailPage({
   }
 
   const order = data as unknown as PurchaseOrderDetail;
+  const variantIds = [...new Set(order.items.map((item) => item.product_variant_id).filter((value): value is string => Boolean(value)))];
+  if (variantIds.length > 0) {
+    const { data: attributeRows, error: attributeError } = await supabase
+      .from("product_variant_attribute_values")
+      .select("product_variant_id, product_attributes!fk_variant_attribute_values_attribute(attribute_name), product_attribute_values!fk_variant_attribute_values_value(value_name)")
+      .in("product_variant_id", variantIds);
+    if (attributeError) throw new Error(`Gagal mengambil atribut varian PO: ${attributeError.message}`);
+    const attributesByVariant = new Map<string, { name: string; value: string }[]>();
+    for (const row of (attributeRows ?? []) as unknown as { product_variant_id: string; product_attributes: { attribute_name: string } | null; product_attribute_values: { value_name: string } | null }[]) {
+      const name = row.product_attributes?.attribute_name;
+      const value = row.product_attribute_values?.value_name;
+      if (!name || !value) continue;
+      const current = attributesByVariant.get(row.product_variant_id) ?? [];
+      current.push({ name, value });
+      attributesByVariant.set(row.product_variant_id, current);
+    }
+    for (const item of order.items) {
+      item.variant_attributes = item.product_variant_id ? attributesByVariant.get(item.product_variant_id) ?? [] : [];
+    }
+  }
   const currency = order.currency || "IDR";
 
   // Riwayat Goods Receipt: pencarian dan status diterapkan pada server.
@@ -682,9 +702,18 @@ export default async function PurchaseOrderDetailPage({
                           SKU Variant: {item.variant?.variant_sku ?? (item.product?.sku ? `${item.product.sku} · Legacy tanpa Variant` : "Variant tidak teridentifikasi")}
                         </p>
                         {item.variant?.variant_name && (
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-sm font-medium text-slate-700">
                             {item.variant.variant_name}
                           </p>
+                        )}
+                        {item.variant_attributes && item.variant_attributes.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {item.variant_attributes.map((attribute) => (
+                              <span key={attribute.name} className="rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-800">
+                                {attribute.name}: {attribute.value}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </td>
 

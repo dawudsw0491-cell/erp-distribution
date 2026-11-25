@@ -656,7 +656,7 @@ export async function createGoodsReceiptAction(
 /**
  * Post Goods Receipt and update inventory.
  */
-export async function postGoodsReceiptAction(
+export async function confirmGoodsReceiptAction(
   formData: FormData
 ): Promise<never> {
   const goodsReceiptId = getString(

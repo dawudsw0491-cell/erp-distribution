@@ -58,8 +58,11 @@ type ReceiptDetail = {
         product_name: string;
       } | null;
       product_variant: {
+        variant_sku: string;
+        variant_name: string | null;
         product: { tracking_type: string } | null;
       } | null;
+      variant_attributes?: { name: string; value: string }[];
     } | null;
     units: {
       id: string;
@@ -167,6 +170,8 @@ export default async function GoodsReceiptDetailPage({
             product_name
           ),
           product_variant:product_variants!purchase_order_items_product_variant_id_fkey (
+            variant_sku,
+            variant_name,
             product:products ( tracking_type )
           )
         ),
@@ -192,6 +197,37 @@ export default async function GoodsReceiptDetailPage({
   if (!data) notFound();
 
   const receipt = data as unknown as ReceiptDetail;
+  const variantIds = [...new Set(receipt.items.map((item) => item.purchase_order_item?.product_variant ? item.purchase_order_item.product_variant.variant_sku : null).filter((value): value is string => Boolean(value)))];
+  const itemVariantIdsResult = await supabase
+    .from("goods_receipt_items")
+    .select("id, purchase_order_item:purchase_order_items!goods_receipt_items_purchase_order_item_id_fkey(product_variant_id)")
+    .eq("goods_receipt_id", receiptId);
+  if (itemVariantIdsResult.error) throw new Error(`Gagal mengambil varian Goods Receipt: ${itemVariantIdsResult.error.message}`);
+  const variantIdByItem = new Map<string, string>();
+  for (const row of (itemVariantIdsResult.data ?? []) as unknown as { id: string; purchase_order_item: { product_variant_id: string | null } | null }[]) {
+    if (row.purchase_order_item?.product_variant_id) variantIdByItem.set(row.id, row.purchase_order_item.product_variant_id);
+  }
+  const variantIdsForAttributes = [...new Set([...variantIdByItem.values()])];
+  const attributesByVariant = new Map<string, { name: string; value: string }[]>();
+  if (variantIdsForAttributes.length > 0) {
+    const { data: attributeRows, error: attributeError } = await supabase
+      .from("product_variant_attribute_values")
+      .select("product_variant_id, product_attributes!fk_variant_attribute_values_attribute(attribute_name), product_attribute_values!fk_variant_attribute_values_value(value_name)")
+      .in("product_variant_id", variantIdsForAttributes);
+    if (attributeError) throw new Error(`Gagal mengambil atribut varian GR: ${attributeError.message}`);
+    for (const row of (attributeRows ?? []) as unknown as { product_variant_id: string; product_attributes: { attribute_name: string } | null; product_attribute_values: { value_name: string } | null }[]) {
+      const name = row.product_attributes?.attribute_name;
+      const value = row.product_attribute_values?.value_name;
+      if (!name || !value) continue;
+      const current = attributesByVariant.get(row.product_variant_id) ?? [];
+      current.push({ name, value });
+      attributesByVariant.set(row.product_variant_id, current);
+    }
+  }
+  for (const item of receipt.items) {
+    const variantId = variantIdByItem.get(item.id);
+    item.variant_attributes = variantId ? attributesByVariant.get(variantId) ?? [] : [];
+  }
 
   const totalQuantity = receipt.items.reduce(
     (sum, item) => sum + Number(item.quantity_received || 0),
@@ -377,8 +413,25 @@ export default async function GoodsReceiptDetailPage({
                             {product?.product_name || "-"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            SKU: {product?.sku || "-"}
+                            SKU Produk: {product?.sku || "-"}
                           </p>
+                          <p className="mt-1 text-xs font-medium text-blue-700">
+                            SKU Varian: {item.purchase_order_item?.product_variant?.variant_sku || "Varian tidak terhubung"}
+                          </p>
+                          {item.purchase_order_item?.product_variant?.variant_name && (
+                            <p className="mt-1 text-sm font-semibold text-slate-800">
+                              {item.purchase_order_item.product_variant.variant_name}
+                            </p>
+                          )}
+                          {item.variant_attributes && item.variant_attributes.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {item.variant_attributes.map((attribute) => (
+                                <span key={attribute.name} className="rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-800">
+                                  {attribute.name}: {attribute.value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
 
                         <td className="px-5 py-4 text-right tabular-nums">
@@ -419,32 +472,28 @@ export default async function GoodsReceiptDetailPage({
           {receipt.items.some((item) => item.units.length > 0) && (
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 p-5">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Identitas Unit IMEI / Serial
-                </h2>
+                <h2 className="text-lg font-semibold text-slate-900">Identitas Unit per Varian</h2>
+                <p className="mt-1 text-sm text-slate-500">Setiap IMEI ditampilkan bersama produk, SKU, dan warna dari baris PO asal.</p>
               </div>
-
-              <div className="space-y-4 p-5">
-                {receipt.items.flatMap((item) =>
-                  item.units.map((unit) => (
-                    <div
-                      key={unit.id}
-                      className="rounded-lg border border-slate-200 p-4"
-                    >
-                      <p className="font-semibold text-slate-900">
-                        {unit.unit_code}
-                      </p>
-
-                      <div className="mt-2 space-y-1">
-                        {unit.identifiers.map((identifier, index) => (
-                          <p key={`${unit.id}-${index}`} className="text-sm text-slate-600">
-                            {identifier.identifier_type}: {identifier.identifier_value}
-                          </p>
-                        ))}
-                      </div>
+              <div className="divide-y divide-slate-100">
+                {receipt.items.filter((item) => item.units.length > 0).map((item) => (
+                  <div key={item.id} className="space-y-3 p-5">
+                    <div>
+                      <p className="font-semibold text-slate-900">{item.purchase_order_item?.product?.product_name || "Produk"}</p>
+                      <p className="text-xs text-slate-500">SKU Varian: {item.purchase_order_item?.product_variant?.variant_sku || "-"}</p>
+                      {item.purchase_order_item?.product_variant?.variant_name && <p className="text-sm font-medium text-slate-700">{item.purchase_order_item.product_variant.variant_name}</p>}
+                      {item.variant_attributes?.length ? <div className="mt-2 flex flex-wrap gap-1.5">{item.variant_attributes.map((attribute) => <span key={attribute.name} className="rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-800">{attribute.name}: {attribute.value}</span>)}</div> : null}
                     </div>
-                  ))
-                )}
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {item.units.map((unit, index) => (
+                        <div key={unit.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-xs text-slate-500">Unit {index + 1} · {unit.unit_code}</p>
+                          {unit.identifiers.map((identifier, identifierIndex) => <p key={`${unit.id}-${identifierIndex}`} className="mt-1 font-mono text-sm font-semibold text-slate-800">{identifier.identifier_value}</p>)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}

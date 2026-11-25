@@ -72,6 +72,7 @@ type ReceiptDetail = {
         identifier_value: string;
       }[];
     }[];
+    variant_attributes?: { name: string; value: string }[];
   }[];
 };
 

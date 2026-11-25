@@ -720,13 +720,14 @@ export async function recoverPostedGoodsReceiptImeiAction(
 ): Promise<never> {
   const itemId = getString(formData, "goods_receipt_item_id");
   const purchaseOrderId = getString(formData, "purchase_order_id");
+  const receiptId = getString(formData, "goods_receipt_id");
   const imei = getString(formData, "imei_1");
 
-  if (!isValidUUID(itemId) || !isValidUUID(purchaseOrderId)) {
+  if (!isValidUUID(itemId) || !isValidUUID(purchaseOrderId) || !isValidUUID(receiptId)) {
     redirect("/purchases?error=invalid_id");
   }
 
-  const returnUrl = `/purchases/${purchaseOrderId}/goods-receipts`;
+  const returnUrl = `/purchases/${purchaseOrderId}/goods-receipts/${receiptId}`;
   if (!/^\\d{15}$/.test(imei)) {
     redirect(`${returnUrl}?error=invalid_imei`);
   }

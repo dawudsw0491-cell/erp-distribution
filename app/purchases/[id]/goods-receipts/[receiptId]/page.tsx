@@ -99,7 +99,7 @@ function formatQuantity(value: number): string {
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
-  posted: "Posted",
+  posted: "Diterima",
   cancelled: "Cancelled",
 };
 
@@ -253,7 +253,7 @@ export default async function GoodsReceiptDetailPage({
           {query.error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
               {query.error === "post_failed"
-                ? "Posting Goods Receipt gagal. Periksa data penerimaan dan hak akses."
+                ? "Proses penerimaan barang gagal. Periksa data penerimaan dan hak akses."
                 : "Terjadi kesalahan saat memuat atau memproses Goods Receipt."}
             </div>
           )}
@@ -304,7 +304,7 @@ export default async function GoodsReceiptDetailPage({
               </div>
 
               <div>
-                <p className="text-sm text-slate-500">Waktu Posting</p>
+                <p className="text-sm text-slate-500">Waktu Penerimaan</p>
                 <p className="mt-1 font-medium text-slate-800">
                   {formatDateTime(receipt.posted_at)}
                 </p>
@@ -450,10 +450,10 @@ export default async function GoodsReceiptDetailPage({
             <section className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-semibold text-slate-900">
-                  Posting Goods Receipt
+                  Konfirmasi Penerimaan
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Posting akan memperbarui saldo inventory dan nilai persediaan.
+                  Konfirmasi akan memperbarui saldo dan nilai persediaan.
                 </p>
               </div>
 
@@ -472,7 +472,7 @@ export default async function GoodsReceiptDetailPage({
                   type="submit"
                   className="w-full rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
                 >
-                  Posting Goods Receipt
+                  Konfirmasi Penerimaan
                 </button>
               </form>
             </section>

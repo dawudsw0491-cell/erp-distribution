@@ -482,13 +482,13 @@ async function StockTransferContent({
           {params.created === "1" && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
               Draft transfer berhasil dibuat. Saldo belum berubah
-              sampai transfer diposting.
+              sampai transfer diproses.
             </div>
           )}
 
           {params.posted === "1" && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              Transfer berhasil diposting dan saldo persediaan telah
+              Transfer berhasil diproses dan saldo persediaan telah
               diperbarui.
             </div>
           )}
@@ -516,7 +516,7 @@ async function StockTransferContent({
                 {numberFormat(draftCount)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Menunggu posting
+                Menunggu proses
               </p>
             </div>
 
@@ -528,7 +528,7 @@ async function StockTransferContent({
                 {numberFormat(totalQuantity)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Dari {numberFormat(postedCount)} transfer posted
+                Dari {numberFormat(postedCount)} transfer selesai
               </p>
             </div>
           </section>
@@ -789,7 +789,7 @@ async function StockTransferContent({
                     options: [
                       { value: "", label: "Semua Status Transfer" },
                       { value: "draft", label: "Draft" },
-                      { value: "posted", label: "Posted" },
+                      { value: "posted", label: "Selesai" },
                       { value: "cancelled", label: "Cancelled" },
                     ],
                   },
@@ -947,7 +947,7 @@ async function StockTransferContent({
                                 type="submit"
                                 className="whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                               >
-                                Posting Transfer
+                                Proses Transfer
                               </button>
                             </form>
                           ) : transfer.status === "posted" ? (
@@ -977,7 +977,7 @@ async function StockTransferContent({
                 Pembuatan draft tidak mengurangi saldo gudang asal.
               </li>
               <li>
-                Posting memproses transfer keluar dan transfer masuk
+                Proses transfer mencatat barang keluar dan barang masuk
                 secara atomik melalui database.
               </li>
               <li>
@@ -985,7 +985,7 @@ async function StockTransferContent({
                 dengan identitas yang valid.
               </li>
               <li>
-                Transfer hanya dapat diposting jika stok sumber
+                Transfer hanya dapat diproses jika stok sumber
                 mencukupi dan pasangan movement valid.
               </li>
             </ul>

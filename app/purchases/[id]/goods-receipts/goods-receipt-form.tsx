@@ -540,8 +540,7 @@ export default function GoodsReceiptForm({
                       </p>
 
                       {product.tracking_type === "imei" && (
-                        <div>                      {product.tracking_type === "imei" && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3">
                           <div>
                             <label
                               htmlFor={`imei1-${product.id}-${unitIndex}`}

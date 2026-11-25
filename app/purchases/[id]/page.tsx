@@ -766,7 +766,7 @@ export default async function PurchaseOrderDetailPage({
                     options: [
                       { value: "", label: "Semua Status" },
                       { value: "draft", label: "Draft" },
-                      { value: "posted", label: "Posted" },
+                      { value: "posted", label: "Diterima" },
                       { value: "cancelled", label: "Cancelled" },
                     ],
                   },
@@ -800,7 +800,7 @@ export default async function PurchaseOrderDetailPage({
                       <th className="px-5 py-3">Nomor GR</th>
                       <th className="px-5 py-3">Tanggal</th>
                       <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3">Waktu Posting</th>
+                      <th className="px-5 py-3">Waktu Penerimaan</th>
                     </tr>
                   </thead>
 
@@ -834,7 +834,7 @@ export default async function PurchaseOrderDetailPage({
                             }`}
                           >
                             {receipt.status === "posted"
-                              ? "Posted"
+                              ? "Diterima"
                               : receipt.status === "cancelled"
                                 ? "Cancelled"
                                 : "Draft"}

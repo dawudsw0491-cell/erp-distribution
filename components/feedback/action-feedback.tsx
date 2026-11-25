@@ -152,32 +152,41 @@ export default function ActionFeedback() {
       pendingRef.current = true;
       pendingFormRef.current = form;
       setNotice(null);
-      setPendingMessage(pendingLabel(submitter));
-      form.setAttribute("aria-busy", "true");
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 
-      const controls = Array.from(
-        form.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
-          'button[type="submit"], button:not([type]), input[type="submit"]'
-        )
-      );
-      pendingButtonsRef.current = controls.filter((control) => !control.disabled);
-
-      // Let the browser capture the current submitter before disabling controls.
+      // React onSubmit/client validation runs after this capture listener.
+      // Wait until event dispatch completes before showing a network-pending
+      // indicator. If validation calls preventDefault(), clear pending state
+      // immediately and do not display a spinner.
       window.setTimeout(() => {
+        if (event.defaultPrevented) {
+          restorePending();
+          setPendingMessage(null);
+          return;
+        }
+
+        setPendingMessage(pendingLabel(submitter));
+        form.setAttribute("aria-busy", "true");
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+        const controls = Array.from(
+          form.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
+            'button[type="submit"], button:not([type]), input[type="submit"]'
+          )
+        );
+        pendingButtonsRef.current = controls.filter((control) => !control.disabled);
         pendingButtonsRef.current.forEach((control) => {
           control.disabled = true;
           control.setAttribute("data-action-feedback-disabled", "true");
         });
-      }, 0);
 
-      timeoutRef.current = setTimeout(() => {
-        setPendingMessage(null);
-        setNotice({
-          type: "warning",
-          message: "Belum ada konfirmasi dari server. Tombol tetap dikunci untuk mencegah transaksi ganda. Periksa status dokumen sebelum memuat ulang.",
-        });
-      }, 45000);
+        timeoutRef.current = setTimeout(() => {
+          setPendingMessage(null);
+          setNotice({
+            type: "warning",
+            message: "Belum ada konfirmasi dari server. Tombol tetap dikunci untuk mencegah transaksi ganda. Periksa status dokumen sebelum memuat ulang.",
+          });
+        }, 45000);
+      }, 0);
     };
 
     document.addEventListener("submit", handleSubmit, true);

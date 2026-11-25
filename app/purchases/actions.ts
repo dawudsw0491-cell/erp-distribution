@@ -728,7 +728,7 @@ export async function recoverPostedGoodsReceiptImeiAction(
   }
 
   const returnUrl = `/purchases/${purchaseOrderId}/goods-receipts/${receiptId}`;
-  if (!/^\\d{15}$/.test(imei)) {
+  if (!/^\d{15}$/.test(imei)) {
     redirect(`${returnUrl}?error=invalid_imei`);
   }
 

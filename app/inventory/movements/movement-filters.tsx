@@ -23,15 +23,15 @@ type MovementFiltersProps = {
 };
 
 const movementLabels: Record<string, string> = {
-  purchase: "Purchase",
-  sale: "Sale",
-  transfer_in: "Transfer Masuk",
-  transfer_out: "Transfer Keluar",
-  adjustment: "Adjustment",
-  customer_return: "Customer Return",
-  supplier_return: "Supplier Return",
-  opening_balance: "Opening Balance",
-  status_change: "Status Change",
+  purchase: "Pembelian",
+  sale: "Penjualan",
+  transfer_in: "Barang Masuk",
+  transfer_out: "Barang Keluar",
+  adjustment: "Penyesuaian",
+  customer_return: "Retur Pelanggan",
+  supplier_return: "Retur Pemasok",
+  opening_balance: "Stok Awal",
+  status_change: "Perubahan Status",
 };
 
 const statusLabels: Record<string, string> = {

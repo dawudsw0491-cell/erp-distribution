@@ -541,26 +541,62 @@ export default function GoodsReceiptForm({
                   </div>
 
                   {product.tracking_type === "imei" && (
-                    <UniversalScanner
-                      label="Scanner IMEI Unit"
-                      placeholder="Scan IMEI 1 atau masukkan manual"
-                      commitOnBlur
-                      onScan={(rawValue) => {
-                        const value = rawValue.replace(/\D/g, "");
-                        if (!isValidImei(value)) {
-                          setClientError("IMEI harus tepat 15 digit dan lolos checksum. Periksa kembali input.");
-                          return;
-                        }
-                        const targetIndex = state.units.findIndex(
-                          (unit) => !unit.imei1.trim()
-                        );
-                        if (targetIndex < 0) {
-                          setClientError("Semua slot IMEI pada baris PO ini sudah terisi.");
-                          return;
-                        }
-                        updateUnit(index, targetIndex, { imei1: value });
-                      }}
-                    />
+                    <>
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                        <p className="text-sm font-semibold text-blue-900">
+                          IMEI untuk varian PO ini
+                        </p>
+                        <p className="mt-1 text-xs text-blue-800">
+                          {product.variant_name || product.product_name}
+                          {product.variant_attributes?.length
+                            ? ` · ${product.variant_attributes.map((attribute) => `${attribute.name}: ${attribute.value}`).join(" · ")}`
+                            : ""}
+                        </p>
+                        <p className="mt-1 text-xs text-blue-700">
+                          Scanner akan mengisi slot kosong pada baris varian ini saja.
+                        </p>
+                      </div>
+                      <UniversalScanner
+                        label="Scanner IMEI untuk varian ini"
+                        placeholder="Scan IMEI atau masukkan manual"
+                        commitOnBlur
+                        onScan={(rawValue) => {
+                          const value = rawValue.replace(/\D/g, "");
+                          if (!isValidImei(value)) {
+                            setClientError("IMEI harus tepat 15 digit dan lolos checksum. Periksa kembali input.");
+                            return;
+                          }
+                          const targetIndex = state.units.findIndex(
+                            (unit) => !unit.imei1.trim()
+                          );
+                          if (targetIndex < 0) {
+                            setClientError("Semua slot IMEI pada baris varian PO ini sudah terisi.");
+                            return;
+                          }
+                          updateUnit(index, targetIndex, { imei1: value });
+                        }}
+                      />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {state.units.map((unit, unitIndex) => (
+                          <label key={`${product.id}-imei-${unitIndex}`} className="block rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <span className="mb-1 block text-xs font-semibold text-slate-600">
+                              {product.variant_attributes?.find((attribute) => /warna|color/i.test(attribute.name))?.value || product.variant_name || "Varian"} · Unit {unitIndex + 1}
+                            </span>
+                            <input
+                              value={unit.imei1}
+                              inputMode="numeric"
+                              maxLength={15}
+                              onChange={(event) => updateUnit(index, unitIndex, { imei1: event.target.value.replace(/\D/g, "").slice(0, 15) })}
+                              placeholder="15 digit IMEI"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono"
+                            />
+                            <span className="mt-1 block text-xs text-slate-500">
+                              {unit.imei1 ? (isValidImei(unit.imei1) ? "Format IMEI valid" : "Periksa 15 digit dan checksum") : "Belum diisi"}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
                   )}
 
                   {product.tracking_type === "imei" ? (

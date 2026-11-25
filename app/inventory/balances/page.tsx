@@ -179,16 +179,6 @@ function buildPageUrl(
   return `/inventory/balances?${params.toString()}`;
 }
 
-function getTrackingLabel(value: string) {
-  const labels: Record<string, string> = {
-    quantity: "Quantity",
-    imei: "IMEI",
-    serial: "Serial Number",
-  };
-
-  return labels[value] ?? value;
-}
-
 function StockBalanceError({
   message,
 }: {
@@ -727,10 +717,6 @@ async function StockBalanceContent({
                               </p>
 
                               <div className="mt-2 flex flex-wrap gap-1.5">
-                                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                                  {getTrackingLabel(row.product.tracking_type)}
-                                </span>
-
                                 {row.onHand === 0 && (
                                   <span className="rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
                                     Stok Kosong

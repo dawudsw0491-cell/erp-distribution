@@ -40,7 +40,7 @@ function makePdf(invoice:any,customer:any,warehouse:any,items:any[],balance:numb
  for(let i=0;i<items.length;i++){
   const item=items[i];const desc=wrap([item.product_name_snapshot,item.variant_name_snapshot].filter(Boolean).join(" / "),43);
   const sku=wrap(item.variant_sku_snapshot,13);const rowLines=Math.max(desc.length,sku.length,1);const rowH=Math.max(32,rowLines*11+15);
-  if(y+rowH>700){text(520,815,"LANJUTAN",true, "[0.45 0.50 0.58]");addPage();header(true);tableHeader();}
+  if(y+rowH>700){text(520,815,7,"LANJUTAN",true,"[0.45 0.50 0.58]");addPage();header(true);tableHeader();}
   if(i%2===0)rect(38,y,519,rowH,"[0.97 0.98 0.99]");
   desc.forEach((v,j)=>value(48,y+9+j*11,v,7.5,j===0));
   sku.forEach((v,j)=>value(326,y+9+j*11,v,7));

@@ -30,7 +30,7 @@ export default async function NewInvoicePage({searchParams}:{searchParams:Promis
 
  if(selected){
   const {data,error}=await supabase.from("delivery_order_items")
-   .select("id,quantity,sales_order_item_id,sales_order_items(unit_price,products(product_name),product_variants(variant_sku,variant_name))")
+   .select("id,quantity,sales_order_item_id,sales_order_items(unit_price,products(product_name),product_variants(variant_sku,variant_name)),sales_invoice_items(quantity,sales_invoices(status))")
    .eq("delivery_order_id",selected.id).order("created_at");
   if(error){
    console.error("Load invoice delivery order details failed:",error);

@@ -1,7 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {getAuthorizationContext} from "@/lib/auth/authorization";
 
-export const runtime="nodejs";
 const clean=(value:unknown)=>String(value??"—").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^\x20-\x7E]/g," ").replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/\s+/g," ").trim();
 const money=(value:unknown)=>"Rp "+new Intl.NumberFormat("id-ID",{maximumFractionDigits:0}).format(Number(value??0));
 function makePdf(lines:string[]){

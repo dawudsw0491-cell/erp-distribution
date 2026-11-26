@@ -207,7 +207,7 @@ export default function DeliveryOrderComposer({
                     <input
                       aria-label={`Kuantitas item ${index + 1}`}
                       type="number"
-                      min="0.001"
+                      min={selected?.tracking_type === "imei" || selected?.tracking_type === "serial" ? 1 : 0.001}
                       max={selected?.tracking_type === "serial" ? 1 : remaining}
                       step={selected?.tracking_type === "imei" || selected?.tracking_type === "serial" ? 1 : 0.001}
                       value={row.quantity}

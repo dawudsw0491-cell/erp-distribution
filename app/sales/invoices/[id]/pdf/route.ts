@@ -68,7 +68,7 @@ function makePdf(invoice:any,customer:any,warehouse:any,items:any[],balance:numb
  pages.forEach((page,index)=>{page.push("[0.84 0.87 0.91] RG 0.7 w 38 37 m 557 37 l S");page.push(`BT [0.42 0.47 0.54] rg /F1 7 Tf 1 0 0 1 38 22 Tm (HEXA CORE  |  DOKUMEN PENJUALAN) Tj ET`);page.push(`BT [0.42 0.47 0.54] rg /F1 7 Tf 1 0 0 1 510 22 Tm (HALAMAN ${index+1} / ${pages.length}) Tj ET`);});
  const objects:string[]=["<< /Type /Catalog /Pages 2 0 R >>","","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"];
  const pageIds:number[]=[];
- for(let i=0;i<pages.length;i++){const pageId=objects.length+1,contentId=objects.length+2;pageIds.push(pageId);const stream=pages[i].join("\n");objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 ${objects.length+1} 0 R /F2 ${objects.length+2} 0 R >> >> /Contents ${contentId} 0 R >>`);objects.push(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`);}
+ for(let i=0;i<pages.length;i++){const pageId=objects.length+1,contentId=objects.length+2;pageIds.push(pageId);const stream=pages[i].join("\n");objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`);objects.push(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`);}
  objects[1]=`<< /Type /Pages /Kids [${pageIds.map(id=>id+" 0 R").join(" ")}] /Count ${pages.length} >>`;
  
  let pdf="%PDF-1.4\n";const offsets=[0];objects.forEach((obj,i)=>{offsets.push(new TextEncoder().encode(pdf).length);pdf+=`${i+1} 0 obj\n${obj}\nendobj\n`;});

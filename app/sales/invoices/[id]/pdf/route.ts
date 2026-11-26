@@ -66,11 +66,11 @@ function makePdf(invoice:any,customer:any,warehouse:any,items:any[],balance:numb
  value(64,y+68,"HEXA CORE",8,true);value(370,y+68,"Pelanggan",8,true);
  // Footer on every page
  pages.forEach((page,index)=>{page.push("[0.84 0.87 0.91] RG 0.7 w 38 37 m 557 37 l S");page.push(`BT [0.42 0.47 0.54] rg /F1 7 Tf 1 0 0 1 38 22 Tm (HEXA CORE  |  DOKUMEN PENJUALAN) Tj ET`);page.push(`BT [0.42 0.47 0.54] rg /F1 7 Tf 1 0 0 1 510 22 Tm (HALAMAN ${index+1} / ${pages.length}) Tj ET`);});
- const objects:string[]=["<< /Type /Catalog /Pages 2 0 R >>",""];
+ const objects:string[]=["<< /Type /Catalog /Pages 2 0 R >>","","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"];
  const pageIds:number[]=[];
  for(let i=0;i<pages.length;i++){const pageId=objects.length+1,contentId=objects.length+2;pageIds.push(pageId);const stream=pages[i].join("\n");objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 ${objects.length+1} 0 R /F2 ${objects.length+2} 0 R >> >> /Contents ${contentId} 0 R >>`);objects.push(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`);}
  objects[1]=`<< /Type /Pages /Kids [${pageIds.map(id=>id+" 0 R").join(" ")}] /Count ${pages.length} >>`;
- objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+ 
  let pdf="%PDF-1.4\n";const offsets=[0];objects.forEach((obj,i)=>{offsets.push(new TextEncoder().encode(pdf).length);pdf+=`${i+1} 0 obj\n${obj}\nendobj\n`;});
  const xref=new TextEncoder().encode(pdf).length;pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;for(let i=1;i<offsets.length;i++)pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";pdf+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
  return new TextEncoder().encode(pdf);

@@ -56,3 +56,89 @@ body {
 
 
 
+
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html, body {
+    width: 100%;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #111827 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body {
+    font-size: 9pt !important;
+  }
+
+  #invoice-print {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
+
+  #invoice-print > div:first-child {
+    padding-bottom: 10px !important;
+    gap: 12px !important;
+  }
+
+  #invoice-print h1 {
+    font-size: 25pt !important;
+  }
+
+  #invoice-print .grid {
+    gap: 14px !important;
+  }
+
+  #invoice-print .py-6 {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  #invoice-print table {
+    width: 100% !important;
+    font-size: 8pt !important;
+    border-collapse: collapse !important;
+  }
+
+  #invoice-print th,
+  #invoice-print td {
+    padding: 6px 7px !important;
+  }
+
+  #invoice-print .mt-6 {
+    margin-top: 12px !important;
+  }
+
+  #invoice-print .mt-12 {
+    margin-top: 22px !important;
+  }
+
+  #invoice-print .h-20 {
+    height: 38px !important;
+  }
+
+  #invoice-print p {
+    orphans: 2;
+    widows: 2;
+  }
+
+  #invoice-print tr,
+  #invoice-print .grid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

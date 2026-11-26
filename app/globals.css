@@ -60,85 +60,106 @@ body {
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 10mm;
+    size: A4;
+    margin: 8mm;
   }
 
   html, body {
-    width: 100%;
+    width: auto !important;
     min-height: 0 !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
     background: #fff !important;
     color: #111827 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
-  body {
-    font-size: 9pt !important;
+  /* Print only the invoice document; hide every app shell and control. */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoice-print,
+  #invoice-print * {
+    visibility: visible !important;
   }
 
   #invoice-print {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
     width: 100% !important;
     max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
     box-shadow: none !important;
-    page-break-inside: avoid;
-    break-inside: avoid-page;
+    overflow: visible !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   #invoice-print > div:first-child {
-    padding-bottom: 10px !important;
-    gap: 12px !important;
+    padding-bottom: 7px !important;
+    gap: 10px !important;
   }
 
   #invoice-print h1 {
-    font-size: 25pt !important;
+    margin-top: 4px !important;
+    font-size: 23pt !important;
+    line-height: 1.05 !important;
   }
 
   #invoice-print .grid {
-    gap: 14px !important;
+    gap: 10px !important;
   }
 
   #invoice-print .py-6 {
-    padding-top: 12px !important;
-    padding-bottom: 12px !important;
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
   }
 
   #invoice-print table {
     width: 100% !important;
+    table-layout: fixed !important;
     font-size: 8pt !important;
     border-collapse: collapse !important;
   }
 
   #invoice-print th,
   #invoice-print td {
-    padding: 6px 7px !important;
+    padding: 5px 6px !important;
+    overflow-wrap: anywhere !important;
   }
 
   #invoice-print .mt-6 {
-    margin-top: 12px !important;
+    margin-top: 9px !important;
   }
 
   #invoice-print .mt-12 {
-    margin-top: 22px !important;
+    margin-top: 15px !important;
   }
 
   #invoice-print .h-20 {
-    height: 38px !important;
-  }
-
-  #invoice-print p {
-    orphans: 2;
-    widows: 2;
+    height: 27px !important;
   }
 
   #invoice-print tr,
-  #invoice-print .grid {
-    break-inside: avoid;
-    page-break-inside: avoid;
+  #invoice-print .grid,
+  #invoice-print .ml-auto {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Never print application navigation, interactive controls or hover states. */
+  nav, aside, header, footer, button, form, input, select, textarea,
+  [role="navigation"], .print\\:hidden {
+    display: none !important;
+    visibility: hidden !important;
   }
 }

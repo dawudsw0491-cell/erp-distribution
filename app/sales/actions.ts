@@ -118,6 +118,22 @@ export async function createDeliveryOrderAction(form: FormData): Promise<never> 
   redirect(`/sales/${id}?delivery_order=${data}`);
 }
 
+export async function cancelDeliveryOrderAction(form: FormData): Promise<never> {
+  const id=value(form,"delivery_order_id"), soId=value(form,"sales_order_id");
+  const reason=value(form,"cancellation_reason");
+  if(!uuid(id)||!uuid(soId)) redirect("/sales?error=invalid_id");
+  if(reason.length<5||reason.length>500) redirect(`/sales/${soId}?error=invalid_do_cancel_reason`);
+  const {supabase,user,profile}=await getAuthenticatedContext();
+  if(!user) redirect("/login");
+  if(!profile) redirect(`/sales/${soId}?error=permission_denied`);
+  const {error}=await supabase.rpc("sales_cancel_delivery_order",{
+    p_delivery_order_id:id,p_reason:reason
+  });
+  if(error){console.error("Cancel DO failed:",error);redirect(`/sales/${soId}?error=cancel_do_failed`);}
+  revalidatePath("/sales"); revalidatePath(`/sales/${soId}`);
+  redirect(`/sales/${soId}?do_cancelled=1`);
+}
+
 export async function completeDeliveryOrderAction(form: FormData): Promise<never> {
   const id=value(form,"delivery_order_id"), soId=value(form,"sales_order_id");
   if(!uuid(id)||!uuid(soId)) redirect("/sales?error=invalid_id");

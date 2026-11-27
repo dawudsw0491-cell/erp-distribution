@@ -764,7 +764,7 @@ async function StockBalanceContent({
                                       {row.units?.map((unit) => (
                                         <li key={unit.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-1.5">
                                           <span className="font-mono">{(unit.product_unit_identifiers ?? []).map((identifier) => identifier.identifier_value).join(" / ") || unit.unit_code}</span>
-                                          <span className="text-slate-500">{unit.unit_status}</span>
+                                          <span className={row.unitDataMismatch ? "font-semibold text-amber-700" : "text-slate-500"}>{row.unitDataMismatch ? "status belum sinkron" : unit.unit_status}</span>
                                         </li>
                                       ))}
                                     </ul>

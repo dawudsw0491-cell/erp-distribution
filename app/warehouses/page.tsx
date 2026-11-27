@@ -210,7 +210,7 @@ async function WarehousePageContent({
                     <th className="px-5 py-4">Contact Person</th>
                     <th className="px-5 py-4">Telepon</th>
                     <th className="px-5 py-4">Status</th>
-                    <th className="px-5 py-4">Aksi</th>
+                    <th className="px-5 py-4">Kelola</th>
                   </tr>
                 </thead>
 

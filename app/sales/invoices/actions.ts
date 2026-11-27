@@ -13,23 +13,30 @@ function date(value: string) {
 }
 
 export async function createInvoiceAction(form: FormData): Promise<never> {
-  const deliveryOrderId = field(form,"delivery_order_id");
-  const invoiceDate = field(form,"invoice_date");
-  const dueDate = field(form,"due_date");
-  const notes = field(form,"notes");
-  let items: unknown;
-  try { items = JSON.parse(field(form,"items")); } catch { redirect("/sales/invoices?error=invalid_items"); }
-  if (!uuid(deliveryOrderId) || !date(invoiceDate) || (dueDate && !date(dueDate)) || (dueDate && dueDate < invoiceDate) || notes.length > 2000 || !Array.isArray(items) || items.length < 1 || items.length > 100) {
-    redirect("/sales/invoices?error=invalid_data");
-  }
+  const deliveryOrderId=field(form,"delivery_order_id");
+  const invoiceDate=field(form,"invoice_date"),dueDate=field(form,"due_date"),notes=field(form,"notes");
+  const amount=field(form,"initial_payment_amount")||"0";
+  const paymentDate=field(form,"payment_date"),method=field(form,"payment_method");
+  const reference=field(form,"reference_number"),paymentNotes=field(form,"payment_notes");
+  let items:unknown;
+  try { items=JSON.parse(field(form,"items")); } catch { redirect("/sales?error=invalid_invoice_items"); }
+  if(!uuid(deliveryOrderId)||!date(invoiceDate)||(dueDate&&!date(dueDate))||(dueDate&&dueDate<invoiceDate)||notes.length>2000||
+     !Array.isArray(items)||items.length<1||items.length>100||
+     !/^\d{1,16}(?:\.\d{1,2})?$/.test(amount)||Number(amount)<0||
+     reference.length>120||paymentNotes.length>2000) redirect("/sales?error=invalid_invoice_data");
+  if(Number(amount)>0&&(!date(paymentDate)||!["cash","bank_transfer","card","other"].includes(method))) redirect("/sales?error=invalid_payment_data");
   const {supabase,user,profile}=await getAuthenticatedContext();
   if(!user) redirect("/login");
-  if(!profile) redirect("/sales/invoices?error=permission_denied");
-  const {data,error}=await supabase.rpc("sales_create_invoice",{
-    p_delivery_order_id:deliveryOrderId,p_invoice_date:invoiceDate,p_due_date:dueDate||null,p_notes:notes||null,p_items:items
+  if(!profile) redirect("/sales?error=permission_denied");
+  const {data,error}=await supabase.rpc("sales_create_invoice_with_payment",{
+    p_delivery_order_id:deliveryOrderId,p_invoice_date:invoiceDate,p_due_date:dueDate||null,
+    p_notes:notes||null,p_items:items,p_initial_payment_amount:amount,
+    p_payment_date:Number(amount)>0?paymentDate:null,p_payment_method:Number(amount)>0?method:null,
+    p_reference_number:reference||null,p_payment_notes:paymentNotes||null
   });
-  if(error||!data){console.error("Create invoice failed",error);redirect("/sales/invoices?error=save_failed");}
+  if(error||!data){console.error("Create invoice with payment failed",error);redirect("/sales?error=invoice_payment_failed");}
   revalidatePath("/sales/invoices");
+  revalidatePath("/sales");
   redirect(`/sales/invoices/${data}?created=1`);
 }
 

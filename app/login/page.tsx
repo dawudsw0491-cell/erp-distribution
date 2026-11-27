@@ -17,18 +17,20 @@ export default function LoginPage() {
 
       <section className="relative z-10 w-full max-w-[430px]">
         <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-[0_28px_80px_rgba(31,58,99,0.16),0_8px_24px_rgba(31,58,99,0.07),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-8">
-          <div className="mb-7 flex justify-center">
-            <div className="overflow-hidden rounded-[1.35rem] shadow-[0_14px_32px_rgba(2,6,23,0.22),0_3px_8px_rgba(2,6,23,0.12)] ring-1 ring-black/5">
-              <Image
-                src="/hexa-core-brand.svg"
-                alt="HexaCore — Dynamic System Workflow"
-                width={240}
-                height={235}
-                priority
-                className="h-auto w-[190px] sm:w-[210px]"
-                unoptimized
-              />
-            </div>
+          <div className="mb-7 flex flex-col items-center text-center">
+            <Image
+              src="/hexa-core-3d.svg"
+              alt="Logo HEXA CORE 3D"
+              width={240}
+              height={258}
+              priority
+              unoptimized
+              className="h-auto w-[170px] drop-shadow-[0_12px_16px_rgba(15,23,42,0.16)] sm:w-[190px]"
+            />
+            <h1 aria-label="HEXA CORE" className="mt-2 inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em] sm:text-[3rem]">
+              <span className="text-slate-950 [text-shadow:0_2px_0_rgba(255,255,255,0.95),0_4px_5px_rgba(15,23,42,0.35)]">HEXA</span>
+              <span className="ml-[0.035em] text-white [-webkit-text-stroke:1.4px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_2px_#fff,0_0_5px_rgba(37,99,235,0.95),0_0_12px_rgba(37,99,235,0.85),0_0_23px_rgba(59,130,246,0.58),0_3px_6px_rgba(15,23,42,0.25)]">CORE</span>
+            </h1>
           </div>
 
           <div className="mb-7 text-center">

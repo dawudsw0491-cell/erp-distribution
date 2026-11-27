@@ -17,7 +17,8 @@ export default function LoginPage() {
 
       <section className="relative z-10 w-full max-w-[430px]">
         <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-[0_28px_80px_rgba(31,58,99,0.16),0_8px_24px_rgba(31,58,99,0.07),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-8">
-          <div className="mb-7 flex flex-col items-center text-center">
+          <div className="relative mb-7 flex flex-col items-center text-center">
+            <div className="pointer-events-none absolute left-1/2 top-[42%] h-56 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(147,197,253,0.30)_0%,rgba(191,219,254,0.16)_42%,rgba(239,246,255,0)_76%)] blur-2xl" />
             <Image
               src="/hexa-core-3d.svg"
               alt="Logo HEXA CORE 3D"
@@ -25,7 +26,7 @@ export default function LoginPage() {
               height={258}
               priority
               unoptimized
-              className="h-auto w-[170px] drop-shadow-[0_12px_16px_rgba(15,23,42,0.16)] sm:w-[190px]"
+              className="relative z-10 h-auto w-[170px] mix-blend-darken drop-shadow-[0_12px_16px_rgba(15,23,42,0.13)] sm:w-[190px]"
             />
             <h1 aria-label="HEXA CORE" className="mt-2 inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em] sm:text-[3rem]">
               <span className="text-slate-950 [text-shadow:0_2px_0_rgba(255,255,255,0.95),0_4px_5px_rgba(15,23,42,0.35)]">HEXA</span>

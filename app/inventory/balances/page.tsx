@@ -519,15 +519,14 @@ async function StockBalanceContent({
     }
     const availableUnits = units.filter((unit) => unit.unit_status === "available").length;
     const onHandUnits = units.filter((unit) => !["sold", "in_transit", "returned_to_supplier"].includes(unit.unit_status)).length;
-    const costedUnits = units.filter((unit) => unit.unit_cost !== null);
-    const totalUnitCost = costedUnits.reduce((sum, unit) => sum + Number(unit.unit_cost), 0);
-    const averageUnitCost = costedUnits.length
-      ? totalUnitCost / costedUnits.length
-      : row.averageCost;
+    // inventory_balances remains the quantity/value ledger. Product Units are
+    // identity records only; never replace ledger balances with a unit count.
+    const unitDataMismatch =
+      availableUnits !== row.available || onHandUnits !== row.onHand;
     return {
-      ...row, units, available: availableUnits, onHand: onHandUnits,
-      value: costedUnits.length === units.length ? totalUnitCost : row.value,
-      averageCost: averageUnitCost, unitDataMismatch: false,
+      ...row,
+      units,
+      unitDataMismatch,
     };
   });
 
@@ -773,7 +772,7 @@ async function StockBalanceContent({
                                     <p className="mt-2 min-w-[220px] text-xs text-amber-700">Belum ada IMEI/unit tersimpan untuk varian dan gudang ini.</p>
                                   )}
                                   {row.unitDataMismatch && (
-                                    <p className="mt-2 min-w-[220px] text-xs font-medium text-amber-700">Saldo agregat {numberFormat(row.onHand)} unit, tetapi data IMEI belum tersedia.</p>
+                                    <p className="mt-2 min-w-[220px] rounded bg-amber-50 p-2 text-xs font-medium text-amber-800">Rekonsiliasi diperlukan: saldo ledger tersedia {numberFormat(row.available)} / on hand {numberFormat(row.onHand)}; unit IMEI tersedia {numberFormat((row.units ?? []).filter((unit) => unit.unit_status === "available").length)} / tercatat {numberFormat((row.units ?? []).filter((unit) => !["sold", "in_transit", "returned_to_supplier"].includes(unit.unit_status)).length)}. Angka saldo tetap mengikuti ledger inventory.</p>
                                   )}
                                 </details>
                               )}

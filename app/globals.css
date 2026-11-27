@@ -421,3 +421,42 @@ body:not(:has(.login-ambient)) main div:has(table) tbody tr:hover {
   border-color: rgba(112,133,238,.38) !important;
   box-shadow: 0 8px 20px rgba(65,91,164,.14), inset 0 1px 0 rgba(255,255,255,.95);
 }
+
+
+/* Sidebar refinement: crisp solid colors, no glow or ambient shadow. */
+body:not(:has(.login-ambient)) .erp-sidebar,
+body:not(:has(.login-ambient)) .erp-sidebar *,
+body:not(:has(.login-ambient)) .erp-sidebar *::before,
+body:not(:has(.login-ambient)) .erp-sidebar *::after {
+  filter: none !important;
+  text-shadow: none !important;
+}
+body:not(:has(.login-ambient)) .erp-sidebar {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+body:not(:has(.login-ambient)) .erp-sidebar .erp-nav-icon svg {
+  filter: none !important;
+  stroke-width: 2.15;
+}
+body:not(:has(.login-ambient)) .erp-sidebar nav a,
+body:not(:has(.login-ambient)) .erp-sidebar nav button {
+  box-shadow: none !important;
+}
+body:not(:has(.login-ambient)) .erp-sidebar nav a:hover,
+body:not(:has(.login-ambient)) .erp-sidebar nav button:hover {
+  color: #394fc1 !important;
+  background-color: #f1f5ff !important;
+}
+body:not(:has(.login-ambient)) .erp-sidebar nav a[aria-current="page"] {
+  color: #354ac0 !important;
+  background: #eaf0ff !important;
+}
+body:not(:has(.login-ambient)) .erp-sidebar nav a .erp-nav-icon,
+body:not(:has(.login-ambient)) .erp-sidebar nav button .erp-nav-icon {
+  color: #2563eb;
+}
+body:not(:has(.login-ambient)) .erp-sidebar nav a:hover .erp-nav-icon,
+body:not(:has(.login-ambient)) .erp-sidebar nav button:hover .erp-nav-icon {
+  color: #4f46e5 !important;
+}

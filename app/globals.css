@@ -316,14 +316,14 @@ body:not(:has(.login-ambient)) [class*="shadow-md"] {
 body:not(:has(.login-ambient)) .erp-sidebar {
   background: rgba(255,255,255,.94);
   border-color: rgba(148,163,184,.2);
-  box-shadow: 8px 0 28px rgba(47,66,115,.045);
+  box-shadow: 2px 0 8px rgba(47,66,115,.025);
 }
 
 
 /* Sidebar wordmark, vivid module icons, logout glass card and consistent table headings */
 .erp-sidebar .erp-nav-icon svg {
   stroke-width: 2.35;
-  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 1px 4px rgba(69, 113, 221, .18));
+  filter: drop-shadow(0 0 1px rgba(69, 113, 221, .12));
 }
 .erp-sidebar nav a,
 .erp-sidebar nav button {

@@ -39,7 +39,7 @@ async function DashboardContent() {
   const [productResult, balanceResult, salesHistoryResult, salesWeekResult] = await Promise.all([
     canMaster ? master.supabase.from("products").select("id,sku,product_name,minimum_stock,is_active").eq("is_active", true).order("product_name").limit(2000) : Promise.resolve({ data: null, error: null }),
     canInventory ? inventory.supabase.from("inventory_balances").select("product_id,available_quantity,on_hand_quantity,inventory_value").limit(5000) : Promise.resolve({ data: null, error: null }),
-    canSales ? sales.supabase.from("sales_orders").select("id,order_date,status,subtotal,sales_order_items(product_id,quantity)").in("status", ["confirmed", "partially_delivered", "delivered", "partially_returned", "returned"]).order("order_date", { ascending: false }).limit(2000) : Promise.resolve({ data: null, error: null }),
+    canSales ? sales.supabase.from("sales_orders").select("id,order_date,status,subtotal,sales_order_items(product_id,quantity)").in("status", ["confirmed", "partially_delivered", "delivered", "partially_returned"]).order("order_date", { ascending: false }).limit(2000) : Promise.resolve({ data: null, error: null }),
     canSales ? sales.supabase.from("sales_orders").select("id,order_date,subtotal").in("status", ["confirmed", "partially_delivered", "delivered", "partially_returned", "returned"]).gte("order_date", dateKey(sevenDaysAgo)).lte("order_date", dateKey(today)).order("order_date", { ascending: true }).limit(2000) : Promise.resolve({ data: null, error: null }),
   ]);
 

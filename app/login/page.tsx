@@ -37,33 +37,6 @@ export default function LoginPage() {
         </p>
       </section>
 
-      <style jsx>{`
-        .login-ambient { background: #f4f5f5; isolation: isolate; }
-        .login-color-field {
-          background:
-            radial-gradient(ellipse 48% 43% at 17% 37%, rgba(255, 77, 0, .96) 0%, rgba(255, 76, 26, .78) 34%, transparent 76%),
-            radial-gradient(ellipse 50% 42% at 24% 76%, rgba(0, 151, 235, .92) 0%, rgba(38, 169, 238, .68) 35%, transparent 76%),
-            radial-gradient(ellipse 38% 34% at 38% 55%, rgba(222, 34, 71, .58) 0%, transparent 76%),
-            radial-gradient(ellipse 48% 40% at 80% 16%, rgba(255, 255, 255, .96) 0%, transparent 82%),
-            linear-gradient(125deg, #f7f7f5 0%, #edf2f6 55%, #fbfaf8 100%);
-          background-size: 140% 140%;
-          animation: loginColorFlow 22s ease-in-out infinite alternate;
-          transform: scale(1.08);
-        }
-        .login-grain {
-          opacity: .12;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
-          mix-blend-mode: soft-light;
-        }
-        @keyframes loginColorFlow {
-          0% { background-position: 0% 20%; filter: hue-rotate(0deg) saturate(1); }
-          50% { background-position: 70% 55%; filter: hue-rotate(12deg) saturate(1.08); }
-          100% { background-position: 100% 80%; filter: hue-rotate(-8deg) saturate(1.04); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .login-color-field { animation: none; }
-        }
-      `}</style>
     </main>
   );
 }

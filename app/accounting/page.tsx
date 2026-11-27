@@ -308,7 +308,7 @@ export default async function ReportsPage({
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
           <header>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="hexa-page-title text-2xl font-bold text-slate-900">
               Akuntansi & Laporan
             </h1>
             <p className="mt-1 text-sm text-slate-600">

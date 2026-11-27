@@ -159,10 +159,10 @@ export default function ErpSidebar({
   }
 
   return (
-    <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="erp-sidebar flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white/95 backdrop-blur-xl">
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 text-white shadow-[0_7px_18px_rgba(76,105,220,0.28)]">
             <Boxes size={22} />
           </div>
 
@@ -204,15 +204,15 @@ export default function ErpSidebar({
                   aria-expanded={isExpanded}
                   className={`group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                     groupActive
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      ? "bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 text-indigo-800 shadow-[inset_0_0_0_1px_rgba(99,115,225,0.10)]"
+                      : "text-slate-600 hover:bg-indigo-50/70 hover:text-indigo-800"
                   }`}
                 >
                   <span className="flex items-center gap-3">
                     <span
                       className={`transition-colors duration-200 ${
                         groupActive
-                          ? "text-blue-600"
+                          ? "text-indigo-600"
                           : "text-slate-400 group-hover:text-slate-700"
                       }`}
                     >
@@ -237,7 +237,7 @@ export default function ErpSidebar({
                   }`}
                 >
                   <div className="min-h-0 overflow-hidden">
-                    <div className="ml-5 space-y-1 border-l border-slate-200 py-1 pl-3">
+                    <div className="ml-5 space-y-1 border-l border-indigo-100 py-1 pl-3">
                       {group.children?.map((child) => {
                         const childActive = isRouteActive(
                           currentPath,
@@ -255,7 +255,7 @@ export default function ErpSidebar({
                             className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 ease-in-out ${
                               childActive
                                 ? "translate-x-1 bg-blue-50 font-semibold text-blue-700"
-                                : "text-slate-500 hover:translate-x-1 hover:bg-slate-50 hover:text-slate-900"
+                                : "text-slate-500 hover:translate-x-1 hover:bg-indigo-50/60 hover:text-indigo-800"
                             }`}
                           >
                             {child.icon && (
@@ -320,7 +320,7 @@ export default function ErpSidebar({
       </nav>
 
       <div className="border-t border-slate-200 p-4">
-        <div className="mb-3 rounded-lg bg-slate-50 p-3">
+        <div className="mb-3 rounded-xl border border-indigo-100/70 bg-gradient-to-br from-indigo-50/80 via-blue-50/70 to-cyan-50/80 p-3">
           <p className="text-xs font-semibold text-slate-700">
             HEXA Core ERP
           </p>

@@ -85,7 +85,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full rounded-2xl bg-gradient-to-b from-blue-600 to-blue-700 px-4 py-3.5 text-sm font-bold tracking-wide text-white shadow-[0_8px_18px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] transition duration-200 hover:-translate-y-0.5 hover:from-blue-500 hover:to-blue-700 hover:shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60
+        className="w-full rounded-2xl bg-gradient-to-b from-blue-600 to-blue-700 px-4 py-3.5 text-sm font-bold tracking-wide text-white shadow-[0_8px_18px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] transition duration-200 hover:-translate-y-0.5 hover:from-blue-500 hover:to-blue-700 hover:shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? "Memverifikasi..." : "Masuk ke Sistem"}
       </button>

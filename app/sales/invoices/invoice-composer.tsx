@@ -16,7 +16,7 @@ export default function InvoiceComposer({deliveryOrderId,lines,paymentScheme,pay
  const today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});
  const receivedAmount=paymentScheme==="credit"?Number(initialAmount||0):(confirmReceived?total:0);
  const method=paymentScheme==="credit"?creditMethod:paymentScheme;
- const validPayment=Number.isFinite(receivedAmount)&&receivedAmount>=0&&receivedAmount<=total&&((receivedAmount===0)||(paymentScheme!=="bank_transfer"||true));
+ const validPayment=Number.isFinite(receivedAmount)&&receivedAmount>=0&&receivedAmount<=total;
  return <form action={createInvoiceAction} className="space-y-5 rounded-xl border border-slate-200 bg-white p-5">
   <input type="hidden" name="delivery_order_id" value={deliveryOrderId}/>
   <input type="hidden" name="items" value={JSON.stringify(items)}/>

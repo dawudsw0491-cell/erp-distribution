@@ -171,13 +171,13 @@ body {
 }
 .login-color-field {
   background:
-    radial-gradient(ellipse 48% 43% at 17% 37%, rgba(255, 82, 35, .98) 0%, rgba(255, 111, 75, .78) 34%, transparent 76%),
-    radial-gradient(ellipse 50% 42% at 24% 76%, rgba(0, 164, 224, .94) 0%, rgba(68, 190, 230, .72) 35%, transparent 76%),
-    radial-gradient(ellipse 38% 34% at 38% 55%, rgba(226, 62, 91, .54) 0%, transparent 76%),
-    radial-gradient(ellipse 48% 40% at 80% 16%, rgba(255, 255, 255, .96) 0%, transparent 82%),
-    linear-gradient(125deg, #fff7f2 0%, #f4f5f5 52%, #effaff 100%);
+    radial-gradient(ellipse 48% 43% at 17% 37%, rgba(66, 153, 255, .94) 0%, rgba(92, 169, 255, .72) 34%, transparent 76%),
+    radial-gradient(ellipse 50% 42% at 24% 76%, rgba(89, 89, 245, .94) 0%, rgba(113, 112, 255, .70) 35%, transparent 76%),
+    radial-gradient(ellipse 38% 34% at 38% 55%, rgba(150, 218, 239, .92) 0%, transparent 76%),
+    radial-gradient(ellipse 48% 40% at 80% 16%, rgba(184, 161, 255, .55) 0%, transparent 82%),
+    linear-gradient(125deg, #e9f3ff 0%, #dfeaff 48%, #e5f7fb 100%);
   background-size: 140% 140%;
-  animation: loginColorFlow 22s ease-in-out infinite alternate;
+  animation: loginColorFlow 26s ease-in-out infinite alternate;
   transform: scale(1.08);
 }
 .login-grain {
@@ -187,8 +187,8 @@ body {
 }
 @keyframes loginColorFlow {
   0% { background-position: 0% 20%; filter: hue-rotate(0deg) saturate(1); }
-  50% { background-position: 70% 55%; filter: hue-rotate(12deg) saturate(1.08); }
-  100% { background-position: 100% 80%; filter: hue-rotate(-8deg) saturate(1.04); }
+  50% { background-position: 70% 55%; filter: hue-rotate(-8deg) saturate(1.06); }
+  100% { background-position: 100% 80%; filter: hue-rotate(10deg) saturate(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {
   .login-color-field { animation: none; }

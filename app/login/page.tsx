@@ -1,5 +1,6 @@
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import LoginForm from "./login-form";
 
 export const metadata: Metadata = {
@@ -9,44 +10,45 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 px-4 py-10 [font-family:var(--font-roboto),Arial,sans-serif]">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_top,_#ffffff_0%,_#eef6ff_42%,_#e8edf5_100%)] px-4 py-10 [font-family:var(--font-roboto),Arial,sans-serif]">
+      <div className="pointer-events-none absolute -left-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-sky-300/25 blur-[90px]" />
+      <div className="pointer-events-none absolute -bottom-44 -right-32 h-[30rem] w-[30rem] rounded-full bg-blue-300/20 blur-[100px]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
 
-      {/* Decorative Background */}
-      <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-blue-300/20 blur-3xl" />
+      <section className="relative z-10 w-full max-w-[430px]">
+        <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-[0_28px_80px_rgba(31,58,99,0.16),0_8px_24px_rgba(31,58,99,0.07),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-8">
+          <div className="mb-7 flex justify-center">
+            <div className="overflow-hidden rounded-[1.35rem] shadow-[0_14px_32px_rgba(2,6,23,0.22),0_3px_8px_rgba(2,6,23,0.12)] ring-1 ring-black/5">
+              <Image
+                src="/hexa-core-brand.svg"
+                alt="HexaCore — Dynamic System Workflow"
+                width={240}
+                height={235}
+                priority
+                className="h-auto w-[190px] sm:w-[210px]"
+                unoptimized
+              />
+            </div>
+          </div>
 
-      <div className="relative z-10 w-full max-w-md">
-
-        {/* HEXACORE Logo */}
-        <div className="mb-8 text-center">
-          <h1 className="inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em]">
-            <span className="relative text-slate-950 [text-shadow:0_2px_0_rgba(255,255,255,0.9),0_4px_5px_rgba(15,23,42,0.28)]">HEXA</span>
-            <span className="relative ml-[0.035em] text-white [-webkit-text-stroke:1.35px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_2px_#fff,0_0_5px_rgba(37,99,235,0.95),0_0_11px_rgba(37,99,235,0.8),0_0_20px_rgba(59,130,246,0.55),0_3px_5px_rgba(15,23,42,0.24)]">CORE</span>
-          </h1>
-        </div>
-
-        {/* 3D Login Card */}
-        <div className="rounded-2xl border border-white/90 bg-gradient-to-br from-white via-sky-50 to-blue-100 p-8 shadow-[0_15px_35px_rgba(37,99,235,0.16),0_5px_12px_rgba(15,23,42,0.08)] ring-1 ring-blue-200/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(37,99,235,0.22),0_8px_16px_rgba(15,23,42,0.10)]">
-
-          <div className="mb-6 text-center">
-            <h2 className="text-lg font-bold tracking-wide text-slate-800">
-              Selamat Datang Kembali
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Masuk untuk melanjutkan ke sistem HEXA CORE
-            </p>
+          <div className="mb-7 text-center">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-blue-600">Secure Workspace</p>
+            <h1 className="text-[1.35rem] font-bold tracking-tight text-slate-900">Selamat Datang</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">Masuk untuk mengakses ruang kerja HEXA CORE.</p>
           </div>
 
           <LoginForm />
 
+          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
+            Secure enterprise access
+          </div>
         </div>
 
-        {/* Footer */}
-        <p className="mt-6 text-center text-sm font-extrabold italic text-slate-900 drop-shadow-[0_1px_1px_rgba(15,23,42,0.25)]">
-          Enterprise Distribution Management System · © 2026
+        <p className="mt-6 text-center text-[11px] font-medium tracking-wide text-slate-500">
+          Enterprise Distribution Management System <span className="mx-1 text-slate-300">·</span> © 2026
         </p>
-
-      </div>
+      </section>
     </main>
   );
 }

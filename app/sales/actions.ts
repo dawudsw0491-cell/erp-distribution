@@ -15,7 +15,7 @@ function validDate(input: string) {
   const d = new Date(input + "T00:00:00.000Z");
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0,10) === input;
 }
-function validItems(raw: string): Array<{product_variant_id:string;quantity:string;unit_price:string}> {
+function validItems(raw: string): Array<{product_variant_id:string;quantity:string;unit_price:string;unit_ids:string[]}> {
   const data: unknown = JSON.parse(raw);
   if (!Array.isArray(data) || data.length < 1 || data.length > 100) throw new Error("invalid_items");
   return data.map((item) => {
@@ -26,7 +26,7 @@ function validItems(raw: string): Array<{product_variant_id:string;quantity:stri
     const unit_price = String(row.unit_price ?? "");
     if (!/^\d{1,15}(?:\.\d{1,3})?$/.test(quantity) || Number(quantity) <= 0) throw new Error("invalid_quantity");
     if (!/^\d{1,16}(?:\.\d{1,2})?$/.test(unit_price) || Number(unit_price) < 0) throw new Error("invalid_price");
-    return { product_variant_id: row.product_variant_id, quantity, unit_price };
+    const unit_ids=Array.isArray(row.unit_ids)?row.unit_ids.map(String):[];\n    if(unit_ids.some(id=>!uuid(id))||new Set(unit_ids).size!==unit_ids.length) throw new Error("invalid_units");\n    return { product_variant_id: row.product_variant_id, quantity, unit_price, unit_ids };
   });
 }
 
@@ -40,7 +40,7 @@ export async function createSalesOrderAction(form: FormData): Promise<never> {
   const {supabase,user,profile}=await getAuthenticatedContext();
   if (!user) redirect("/login");
   if (!profile) redirect("/sales?error=permission_denied");
-  const {data,error}=await supabase.rpc("sales_create_order_with_payment_terms",{p_customer_id:customerId,p_warehouse_id:warehouseId,p_order_date:orderDate,p_notes:notes||null,p_items:items,p_payment_scheme:paymentScheme,p_payment_due_date:paymentDueDate||null});
+  const {data,error}=await supabase.rpc("sales_create_order_with_payment_terms_and_units",{p_customer_id:customerId,p_warehouse_id:warehouseId,p_order_date:orderDate,p_notes:notes||null,p_items:items,p_payment_scheme:paymentScheme,p_payment_due_date:paymentDueDate||null});
   if (error || !data) { console.error("Create Sales Order failed:",error); redirect("/sales/new?error=save_failed"); }
   revalidatePath("/sales");
   redirect(`/sales/${data}?created=1`);

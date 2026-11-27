@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-100 via-blue-50 to-slate-100 px-4 py-10 [font-family:var(--font-roboto),Arial,sans-serif]">
 
       {/* Decorative Background */}
       <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
@@ -19,11 +19,9 @@ export default function LoginPage() {
 
         {/* HEXACORE Logo */}
         <div className="mb-8 text-center">
-          <h1 className="font-[family-name:var(--font-lora)] text-4xl font-semibold tracking-[0.12em] text-slate-900">
-            HEXA
-            <span className="font-semibold text-blue-700">
-              CORE
-            </span>
+          <h1 className="inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em]">
+            <span className="relative text-slate-950 [text-shadow:0_2px_0_rgba(255,255,255,0.9),0_4px_5px_rgba(15,23,42,0.28)]">HEXA</span>
+            <span className="relative ml-[0.035em] text-white [-webkit-text-stroke:1.35px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_2px_#fff,0_0_5px_rgba(37,99,235,0.95),0_0_11px_rgba(37,99,235,0.8),0_0_20px_rgba(59,130,246,0.55),0_3px_5px_rgba(15,23,42,0.24)]">CORE</span>
           </h1>
         </div>
 

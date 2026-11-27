@@ -26,7 +26,9 @@ function validItems(raw: string): Array<{product_variant_id:string;quantity:stri
     const unit_price = String(row.unit_price ?? "");
     if (!/^\d{1,15}(?:\.\d{1,3})?$/.test(quantity) || Number(quantity) <= 0) throw new Error("invalid_quantity");
     if (!/^\d{1,16}(?:\.\d{1,2})?$/.test(unit_price) || Number(unit_price) < 0) throw new Error("invalid_price");
-    const unit_ids=Array.isArray(row.unit_ids)?row.unit_ids.map(String):[];\n    if(unit_ids.some(id=>!uuid(id))||new Set(unit_ids).size!==unit_ids.length) throw new Error("invalid_units");\n    return { product_variant_id: row.product_variant_id, quantity, unit_price, unit_ids };
+    const unit_ids=Array.isArray(row.unit_ids)?row.unit_ids.map(String):[];
+    if(unit_ids.some(id=>!uuid(id))||new Set(unit_ids).size!==unit_ids.length) throw new Error("invalid_units");
+    return { product_variant_id: row.product_variant_id, quantity, unit_price, unit_ids };
   });
 }
 

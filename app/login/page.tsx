@@ -22,18 +22,16 @@ export default function LoginPage() {
             <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">Secure Workspace</p>
           </div>
 
-          <p className="mb-6 text-center text-sm leading-relaxed text-slate-600">Masuk untuk mengakses ruang kerja HEXA CORE.</p>
-
           <LoginForm />
 
-          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-500">
+          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-700">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
             Secure enterprise access
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] font-medium tracking-wide text-slate-600">
-          Enterprise Distribution Management System <span className="mx-1 text-slate-400">·</span> © 2026
+        <p className="mx-auto mt-5 w-fit rounded-full border border-white/60 bg-white/35 px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-slate-800 shadow-[0_4px_18px_rgba(15,23,42,0.08)] backdrop-blur-md drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+          Enterprise Distribution Management System <span className="mx-1 text-slate-600">·</span> © 2026
         </p>
       </section>
 

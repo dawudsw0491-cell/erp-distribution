@@ -128,7 +128,7 @@ const SESSION_STATUS_LABELS: Record<string, string> = {
   counting: "Sedang Dihitung",
   review: "Menunggu Persetujuan",
   approved: "Disetujui",
-  posted: "Posted",
+  posted: "Selesai",
   cancelled: "Dibatalkan",
 };
 

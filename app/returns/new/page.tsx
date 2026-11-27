@@ -28,7 +28,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
 
   const [{data:deliveryOrders,error:doError},{data:goodsReceipts,error:grError}]=await Promise.all([
     type==="customer"
-      ? supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,customers(customer_name)").eq("status","posted").order("delivery_date",{ascending:false}).limit(100)
+      ? supabase.from("delivery_orders").select("id,delivery_order_number,delivery_date,customers(customer_name)").in("status",["posted","partially_returned"]).order("delivery_date",{ascending:false}).limit(100)
       : Promise.resolve({data:[],error:null}),
     type==="supplier"
       ? supabase.from("goods_receipts").select("id,receipt_number,receipt_date,warehouse_id,suppliers(supplier_name)").eq("status","posted").order("receipt_date",{ascending:false}).limit(100)

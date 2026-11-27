@@ -86,12 +86,13 @@ export async function confirmSalesOrderAction(form: FormData): Promise<never> {
 }
 
 export async function cancelSalesOrderAction(form: FormData): Promise<never> {
-  const id=value(form,"sales_order_id");
+  const id=value(form,"sales_order_id"), reason=value(form,"cancellation_reason");
   if (!uuid(id)) redirect("/sales?error=invalid_id");
+  if(reason.length<5||reason.length>500) redirect(`/sales/${id}?error=cancel_reason_required`);
   const {supabase,user,profile}=await getAuthenticatedContext();
   if (!user) redirect("/login");
   if (!profile) redirect(`/sales/${id}?error=permission_denied`);
-  const {error}=await supabase.rpc("sales_cancel_order",{p_sales_order_id:id});
+  const {error}=await supabase.rpc("sales_cancel_order",{p_sales_order_id:id,p_reason:reason});
   if(error){console.error("Cancel SO failed:",error);redirect(`/sales/${id}?error=cancel_failed`);}
   revalidatePath("/sales"); revalidatePath(`/sales/${id}`);
   redirect(`/sales/${id}?cancelled=1`);
@@ -114,10 +115,10 @@ export async function createDeliveryOrderAction(form: FormData): Promise<never> 
   const {supabase,user,profile}=await getAuthenticatedContext();
   if (!user) redirect("/login");
   if (!profile) redirect(`/sales/${id}?error=permission_denied`);
-  const {data,error}=await supabase.rpc("sales_create_delivery_order",{p_sales_order_id:id,p_delivery_date:date,p_notes:notes||null,p_items:items});
+  const {data,error}=await supabase.rpc("sales_create_and_post_delivery_order",{p_sales_order_id:id,p_delivery_date:date,p_notes:notes||null,p_items:items});
   if(error || !data){console.error("Create DO failed:",error);redirect(`/sales/${id}?error=create_do_failed`);}
   revalidatePath("/sales"); revalidatePath(`/sales/${id}`);
-  redirect(`/sales/${id}?delivery_order=${data}`);
+  redirect(`/sales/${id}?posted=${data}`);
 }
 
 export async function cancelDeliveryOrderAction(form: FormData): Promise<never> {

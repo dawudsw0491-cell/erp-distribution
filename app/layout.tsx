@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Lora } from "next/font/google";
 import "./globals.css";
 import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
 import MasterDataLoading from "@/components/layout/master-data-loading";
@@ -17,6 +17,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "HEXA Core - Dynamic System Worjflow ",
   description: "ERP Distribution and Mobile Phone Trading Management System",
@@ -30,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
         <Suspense fallback={<MasterDataLoading />}>

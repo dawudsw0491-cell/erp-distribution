@@ -113,3 +113,15 @@ export async function restockReturnedUnitAction(form: FormData): Promise<never> 
   revalidatePath("/inventory/movements");
   redirect(`/returns/${returnId}?restocked=1`);
 }
+
+export async function restockReturnedUnitAction(form: FormData): Promise<never> {
+ const itemId=field(form,"return_item_id"),returnId=field(form,"return_id");
+ if(!uuid(itemId)||!uuid(returnId))redirect("/returns?error=invalid_id");
+ const {supabase,user,profile,authorized}=await getAuthorizationContext("inventory.update");
+ if(!user)redirect("/login");
+ if(!profile||!authorized)redirect("/returns?error=permission_denied");
+ const {error}=await supabase.rpc("sales_return_restock_unit",{p_return_item_id:itemId});
+ if(error){console.error("Restock returned unit failed:",error);redirect(`/returns/${returnId}?error=restock_failed`);}
+ revalidatePath("/returns");revalidatePath(`/returns/${returnId}`);revalidatePath("/inventory/balances");revalidatePath("/inventory/movements");
+ redirect(`/returns/${returnId}?restocked=1`);
+}

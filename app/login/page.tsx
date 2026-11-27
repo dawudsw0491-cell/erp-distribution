@@ -1,6 +1,4 @@
-
 import type { Metadata } from "next";
-import Image from "next/image";
 import LoginForm from "./login-form";
 
 export const metadata: Metadata = {
@@ -10,48 +8,62 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_top,_#ffffff_0%,_#eef6ff_42%,_#e8edf5_100%)] px-4 py-10 [font-family:var(--font-roboto),Arial,sans-serif]">
-      <div className="pointer-events-none absolute -left-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-sky-300/25 blur-[90px]" />
-      <div className="pointer-events-none absolute -bottom-44 -right-32 h-[30rem] w-[30rem] rounded-full bg-blue-300/20 blur-[100px]" />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
+    <main className="login-ambient relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 [font-family:var(--font-roboto),Arial,sans-serif]">
+      <div aria-hidden="true" className="login-color-field pointer-events-none absolute inset-0" />
+      <div aria-hidden="true" className="login-grain pointer-events-none absolute inset-0" />
 
       <section className="relative z-10 w-full max-w-[430px]">
-        <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-[0_28px_80px_rgba(31,58,99,0.16),0_8px_24px_rgba(31,58,99,0.07),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-8">
-          <div className="relative mb-7 flex flex-col items-center text-center">
-            <div className="pointer-events-none absolute left-1/2 top-[42%] h-56 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(147,197,253,0.30)_0%,rgba(191,219,254,0.16)_42%,rgba(239,246,255,0)_76%)] blur-2xl" />
-            <Image
-              src="/hexa-core-3d.svg"
-              alt="Logo HEXA CORE 3D"
-              width={240}
-              height={258}
-              priority
-              unoptimized
-              className="relative z-10 h-auto w-[170px] mix-blend-darken drop-shadow-[0_12px_16px_rgba(15,23,42,0.13)] sm:w-[190px]"
-            />
-            <h1 aria-label="HEXA CORE" className="mt-2 inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em] sm:text-[3rem]">
+        <div className="overflow-hidden rounded-[2rem] border border-white/55 bg-white/55 p-6 shadow-[0_28px_80px_rgba(31,41,55,0.15),0_8px_24px_rgba(31,41,55,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl sm:p-8">
+          <div className="mb-8 flex flex-col items-center text-center">
+            <h1 aria-label="HEXA CORE" className="inline-flex items-center text-[2.65rem] font-black leading-none tracking-[0.035em] sm:text-[3rem]">
               <span className="text-slate-950 [text-shadow:0_2px_0_rgba(255,255,255,0.95),0_4px_5px_rgba(15,23,42,0.35)]">HEXA</span>
               <span className="ml-[0.035em] text-white [-webkit-text-stroke:1.4px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_2px_#fff,0_0_5px_rgba(37,99,235,0.95),0_0_12px_rgba(37,99,235,0.85),0_0_23px_rgba(59,130,246,0.58),0_3px_6px_rgba(15,23,42,0.25)]">CORE</span>
             </h1>
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">Secure Workspace</p>
           </div>
 
-          <div className="mb-7 text-center">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-blue-600">Secure Workspace</p>
-            <h1 className="text-[1.35rem] font-bold tracking-tight text-slate-900">Selamat Datang</h1>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">Masuk untuk mengakses ruang kerja HEXA CORE.</p>
-          </div>
+          <p className="mb-6 text-center text-sm leading-relaxed text-slate-600">Masuk untuk mengakses ruang kerja HEXA CORE.</p>
 
           <LoginForm />
 
-          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400">
+          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-500">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
             Secure enterprise access
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] font-medium tracking-wide text-slate-500">
-          Enterprise Distribution Management System <span className="mx-1 text-slate-300">·</span> © 2026
+        <p className="mt-6 text-center text-[11px] font-medium tracking-wide text-slate-600">
+          Enterprise Distribution Management System <span className="mx-1 text-slate-400">·</span> © 2026
         </p>
       </section>
+
+      <style jsx>{`
+        .login-ambient { background: #f4f5f5; isolation: isolate; }
+        .login-color-field {
+          background:
+            radial-gradient(ellipse 48% 43% at 17% 37%, rgba(255, 77, 0, .96) 0%, rgba(255, 76, 26, .78) 34%, transparent 76%),
+            radial-gradient(ellipse 50% 42% at 24% 76%, rgba(0, 151, 235, .92) 0%, rgba(38, 169, 238, .68) 35%, transparent 76%),
+            radial-gradient(ellipse 38% 34% at 38% 55%, rgba(222, 34, 71, .58) 0%, transparent 76%),
+            radial-gradient(ellipse 48% 40% at 80% 16%, rgba(255, 255, 255, .96) 0%, transparent 82%),
+            linear-gradient(125deg, #f7f7f5 0%, #edf2f6 55%, #fbfaf8 100%);
+          background-size: 140% 140%;
+          animation: loginColorFlow 22s ease-in-out infinite alternate;
+          transform: scale(1.08);
+        }
+        .login-grain {
+          opacity: .12;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+          mix-blend-mode: soft-light;
+        }
+        @keyframes loginColorFlow {
+          0% { background-position: 0% 20%; filter: hue-rotate(0deg) saturate(1); }
+          50% { background-position: 70% 55%; filter: hue-rotate(12deg) saturate(1.08); }
+          100% { background-position: 100% 80%; filter: hue-rotate(-8deg) saturate(1.04); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-color-field { animation: none; }
+        }
+      `}</style>
     </main>
   );
 }

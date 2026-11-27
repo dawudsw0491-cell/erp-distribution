@@ -69,7 +69,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
       const tracking=product?.tracking_type === "imei" || product?.tracking_type === "serial" ? product.tracking_type : "quantity";
       const imei=row.product_unit_id?identifierByUnit.get(row.product_unit_id):undefined;
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:tracking,variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:imei?[{id:row.product_unit_id,unit_code:imei}]:[],suggested_unit_id:row.product_unit_id??null,has_source_unit:Boolean(row.product_unit_id)};
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:tracking,variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:imei?[{id:row.product_unit_id,product_unit_id:row.product_unit_id,unit_code:imei}]:[],suggested_unit_id:row.product_unit_id??null,has_source_unit:Boolean(row.product_unit_id)};
     });
   }
   if(selected&&type==="supplier"){

@@ -167,10 +167,11 @@ export default function ErpSidebar({
           </div>
 
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900">
-              HEXA CORE
+            <h1 aria-label="HEXA CORE" className="inline-flex items-center text-[17px] font-black leading-none tracking-[0.015em]">
+              <span className="text-slate-950 [text-shadow:0_1px_0_rgba(255,255,255,0.95),0_2px_3px_rgba(15,23,42,0.28)]">HEXA</span>
+              <span className="ml-[0.025em] text-white [-webkit-text-stroke:0.9px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_1px_#fff,0_0_3px_rgba(37,99,235,0.95),0_0_7px_rgba(37,99,235,0.8),0_1px_3px_rgba(15,23,42,0.2)]">CORE</span>
             </h1>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
+            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
               Enterprise ERP System
             </p>
           </div>
@@ -210,10 +211,10 @@ export default function ErpSidebar({
                 >
                   <span className="flex items-center gap-3">
                     <span
-                      className={`transition-colors duration-200 ${
+                      className={`erp-nav-icon drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] transition-colors duration-200 ${
                         groupActive
                           ? "text-indigo-600"
-                          : "text-slate-400 group-hover:text-slate-700"
+                          : "text-blue-500 group-hover:text-violet-600"
                       }`}
                     >
                       {group.icon}
@@ -255,7 +256,7 @@ export default function ErpSidebar({
                             className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 ease-in-out ${
                               childActive
                                 ? "translate-x-1 bg-blue-50 font-semibold text-blue-700"
-                                : "text-slate-500 hover:translate-x-1 hover:bg-indigo-50/60 hover:text-indigo-800"
+                                : "font-semibold text-slate-700 hover:translate-x-1 hover:bg-indigo-50/60 hover:text-indigo-800"
                             }`}
                           >
                             {child.icon && (
@@ -263,7 +264,7 @@ export default function ErpSidebar({
                                 className={
                                   childActive
                                     ? "text-blue-600"
-                                    : "text-slate-400 group-hover/child:text-slate-600"
+                                    : "text-cyan-600 group-hover/child:text-indigo-600"
                                 }
                               >
                                 {child.icon}
@@ -296,7 +297,7 @@ export default function ErpSidebar({
               className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 groupActive
                   ? "bg-blue-50 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "font-semibold text-slate-700 hover:bg-indigo-50/70 hover:text-indigo-800"
               }`}
             >
               <span

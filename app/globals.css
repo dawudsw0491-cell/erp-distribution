@@ -158,7 +158,7 @@ body {
 
   /* Never print application navigation, interactive controls or hover states. */
   nav, aside, header, footer, button, form, input, select, textarea,
-  [role="navigation"], .print\\:hidden {
+  [role="navigation"], .print\:hidden {
     display: none !important;
     visibility: hidden !important;
   }

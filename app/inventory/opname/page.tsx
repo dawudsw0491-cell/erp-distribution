@@ -45,7 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
   counting: "Sedang Dihitung",
   review: "Menunggu Review",
   approved: "Disetujui",
-  posted: "Posted",
+  posted: "Selesai",
   cancelled: "Dibatalkan",
 };
 

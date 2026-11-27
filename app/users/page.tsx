@@ -255,7 +255,7 @@ async function UsersContent() {
       </section>
 
       {/* DELETION HISTORY */}
-      <section className="space-y-3">
+      <section className="space-y-4 rounded-xl border border-slate-200/80 bg-white/70 p-4">
         <div>
           <h2 className="text-lg font-semibold">
             Riwayat Penghapusan Pengguna
@@ -266,7 +266,7 @@ async function UsersContent() {
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-1.5">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-100">
               <tr>

@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { createReturnDraftAction } from "./actions";
 
-type UnitOption = { id: string; unit_code: string };
+type UnitOption = { id: string; unit_code: string; product_unit_id?: string };
 type SourceLine = {
   id: string;
   product_name: string;

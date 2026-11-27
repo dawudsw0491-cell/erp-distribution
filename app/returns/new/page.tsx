@@ -55,10 +55,21 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   if(selected&&type==="customer"){
     const {data,error}=await supabase.from("delivery_order_items").select("id,quantity,product_unit_id,products(product_name,tracking_type),product_variants(variant_sku,variant_name)").eq("delivery_order_id",selected.id).order("created_at");
     if(error) lineError=error.message;
+    const unitIds=(data??[]).map(row=>row.product_unit_id).filter((id):id is string=>Boolean(id));
+    const {data:unitIdentifiers,error:identifierError}=unitIds.length
+      ? await supabase.from("product_unit_identifiers").select("product_unit_id,identifier_type,identifier_value").in("product_unit_id",unitIds)
+      : {data:[],error:null};
+    if(identifierError) lineError=identifierError.message;
+    const identifierByUnit=new Map<string,string>();
+    for(const identifier of unitIdentifiers??[]){
+      if(identifier.identifier_type.toLowerCase()==="imei") identifierByUnit.set(identifier.product_unit_id,identifier.identifier_value);
+    }
     sourceLines=(data??[]).map((row)=>{
       const product=Array.isArray(row.products)?row.products[0]:row.products;
       const variant=Array.isArray(row.product_variants)?row.product_variants[0]:row.product_variants;
-      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:product?.tracking_type === "imei" || product?.tracking_type === "serial" ? product.tracking_type : "quantity",variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:[],suggested_unit_id:null,has_source_unit:Boolean(row.product_unit_id)};
+      const tracking=product?.tracking_type === "imei" || product?.tracking_type === "serial" ? product.tracking_type : "quantity";
+      const imei=row.product_unit_id?identifierByUnit.get(row.product_unit_id):undefined;
+      return {id:row.id,product_name:product?.product_name??"Produk",tracking_type:tracking,variant_sku:variant?.variant_sku??"—",variant_name:variant?.variant_name??"",source_quantity:Number(row.quantity),inventory_status:"quarantine",units:imei?[{id:row.product_unit_id,unit_code:imei}]:[],suggested_unit_id:row.product_unit_id??null,has_source_unit:Boolean(row.product_unit_id)};
     });
   }
   if(selected&&type==="supplier"){

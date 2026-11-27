@@ -18,7 +18,7 @@ export default async function EditSalesOrderPage({params,searchParams}:{params:P
   if(canCreate!==true) redirect("/sales?error=permission_denied");
 
   const [orderResult,customers,warehouses,products,variants]=await Promise.all([
-    supabase.from("sales_orders").select("id,customer_id,warehouse_id,order_date,notes,status").eq("id",id).maybeSingle(),
+    supabase.from("sales_orders").select("id,customer_id,warehouse_id,order_date,notes,status,payment_scheme,payment_due_date").eq("id",id).maybeSingle(),
     supabase.from("customers").select("id,customer_code,customer_name").eq("is_active",true).order("customer_name"),
     supabase.from("warehouses").select("id,warehouse_code,warehouse_name").eq("is_active",true).order("warehouse_name"),
     supabase.from("products").select("id,product_name,tracking_type").eq("is_active",true).eq("product_type","goods"),
@@ -69,6 +69,8 @@ export default async function EditSalesOrderPage({params,searchParams}:{params:P
             warehouseId:order.warehouse_id,
             orderDate:order.order_date,
             notes:order.notes??"",
+            paymentScheme:order.payment_scheme==="unspecified"?"":order.payment_scheme,
+            paymentDueDate:order.payment_due_date,
             items:initialItems
           }}
         />

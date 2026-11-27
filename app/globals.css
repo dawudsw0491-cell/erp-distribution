@@ -344,3 +344,80 @@ body:not(:has(.login-ambient)) table thead th.text-left,
 body:not(:has(.login-ambient)) table thead th.text-right {
   text-align: center !important;
 }
+
+
+/* Page and detail heading accent */
+body:not(:has(.login-ambient)) main header h1,
+body:not(:has(.login-ambient)) main > h1 {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  color: #1e293b;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+body:not(:has(.login-ambient)) main header h1::before,
+body:not(:has(.login-ambient)) main > h1::before {
+  content: "";
+  display: inline-block;
+  flex: 0 0 4px;
+  width: 4px;
+  height: 1.25em;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5965e8 0%, #3988f5 55%, #42c5df 100%);
+  box-shadow: 0 2px 7px rgba(74,118,232,.18);
+}
+
+/* Glass-gradient surfaces around module and submodule tables */
+body:not(:has(.login-ambient)) main section:has(table),
+body:not(:has(.login-ambient)) main div:has(> table),
+body:not(:has(.login-ambient)) main div:has(> div > table) {
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(255,255,255,.96) 0%, rgba(246,249,255,.94) 58%, rgba(238,249,252,.92) 100%);
+  box-shadow: 0 9px 26px rgba(67,91,151,.055), inset 0 1px 0 rgba(255,255,255,.95);
+  backdrop-filter: blur(14px);
+}
+body:not(:has(.login-ambient)) main section:has(table) table,
+body:not(:has(.login-ambient)) main div:has(> table) table,
+body:not(:has(.login-ambient)) main div:has(> div > table) table {
+  background: rgba(255,255,255,.72);
+  border-radius: .75rem;
+}
+body:not(:has(.login-ambient)) main section:has(table) thead,
+body:not(:has(.login-ambient)) main div:has(table) thead {
+  background: linear-gradient(100deg, rgba(89,101,232,.11), rgba(57,136,245,.09) 55%, rgba(66,197,223,.12)) !important;
+}
+body:not(:has(.login-ambient)) main section:has(table) tbody tr:nth-child(even),
+body:not(:has(.login-ambient)) main div:has(table) tbody tr:nth-child(even) {
+  background: rgba(239,245,255,.34);
+}
+body:not(:has(.login-ambient)) main section:has(table) tbody tr:hover,
+body:not(:has(.login-ambient)) main div:has(table) tbody tr:hover {
+  background: linear-gradient(90deg, rgba(89,101,232,.07), rgba(66,197,223,.07));
+}
+
+/* Reusable glass Back control injected onto existing return links */
+.hexa-back-glass {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: .45rem .9rem !important;
+  border: 1px solid rgba(255,255,255,.92) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(115deg, rgba(255,255,255,.84), rgba(235,242,255,.72), rgba(230,248,252,.76)) !important;
+  color: #4055bb !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+  letter-spacing: .01em;
+  text-decoration: none !important;
+  box-shadow: 0 5px 16px rgba(65,91,164,.09), inset 0 1px 0 rgba(255,255,255,.95);
+  backdrop-filter: blur(12px);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.hexa-back-glass:hover {
+  transform: translateY(-1px);
+  border-color: rgba(112,133,238,.38) !important;
+  box-shadow: 0 8px 20px rgba(65,91,164,.14), inset 0 1px 0 rgba(255,255,255,.95);
+}

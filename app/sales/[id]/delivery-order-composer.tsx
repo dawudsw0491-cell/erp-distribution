@@ -1,58 +1,11 @@
 "use client";
-
 import { useMemo, useState } from "react";
 import { createDeliveryOrderAction } from "../actions";
-
-type Line = {
-  id: string; product_variant_id: string; product_name: string; variant_sku: string;
-  variant_name: string; tracking_type: string; outstanding: number;
-};
-type Unit = { id: string; product_variant_id: string; unit_code: string };
-
+type Line={id:string;product_variant_id:string;product_name:string;variant_sku:string;variant_name:string;tracking_type:string;outstanding:number};
+type Unit={id:string;product_variant_id:string;unit_code:string};
 export default function DeliveryOrderComposer({salesOrderId,lines,units,selectedUnitsByLine}:{salesOrderId:string;lines:Line[];units:Unit[];selectedUnitsByLine:Record<string,string[]>}) {
-  const [quantities,setQuantities]=useState<Record<string,string>>(()=>Object.fromEntries(lines.map(line=>[line.id,String(line.outstanding)])));
-  const [selectedUnits,setSelectedUnits]=useState<Record<string,string[]>>(()=>Object.fromEntries(lines.map(line=>[line.id,(selectedUnitsByLine[line.id]??[]).slice(0,line.outstanding)])));
-  const payload=useMemo(()=>{
-    const result:Array<{sales_order_item_id:string;quantity:string;product_unit_id?:string}>=[];
-    for(const line of lines){
-      const qty=Number(quantities[line.id]??0), chosen=selectedUnits[line.id]??[];
-      for(const unitId of chosen) result.push({sales_order_item_id:line.id,quantity:"1",product_unit_id:unitId});
-      const aggregate=qty-chosen.length;
-      if(aggregate>0) result.push({sales_order_item_id:line.id,quantity:String(aggregate)});
-    }
-    return result;
-  },[lines,quantities,selectedUnits]);
-  const invalid=lines.length===0||lines.some(line=>{
-    const qty=Number(quantities[line.id]??0),chosen=selectedUnits[line.id]??[];
-    if(!Number.isFinite(qty)||qty<=0||qty>line.outstanding||((line.tracking_type==="imei"||line.tracking_type==="serial")&&!Number.isInteger(qty))||chosen.length>qty)return true;
-    return line.tracking_type==="serial"&&chosen.length!==qty;
-  });
-  return <section className="rounded-xl border border-slate-200 bg-white p-5">
-    <div><h2 className="font-semibold">Buat Delivery Order</h2><p className="mt-1 text-xs text-slate-500">Detail produk dan SKU diambil otomatis dari Sales Order. Simpan akan langsung menyelesaikan pengiriman dan memperbarui stok.</p></div>
-    <form action={createDeliveryOrderAction} className="mt-4 space-y-4">
-      <input type="hidden" name="sales_order_id" value={salesOrderId}/>
-      <input type="hidden" name="items" value={JSON.stringify(payload)}/>
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="text-xs font-semibold">Tanggal Pengiriman<input type="date" name="delivery_date" required defaultValue={new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})} className="mt-1 w-full rounded border p-2 text-sm font-normal"/></label>
-        <label className="text-xs font-semibold">Catatan<input name="notes" maxLength={2000} className="mt-1 w-full rounded border p-2 text-sm font-normal"/></label>
-      </div>
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-600"><tr><th className="px-3 py-3 font-semibold">Produk / SKU</th><th className="px-3 py-3 font-semibold">Sisa SO</th><th className="px-3 py-3 font-semibold">Kirim</th><th className="px-3 py-3 font-semibold">Unit / IMEI</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{lines.map(line=>{
-            const selected=selectedUnits[line.id]??[];
-            const options=units.filter(unit=>unit.product_variant_id===line.product_variant_id&&(selectedUnitsByLine[line.id]??[]).includes(unit.id));
-            const tracked=line.tracking_type==="imei"||line.tracking_type==="serial";
-            return <tr key={line.id} className="align-top">
-              <td className="px-3 py-3"><p className="font-medium">{line.product_name} {line.variant_name}</p><p className="text-xs text-slate-500">{line.variant_sku}</p></td>
-              <td className="px-3 py-3 tabular-nums">{line.outstanding}</td>
-              <td className="px-3 py-3"><input aria-label={`Kuantitas kirim ${line.variant_sku}`} type="number" min="1" max={line.outstanding} step={tracked?1:0.001} value={quantities[line.id]??""} onChange={e=>setQuantities(current=>({...current,[line.id]:e.target.value}))} className="w-24 rounded border border-slate-300 p-2 text-sm"/></td>
-              <td className="px-3 py-3">{tracked?<div className="max-h-32 min-w-52 space-y-1 overflow-y-auto rounded-md bg-slate-50 p-2">{options.length?options.map(unit=><label key={unit.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected.includes(unit.id)} onChange={e=>setSelectedUnits(current=>({...current,[line.id]:e.target.checked?[...selected,unit.id]:selected.filter(id=>id!==unit.id)}))}/><span className="font-mono">{unit.unit_code}</span></label>):<span className="text-xs text-slate-400">Unit terdaftar tidak ditemukan</span>}<p className="pt-1 text-[11px] text-slate-500">{line.tracking_type==="serial"?"Pilih satu unit untuk setiap kuantitas.":"IMEI dipilih pada SO dan otomatis digunakan di DO. Periksa identitas unit sebelum menyelesaikan pengiriman."}</p></div>:<span className="text-xs text-slate-400">Agregat SKU</span>}</td>
-            </tr>;
-          })}</tbody>
-        </table>
-      </div>
-      <div className="flex justify-end"><button disabled={invalid} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Simpan & Selesaikan DO</button></div>
-    </form>
-  </section>;
+ const [quantities,setQuantities]=useState<Record<string,string>>(()=>Object.fromEntries(lines.map(line=>[line.id,String(line.outstanding)])));
+ const payload=useMemo(()=>{const result:Array<{sales_order_item_id:string;quantity:string;product_unit_id?:string}>=[];for(const line of lines){const qty=Number(quantities[line.id]??0),tracked=line.tracking_type==="imei"||line.tracking_type==="serial";if(tracked){for(const unitId of (selectedUnitsByLine[line.id]??[]).slice(0,qty))result.push({sales_order_item_id:line.id,quantity:"1",product_unit_id:unitId});}else if(qty>0)result.push({sales_order_item_id:line.id,quantity:String(qty)});}return result;},[lines,quantities,selectedUnitsByLine]);
+ const invalid=lines.length===0||lines.some(line=>{const qty=Number(quantities[line.id]??0),tracked=line.tracking_type==="imei"||line.tracking_type==="serial",selected=selectedUnitsByLine[line.id]??[];if(!Number.isFinite(qty)||qty<=0||qty>line.outstanding||(tracked&&!Number.isInteger(qty)))return true;return tracked&&(selected.length<qty||(line.tracking_type==="serial"&&selected.length!==qty));});
+ return <section className="rounded-xl border border-slate-200 bg-white p-5"><div><h2 className="font-semibold">Buat Delivery Order</h2><p className="mt-1 text-xs text-slate-500">SKU dan IMEI otomatis mengikuti alokasi pada Sales Order. Tidak ada pemilihan ulang unit pada DO.</p></div><form action={createDeliveryOrderAction} className="mt-4 space-y-4"><input type="hidden" name="sales_order_id" value={salesOrderId}/><input type="hidden" name="items" value={JSON.stringify(payload)}/><div className="grid gap-3 md:grid-cols-2"><label className="text-xs font-semibold">Tanggal Pengiriman<input type="date" name="delivery_date" required defaultValue={new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})} className="mt-1 w-full rounded border p-2 text-sm font-normal"/></label><label className="text-xs font-semibold">Catatan<input name="notes" maxLength={2000} className="mt-1 w-full rounded border p-2 text-sm font-normal"/></label></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-600"><tr><th className="px-3 py-3 font-semibold">Produk / SKU</th><th className="px-3 py-3 font-semibold">Sisa SO</th><th className="px-3 py-3 font-semibold">Kirim</th><th className="px-3 py-3 font-semibold">Unit / IMEI dari SO</th></tr></thead><tbody className="divide-y divide-slate-100">{lines.map(line=>{const selected=(selectedUnitsByLine[line.id]??[]).slice(0,Number(quantities[line.id]??0)),options=units.filter(unit=>selected.includes(unit.id)),tracked=line.tracking_type==="imei"||line.tracking_type==="serial";return <tr key={line.id} className="align-top"><td className="px-3 py-3"><p className="font-medium">{line.product_name} {line.variant_name}</p><p className="text-xs text-slate-500">{line.variant_sku}</p></td><td className="px-3 py-3 tabular-nums">{line.outstanding}</td><td className="px-3 py-3"><input aria-label={`Kuantitas kirim ${line.variant_sku}`} type="number" min="1" max={line.outstanding} step={tracked?1:0.001} value={quantities[line.id]??""} onChange={e=>setQuantities(current=>({...current,[line.id]:e.target.value}))} className="w-24 rounded border border-slate-300 p-2 text-sm"/></td><td className="px-3 py-3">{tracked?<div className="min-w-52 space-y-1 rounded-md bg-slate-50 p-2">{options.length?options.map(unit=><p key={unit.id} className="font-mono text-xs">{unit.unit_code}</p>):<span className="text-xs text-slate-400">Tidak ada IMEI yang teralokasi di SO</span>}<p className="pt-1 text-[11px] text-slate-500">Unit otomatis dipilih dari SO dan menjadi sold saat DO diposting.</p></div>:<span className="text-xs text-slate-400">Agregat SKU</span>}</td></tr>;})}</tbody></table></div><div className="flex justify-end"><button disabled={invalid} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Simpan & Selesaikan DO</button></div></form></section>;
 }

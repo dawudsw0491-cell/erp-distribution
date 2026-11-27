@@ -8,7 +8,7 @@ import DeliveryOrderComposer from "./delivery-order-composer";
 
 export const metadata={title:"Detail Penjualan | HEXA CORE ERP"};
 
-const statusLabels:Record<string,string>={draft:"Draft",confirmed:"Dikonfirmasi",partially_delivered:"Terkirim Sebagian",delivered:"Selesai",cancelled:"Dibatalkan"};
+const statusLabels:Record<string,string>={draft:"Draft",confirmed:"Dikonfirmasi",partially_delivered:"Terkirim Sebagian",delivered:"Selesai",partially_returned:"Retur Sebagian",returned:"Diretur",cancelled:"Dibatalkan"};
 export default async function SalesDetailPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{error?:string;created?:string;updated?:string;confirmed?:string;cancelled?:string;posted?:string;do_cancelled?:string}>}) {
  await connection();
  const {id}=await params, notice=await searchParams;

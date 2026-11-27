@@ -85,7 +85,7 @@ export default async function NewReturnPage({searchParams}:{searchParams:Promise
   }
 
   return <div className="min-h-screen bg-slate-100 md:flex"><ErpSidebar activePath="/returns"/><main className="min-w-0 flex-1 p-4 md:p-8"><div className="mx-auto max-w-6xl space-y-6">
-    <div><Link href="/returns" className="text-sm font-semibold text-blue-700">← Daftar Returns</Link><h1 className="mt-2 text-2xl font-bold">Buat Retur</h1><p className="mt-1 text-sm text-slate-500">Pilih dokumen sumber yang sudah diposting. Draft tidak mengubah stok.</p></div>
+    <div><Link href="/returns" aria-label="Kembali ke Daftar Returns" className="hexa-back-glass">Back</Link><h1 className="mt-2 text-2xl font-bold">Buat Retur</h1><p className="mt-1 text-sm text-slate-500">Pilih dokumen sumber yang sudah diposting. Draft tidak mengubah stok.</p></div>
     {params.error&&<p className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700">Permintaan gagal ({params.error}).</p>}
     <form className="grid gap-4 rounded-xl border bg-white p-5 sm:grid-cols-2">
       <label className="text-sm font-medium">Jenis Retur<select name="type" defaultValue={type} className="mt-1 w-full rounded-lg border px-3 py-2"><option value="customer" disabled={canCustomer!==true}>Customer Return</option><option value="supplier" disabled={canSupplier!==true}>Supplier Return</option></select></label>

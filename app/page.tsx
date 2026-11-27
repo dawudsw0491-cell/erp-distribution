@@ -7,7 +7,7 @@ import { getAuthorizationContext } from "@/lib/auth/authorization";
 import DashboardClock from "@/components/layout/dashboard-clock";
 
 type Product = { id: string; sku: string; product_name: string; minimum_stock: number | null; is_active: boolean };
-type Balance = { product_id: string | null; available_quantity: number | string | null; on_hand_quantity: number | string | null; inventory_value: number | string | null };
+type Balance = { product_id: string | null; warehouse_id: string; available_quantity: number | string | null; on_hand_quantity: number | string | null; inventory_value: number | string | null };
 type SalesOrder = { id: string; sales_order_number: string; order_date: string; status: string; subtotal: number | string | null; sales_order_items?: { product_id: string; quantity: number | string }[] };
 
 const number = (value: number) => Number(value || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
@@ -49,12 +49,12 @@ async function DashboardContent() {
   const warehouseChecks = canInventory
     ? await Promise.all(balanceWarehouseIds.map(async (warehouseId) => {
         const result = await inventory.supabase.rpc("has_warehouse_access", { target_warehouse_id: warehouseId });
-        return { warehouseId, allowed: !result.error && result.data === true };
+        return { warehouseId, allowed: !result.error && result.data === true, hasError: Boolean(result.error) };
       }))
     : [];
   const allowedWarehouseIds = new Set(warehouseChecks.filter((item) => item.allowed).map((item) => item.warehouseId));
   const balances = rawBalances.filter((row) => allowedWarehouseIds.has(row.warehouse_id));
-  const warehouseScopeError = warehouseChecks.some((item) => !item.allowed);
+  const warehouseScopeError = warehouseChecks.some((item) => item.hasError);
   const salesHistory = (salesHistoryResult.data ?? []) as SalesOrder[];
   const salesWeek = (salesWeekResult.data ?? []) as Pick<SalesOrder, "id" | "order_date" | "subtotal">[];
   const masterError = Boolean(productResult.error);

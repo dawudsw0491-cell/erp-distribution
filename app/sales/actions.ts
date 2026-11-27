@@ -33,13 +33,14 @@ function validItems(raw: string): Array<{product_variant_id:string;quantity:stri
 export async function createSalesOrderAction(form: FormData): Promise<never> {
   const customerId=value(form,"customer_id"), warehouseId=value(form,"warehouse_id"), orderDate=value(form,"order_date");
   const notes=value(form,"notes");
+  const paymentScheme=value(form,"payment_scheme"), paymentDueDate=value(form,"payment_due_date");
   let items;
   try { items=validItems(value(form,"items")); } catch { redirect("/sales/new?error=invalid_items"); }
-  if (!uuid(customerId) || !uuid(warehouseId) || !validDate(orderDate) || notes.length>2000) redirect("/sales/new?error=invalid_data");
+  if (!uuid(customerId) || !uuid(warehouseId) || !validDate(orderDate) || notes.length>2000 || !["cash","bank_transfer","credit"].includes(paymentScheme) || (paymentScheme==="credit" ? (!validDate(paymentDueDate)||paymentDueDate<orderDate) : Boolean(paymentDueDate))) redirect("/sales/new?error=invalid_data");
   const {supabase,user,profile}=await getAuthenticatedContext();
   if (!user) redirect("/login");
   if (!profile) redirect("/sales?error=permission_denied");
-  const {data,error}=await supabase.rpc("sales_create_order",{p_customer_id:customerId,p_warehouse_id:warehouseId,p_order_date:orderDate,p_notes:notes||null,p_items:items});
+  const {data,error}=await supabase.rpc("sales_create_order_with_payment_terms",{p_customer_id:customerId,p_warehouse_id:warehouseId,p_order_date:orderDate,p_notes:notes||null,p_items:items,p_payment_scheme:paymentScheme,p_payment_due_date:paymentDueDate||null});
   if (error || !data) { console.error("Create Sales Order failed:",error); redirect("/sales/new?error=save_failed"); }
   revalidatePath("/sales");
   redirect(`/sales/${data}?created=1`);
@@ -49,18 +50,19 @@ export async function updateDraftSalesOrderAction(form: FormData): Promise<never
   const id=value(form,"sales_order_id"), customerId=value(form,"customer_id");
   const warehouseId=value(form,"warehouse_id"), orderDate=value(form,"order_date");
   const notes=value(form,"notes");
+  const paymentScheme=value(form,"payment_scheme"), paymentDueDate=value(form,"payment_due_date");
   if (!uuid(id)) redirect("/sales?error=invalid_id");
   let items;
   try { items=validItems(value(form,"items")); } catch { redirect(`/sales/${id}/edit?error=invalid_items`); }
-  if (!uuid(customerId) || !uuid(warehouseId) || !validDate(orderDate) || notes.length>2000) {
+  if (!uuid(customerId) || !uuid(warehouseId) || !validDate(orderDate) || notes.length>2000 || !["cash","bank_transfer","credit"].includes(paymentScheme) || (paymentScheme==="credit" ? (!validDate(paymentDueDate)||paymentDueDate<orderDate) : Boolean(paymentDueDate))) {
     redirect(`/sales/${id}/edit?error=invalid_data`);
   }
   const {supabase,user,profile}=await getAuthenticatedContext();
   if (!user) redirect("/login");
   if (!profile) redirect(`/sales/${id}?error=permission_denied`);
-  const {data,error}=await supabase.rpc("sales_update_draft_order",{
+  const {data,error}=await supabase.rpc("sales_update_draft_order_with_payment_terms",{
     p_sales_order_id:id,p_customer_id:customerId,p_warehouse_id:warehouseId,
-    p_order_date:orderDate,p_notes:notes||null,p_items:items
+    p_order_date:orderDate,p_notes:notes||null,p_items:items,p_payment_scheme:paymentScheme,p_payment_due_date:paymentDueDate||null
   });
   if (error || !data) {
     console.error("Update draft Sales Order failed:",error);

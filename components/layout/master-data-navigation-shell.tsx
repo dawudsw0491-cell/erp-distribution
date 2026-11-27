@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import ErpSidebar from "@/components/layout/erp-sidebar";
+import BackLinkStyler from "@/components/layout/back-link-styler";
 
 const STANDALONE_PATHS = ["/login", "/change-password"];
 
@@ -24,7 +25,7 @@ export default function MasterDataNavigationShell({
   return (
     <div className="flex min-h-screen w-full bg-slate-100">
       <ErpSidebar persistent />
-      <div className="relative min-w-0 flex-1">{children}</div>
+      <div className="relative min-w-0 flex-1"><BackLinkStyler />{children}</div>
     </div>
   );
 }

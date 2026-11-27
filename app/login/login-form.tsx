@@ -43,7 +43,7 @@ export default function LoginForm() {
     <form onSubmit={handleLogin} className="space-y-5">
       <div>
         <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-slate-700">
-          USER ROLE
+          ID Pengguna
         </label>
         <input
           id="identifier"
@@ -52,14 +52,14 @@ export default function LoginForm() {
           required
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
-          placeholder="Contoh: OWN01 atau owner"
+          placeholder="Masukkan ID pengguna"
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
       </div>
 
       <div>
         <label htmlFor="pin" className="mb-2 block text-sm font-medium text-slate-700">
-          PASSWORD
+          PIN Akses
         </label>
         <input
           id="pin"
@@ -87,7 +87,7 @@ export default function LoginForm() {
         disabled={isLoading}
         className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isLoading ? "Memproses..." : "Login"}
+        {isLoading ? "Memverifikasi..." : "Masuk ke Sistem"}
       </button>
     </form>
   );

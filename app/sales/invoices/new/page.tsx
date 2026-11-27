@@ -40,9 +40,9 @@ export default async function NewInvoicePage({searchParams}:{searchParams:Promis
  });
  const customer=Array.isArray(order.customers)?order.customers[0]:order.customers;
  const salesOrder=Array.isArray(order.sales_orders)?order.sales_orders[0]:order.sales_orders;
- const paymentScheme=salesOrder?.payment_scheme??"unspecified";
+ const paymentScheme=["cash","bank_transfer","credit"].includes(salesOrder?.payment_scheme??"")?salesOrder?.payment_scheme??"credit":"credit";
  const paymentDueDate=salesOrder?.payment_due_date??null;
- if(!["cash","bank_transfer","credit"].includes(paymentScheme)) return <PageError message="Skema pembayaran Sales Order belum ditentukan. Edit SO draft dan pilih Cash, Transfer Bank, atau Kredit sebelum membuat invoice."/>;
+
  const remaining=lines.filter(line=>line.delivered>line.already_invoiced);
  const remainingValue=remaining.reduce((sum,line)=>sum+(line.delivered-line.already_invoiced)*line.unit_price,0);
 

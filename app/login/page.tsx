@@ -19,9 +19,9 @@ export default function LoginPage() {
 
         {/* HEXACORE Logo */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold tracking-wider text-black drop-shadow-[0_2px_3px_rgba(37,99,235,0.22)]">
+          <h1 className="font-[family-name:var(--font-lora)] text-4xl font-semibold tracking-[0.12em] text-slate-900">
             HEXA
-            <span className="font-extrabold text-white [-webkit-text-stroke:1.5px_#2563eb] drop-shadow-[0_0_3px_rgba(37,99,235,0.45)]">
+            <span className="font-semibold text-blue-700">
               CORE
             </span>
           </h1>
@@ -32,10 +32,10 @@ export default function LoginPage() {
 
           <div className="mb-6 text-center">
             <h2 className="text-lg font-bold tracking-wide text-slate-800">
-              Welcome Back
+              Selamat Datang Kembali
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Sign in to access your enterprise system
+              Masuk untuk melanjutkan ke sistem HEXA CORE
             </p>
           </div>
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-sm font-extrabold italic text-slate-900 drop-shadow-[0_1px_1px_rgba(15,23,42,0.25)]">
-          Enterprise Distribution &amp; Workflow Gateway © 2026
+          Enterprise Distribution Management System · © 2026
         </p>
 
       </div>

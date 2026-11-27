@@ -164,7 +164,7 @@ async function UsersContent() {
       </div>
 
       {/* USER LIST */}
-      <section className="space-y-4 rounded-xl border border-slate-200/80 bg-white/70 p-4">
+      <section className="space-y-5 rounded-xl border border-slate-200/80 bg-white/70 p-5">
         <div>
           <h2 className="text-lg font-semibold">Daftar Pengguna</h2>
           <p className="text-sm text-gray-500">
@@ -172,17 +172,17 @@ async function UsersContent() {
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-1.5">
+        <div className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-3">User ID</th>
-                <th className="p-3">Nama</th>
-                <th className="p-3">Username</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">PIN</th>
-                <th className="p-3">Kelola</th>
+                <th className="p-3 text-center font-bold text-slate-700">User ID</th>
+                <th className="p-3 text-center font-bold text-slate-700">Nama</th>
+                <th className="p-3 text-center font-bold text-slate-700">Username</th>
+                <th className="p-3 text-center font-bold text-slate-700">Role</th>
+                <th className="p-3 text-center font-bold text-slate-700">Status</th>
+                <th className="p-3 text-center font-bold text-slate-700">PIN</th>
+                <th className="p-3 text-center font-bold text-slate-700">Kelola</th>
               </tr>
             </thead>
 
@@ -270,13 +270,13 @@ async function UsersContent() {
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-3">User ID</th>
-                <th className="p-3">Nama Pengguna</th>
-                <th className="p-3">Dilakukan Oleh</th>
-                <th className="p-3">Waktu Permintaan</th>
-                <th className="p-3">Waktu Selesai</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Keterangan</th>
+                <th className="p-3 text-center font-bold text-slate-700">User ID</th>
+                <th className="p-3 text-center font-bold text-slate-700">Nama Pengguna</th>
+                <th className="p-3 text-center font-bold text-slate-700">Dilakukan Oleh</th>
+                <th className="p-3 text-center font-bold text-slate-700">Waktu Permintaan</th>
+                <th className="p-3 text-center font-bold text-slate-700">Waktu Selesai</th>
+                <th className="p-3 text-center font-bold text-slate-700">Status</th>
+                <th className="p-3 text-center font-bold text-slate-700">Keterangan</th>
               </tr>
             </thead>
 

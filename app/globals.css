@@ -460,3 +460,27 @@ body:not(:has(.login-ambient)) .erp-sidebar nav a:hover .erp-nav-icon,
 body:not(:has(.login-ambient)) .erp-sidebar nav button:hover .erp-nav-icon {
   color: #4f46e5 !important;
 }
+
+
+/* Tables in user settings: visible inset and neutral separators. */
+body:not(:has(.login-ambient)) main section:has(> div > table) {
+  padding: 1rem;
+  gap: 1rem;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) > div:has(> table) {
+  margin: .15rem;
+  padding: .35rem;
+  border: 1px solid #e2e8f0;
+  border-radius: .7rem;
+  background: #fff;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) table {
+  border-radius: .45rem;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) tbody tr {
+  border-color: #e5e7eb;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) td,
+body:not(:has(.login-ambient)) main section:has(> div > table) th {
+  border-bottom-color: #e5e7eb !important;
+}

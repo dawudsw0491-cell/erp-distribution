@@ -132,7 +132,7 @@ export async function cancelDeliveryOrderAction(form: FormData): Promise<never> 
   const {error}=await supabase.rpc("sales_cancel_delivery_order",{
     p_delivery_order_id:id,p_reason:reason
   });
-  if(error){console.error("Cancel DO failed:",error);redirect(`/sales/${soId}?error=cancel_do_failed`);}
+  if(error){console.error("Cancel DO failed:",error);const message=String(error.message??"");const code=message.includes("invoice aktif")?"cancel_do_invoice_active":message.includes("Unit serial")?"cancel_do_unit_moved":message.includes("reversal")||message.includes("movement")||message.includes("valuasi")?"cancel_do_reversal_blocked":"cancel_do_failed";redirect(`/sales/${soId}?error=${code}`);}
   revalidatePath("/sales"); revalidatePath(`/sales/${soId}`);
   redirect(`/sales/${soId}?do_cancelled=1`);
 }

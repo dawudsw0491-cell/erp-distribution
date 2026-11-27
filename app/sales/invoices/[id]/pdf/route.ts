@@ -22,7 +22,7 @@ function makePdf(invoice:any,customer:any,warehouse:any,items:any[],balance:numb
  rect(38,y,519,48,"0.95 0.97 0.99");
  label(50,y+9,"STATUS");value(50,y+23,({issued:"BELUM LUNAS",partially_paid:"DIBAYAR SEBAGIAN",paid:"LUNAS",void:"VOID"} as Record<string,string>)[invoice.status]??invoice.status,9,true);
  label(245,y+9,"JATUH TEMPO");value(245,y+23,invoice.due_date??"—",9,true);
- label(425,y+9,"MATA UANG");value(425,y+23,"IDR / RUPIAH",9,true);y+=62;
+ label(425,y+9,"SKEMA PEMBAYARAN");value(425,y+23,({cash:"CASH",bank_transfer:"TRANSFER",credit:"KREDIT",unspecified:"—"} as Record<string,string>)[invoice.payment_scheme]??"—",9,true);y+=62;
  // Customer and shipping panels
  const leftX=38,rightX=304,panelW=253,panelTop=y;
  const customerAddress=wrap(customer?.address,43), customerName=wrap(customer?.customer_name,39);

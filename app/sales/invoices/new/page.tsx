@@ -18,7 +18,7 @@ export default async function NewInvoicePage({searchParams}:{searchParams:Promis
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) redirect("/sales?error=invalid_delivery_order");
 
  const {data:order,error:orderError}=await supabase.from("delivery_orders")
-  .select("id,delivery_order_number,delivery_date,status,customers(customer_name),sales_orders(id,sales_order_number)")
+  .select("id,delivery_order_number,delivery_date,status,customers(customer_name),sales_orders(id,sales_order_number,payment_scheme,payment_due_date)")
   .eq("id",id).eq("status","posted").maybeSingle();
  if(orderError){console.error("Load invoice DO failed:",orderError);return <PageError message="Delivery Order gagal dimuat. Tidak ada invoice yang diterbitkan."/>;}
  if(!order) return <PageError message="Delivery Order tidak ditemukan atau belum berstatus posted. Pilih DO yang sudah selesai dari Detail Penjualan."/>;

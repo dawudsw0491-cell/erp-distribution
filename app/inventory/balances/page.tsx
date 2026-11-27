@@ -532,11 +532,12 @@ async function StockBalanceContent({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  href="/inventory"
-                  className="text-sm font-medium text-blue-700 hover:underline"
-                >
-                  Inventory
-                </Link>
+                href="/inventory"
+                aria-label="Kembali ke Inventory"
+                className="hexa-back-glass"
+              >
+                Back
+              </Link>
 
                 <span className="text-slate-400">/</span>
 

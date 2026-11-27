@@ -702,12 +702,7 @@ async function StockOpnameDetailContent({
           {/* HEADER */}
           <header>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Link
-                href="/inventory"
-                className="font-medium text-blue-700 hover:underline"
-              >
-                Inventory
-              </Link>
+              <Link href="/inventory" aria-label="Kembali ke Inventory" className="hexa-back-glass">Back</Link>
 
               <span className="text-slate-400">/</span>
 
@@ -830,12 +825,7 @@ async function StockOpnameDetailContent({
                 Informasi Stock Opname
               </h2>
 
-              <Link
-                href="/inventory/opname"
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Kembali ke Daftar
-              </Link>
+              <Link href="/inventory/opname" aria-label="Kembali ke Daftar Stock Opname" className="hexa-back-glass">Back</Link>
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">

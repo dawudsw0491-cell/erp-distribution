@@ -6,6 +6,7 @@ import "./globals.css";
 import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
 import MasterDataLoading from "@/components/layout/master-data-loading";
 import ActionFeedback from "@/components/feedback/action-feedback";
+import BackLinkStyler from "@/components/layout/back-link-styler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,6 +44,7 @@ export default function RootLayout({
         <Suspense fallback={<MasterDataLoading />}>
           <>
             <ActionFeedback />
+            <BackLinkStyler />
             <MasterDataNavigationShell>{children}</MasterDataNavigationShell>
           </>
         </Suspense>

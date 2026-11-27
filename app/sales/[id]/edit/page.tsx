@@ -50,7 +50,7 @@ export default async function EditSalesOrderPage({params,searchParams}:{params:P
   const validVariantIds=new Set(variantOptions.map(v=>v.id));
   const initialItems=(linesResult.data??[])
     .filter(line=>validVariantIds.has(line.product_variant_id))
-    .map(line=>({product_variant_id:line.product_variant_id,quantity:String(line.quantity),unit_price:String(line.unit_price)}));
+    .map(line=>({product_variant_id:line.product_variant_id,quantity:String(line.quantity),unit_price:String(line.unit_price),unit_ids:[]}));
   if(initialItems.length!==(linesResult.data??[]).length){
     return <div className="p-8 text-red-700">Draft tidak dapat diedit: terdapat Product Variant nonaktif atau tidak tersedia. Data tidak diubah.</div>;
   }

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Activity, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
@@ -114,12 +115,40 @@ async function DashboardContent() {
   return <div className="min-h-screen bg-slate-100 text-slate-800 md:flex">
     <ErpSidebar activePath="/" />
     <main className="min-w-0 flex-1">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 md:px-8">
-        <div><h1 className="text-xl font-bold text-slate-900">Dashboard</h1></div>
-        <div className="flex flex-wrap items-center gap-4"><DashboardClock /><div className="text-right"><p className="text-sm font-semibold">{displayName}</p><p className="text-xs text-slate-500">Pengguna ERP</p></div></div>
+      <header className="relative overflow-hidden border-b border-slate-200 bg-white px-5 py-4 md:px-8">
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] bg-gradient-to-l from-blue-50/70 via-indigo-50/30 to-transparent" />
+        <div className="relative flex flex-wrap items-center justify-between gap-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="h-5 w-1 rounded-full bg-gradient-to-b from-indigo-600 to-cyan-500" />
+              <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Dashboard</h1>
+            </div>
+            <p className="mt-1 pl-3 text-xs font-medium text-slate-500">Pusat kendali operasional HEXA CORE</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 sm:flex">
+              <Activity size={14} className="text-emerald-700" />
+              <span className="text-[11px] font-bold text-emerald-800">Operational Workspace</span>
+            </div>
+            <DashboardClock />
+            <div className="flex items-center gap-2.5 border-l border-slate-200 pl-3 sm:pl-5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700">
+                <UserRound size={19} strokeWidth={2.3} />
+              </span>
+              <div className="min-w-[86px]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Account</p>
+                <p className="mt-0.5 text-sm font-extrabold leading-tight text-slate-900">Owner</p>
+                <p className="mt-0.5 max-w-[150px] truncate text-[11px] font-medium text-slate-500">{displayName}</p>
+              </div>
+              <ShieldCheck size={16} className="ml-1 text-emerald-600" aria-label="Akun terverifikasi" />
+            </div>
+          </div>
+        </div>
       </header>
       <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
-        <section className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">Ringkasan Operasional</h2></div><p className="text-xs text-slate-500">{new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(now)}</p></section>
+        <section className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-bold text-slate-900">Ringkasan Operasional</h2><p className="mt-1 text-sm text-slate-500">Pantau penjualan, persediaan, dan pergerakan produk dalam satu tampilan.</p></div>
+        </section>
         {(masterError || inventoryError || salesError) && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Sebagian data gagal dimuat. Nilai yang tidak tersedia tidak ditampilkan sebagai nol.</p>}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <Link key={card.title} href={card.href} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"><div className="flex items-center justify-between"><p className="text-sm font-medium text-slate-500">{card.title}</p><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-xl text-slate-700">▦</span></div><p className="mt-4 break-words text-2xl font-bold text-slate-900">{card.value}</p><p className="mt-2 text-xs text-slate-500">{card.note}</p></Link>)}</section>
         <section className="grid gap-6 xl:grid-cols-3">

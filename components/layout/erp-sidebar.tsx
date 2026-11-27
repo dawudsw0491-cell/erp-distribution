@@ -162,16 +162,16 @@ export default function ErpSidebar({
     <aside className="erp-sidebar flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white/95">
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 text-white shadow-[0_7px_18px_rgba(76,105,220,0.28)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 text-white shadow-[0_3px_9px_rgba(76,105,220,0.16)]">
             <Boxes size={22} />
           </div>
 
           <div>
-            <h1 aria-label="HEXA CORE" className="inline-flex items-center text-[17px] font-black leading-none tracking-[0.015em]">
+            <h1 aria-label="HEXA CORE" className="hexa-wordmark inline-flex items-center text-[17px] font-black leading-none tracking-[0.015em]">
               <span className="text-slate-950 [text-shadow:0_1px_0_rgba(255,255,255,0.85)]">HEXA</span>
               <span className="ml-[0.025em] text-white [-webkit-text-stroke:0.85px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_1px_#fff,0_1px_1px_rgba(37,99,235,0.45)]">CORE</span>
             </h1>
-            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 [text-shadow:0_1px_0_rgba(255,255,255,0.8)]">
+            <p className="hexa-enterprise-label text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-600">
               Enterprise ERP System
             </p>
           </div>

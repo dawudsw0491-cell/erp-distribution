@@ -182,7 +182,7 @@ async function UsersContent() {
                 <th className="p-3">Role</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">PIN</th>
-                <th className="p-3">Tindakan</th>
+                <th className="p-3">Kelola</th>
               </tr>
             </thead>
 

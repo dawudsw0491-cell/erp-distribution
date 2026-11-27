@@ -159,7 +159,7 @@ export default function ErpSidebar({
   }
 
   return (
-    <aside className="erp-sidebar flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white/95 backdrop-blur-xl">
+    <aside className="erp-sidebar flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white/95">
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 text-white shadow-[0_7px_18px_rgba(76,105,220,0.28)]">
@@ -203,18 +203,14 @@ export default function ErpSidebar({
                   type="button"
                   onClick={() => toggleGroup(group.label, isExpanded)}
                   aria-expanded={isExpanded}
-                  className={`group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                    groupActive
-                      ? "bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 text-indigo-800 shadow-[inset_0_0_0_1px_rgba(99,115,225,0.10)]"
-                      : "text-slate-600 hover:bg-indigo-50/70 hover:text-indigo-800"
-                  }`}
+                  className={`group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ${groupActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-indigo-700"}`}
                 >
                   <span className="flex items-center gap-3">
                     <span
-                      className={`erp-nav-icon drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] transition-colors duration-200 ${
+                      className={`erp-nav-icon  transition-colors duration-200 ${
                         groupActive
                           ? "text-indigo-600"
-                          : "text-blue-500 group-hover:text-violet-600"
+                          : "text-blue-500 group-hover:text-indigo-700"
                       }`}
                     >
                       {group.icon}
@@ -253,15 +249,11 @@ export default function ErpSidebar({
                             onMouseEnter={() => prefetchDestination(child.href)}
                             onFocus={() => prefetchDestination(child.href)}
                             onTouchStart={() => prefetchDestination(child.href)}
-                            className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 ease-in-out ${
-                              childActive
-                                ? "translate-x-1 bg-blue-50 font-semibold text-blue-700"
-                                : "font-semibold text-slate-700 hover:translate-x-1 hover:bg-indigo-50/60 hover:text-indigo-800"
-                            }`}
+                            className={`group/child flex items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors duration-150 ${childActive ? "bg-blue-50 font-semibold text-blue-700" : "font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-700"}`}
                           >
                             {child.icon && (
                               <span
-                                className="erp-nav-icon text-cyan-600 drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] group-hover/child:text-indigo-600"
+                                className="erp-nav-icon text-cyan-600  group-hover/child:text-indigo-700"
                               >
                                 {child.icon}
                               </span>
@@ -297,7 +289,7 @@ export default function ErpSidebar({
               }`}
             >
               <span
-                className="erp-nav-icon text-blue-500 drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] group-hover:text-violet-600"
+                className="erp-nav-icon text-blue-500  group-hover:text-violet-600"
               >
                 {group.icon}
               </span>

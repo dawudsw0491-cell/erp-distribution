@@ -9,9 +9,9 @@ type Line = {
 };
 type Unit = { id: string; product_variant_id: string; unit_code: string };
 
-export default function DeliveryOrderComposer({salesOrderId,lines,units}:{salesOrderId:string;lines:Line[];units:Unit[]}) {
+export default function DeliveryOrderComposer({salesOrderId,lines,units,selectedUnitsByLine}:{salesOrderId:string;lines:Line[];units:Unit[];selectedUnitsByLine:Record<string,string[]>}) {
   const [quantities,setQuantities]=useState<Record<string,string>>(()=>Object.fromEntries(lines.map(line=>[line.id,String(line.outstanding)])));
-  const [selectedUnits,setSelectedUnits]=useState<Record<string,string[]>>({});
+  const [selectedUnits,setSelectedUnits]=useState<Record<string,string[]>>(()=>Object.fromEntries(lines.map(line=>[line.id,(selectedUnitsByLine[line.id]??[]).slice(0,line.outstanding)])));
   const payload=useMemo(()=>{
     const result:Array<{sales_order_item_id:string;quantity:string;product_unit_id?:string}>=[];
     for(const line of lines){
@@ -47,7 +47,7 @@ export default function DeliveryOrderComposer({salesOrderId,lines,units}:{salesO
               <td className="px-3 py-3"><p className="font-medium">{line.product_name} {line.variant_name}</p><p className="text-xs text-slate-500">{line.variant_sku}</p></td>
               <td className="px-3 py-3 tabular-nums">{line.outstanding}</td>
               <td className="px-3 py-3"><input aria-label={`Kuantitas kirim ${line.variant_sku}`} type="number" min="1" max={line.outstanding} step={tracked?1:0.001} value={quantities[line.id]??""} onChange={e=>setQuantities(current=>({...current,[line.id]:e.target.value}))} className="w-24 rounded border border-slate-300 p-2 text-sm"/></td>
-              <td className="px-3 py-3">{tracked?<div className="max-h-32 min-w-52 space-y-1 overflow-y-auto rounded-md bg-slate-50 p-2">{options.length?options.map(unit=><label key={unit.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected.includes(unit.id)} onChange={e=>setSelectedUnits(current=>({...current,[line.id]:e.target.checked?[...selected,unit.id]:selected.filter(id=>id!==unit.id)}))}/><span className="font-mono">{unit.unit_code}</span></label>):<span className="text-xs text-slate-400">Unit terdaftar tidak ditemukan</span>}<p className="pt-1 text-[11px] text-slate-500">{line.tracking_type==="serial"?"Pilih satu unit untuk setiap kuantitas.":"IMEI opsional. Jika unit dipilih, status IMEI ikut diperbarui. Jika tidak dipilih, pengiriman hanya mengurangi saldo SKU agregat dan status unit IMEI tidak berubah."}</p></div>:<span className="text-xs text-slate-400">Agregat SKU</span>}</td>
+              <td className="px-3 py-3">{tracked?<div className="max-h-32 min-w-52 space-y-1 overflow-y-auto rounded-md bg-slate-50 p-2">{options.length?options.map(unit=><label key={unit.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected.includes(unit.id)} onChange={e=>setSelectedUnits(current=>({...current,[line.id]:e.target.checked?[...selected,unit.id]:selected.filter(id=>id!==unit.id)}))}/><span className="font-mono">{unit.unit_code}</span></label>):<span className="text-xs text-slate-400">Unit terdaftar tidak ditemukan</span>}<p className="pt-1 text-[11px] text-slate-500">{line.tracking_type==="serial"?"Pilih satu unit untuk setiap kuantitas.":"IMEI dipilih pada SO dan otomatis digunakan di DO. Periksa identitas unit sebelum menyelesaikan pengiriman."}</p></div>:<span className="text-xs text-slate-400">Agregat SKU</span>}</td>
             </tr>;
           })}</tbody>
         </table>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono, Lora } from "next/font/google";
+import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 import MasterDataNavigationShell from "@/components/layout/master-data-navigation-shell";
 import MasterDataLoading from "@/components/layout/master-data-loading";
@@ -17,9 +17,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const lora = Lora({
-  variable: "--font-lora",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "900"],
   display: "swap",
 });
 
@@ -36,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} min-h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} min-h-full antialiased`}
     >
       <body className="min-h-screen w-full">
         <Suspense fallback={<MasterDataLoading />}>

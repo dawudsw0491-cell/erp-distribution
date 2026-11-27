@@ -1,20 +1,15 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
+import { CalendarDays, Clock3 } from "lucide-react";
 
 export default function DashboardClock() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    const updateClock = () => {
-      setCurrentTime(new Date());
-    };
-
+    const updateClock = () => setCurrentTime(new Date());
     updateClock();
-
-    const interval = setInterval(updateClock, 1000);
-
+    const interval = setInterval(updateClock, 30_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -23,6 +18,7 @@ export default function DashboardClock() {
         day: "2-digit",
         month: "short",
         year: "numeric",
+        timeZone: "Asia/Jakarta",
       }).format(currentTime)
     : "--";
 
@@ -31,40 +27,24 @@ export default function DashboardClock() {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
+        timeZone: "Asia/Jakarta",
       }).format(currentTime)
-    : "--:--:--";
+    : "--:--";
 
   return (
-    <div className="flex items-center gap-2.5 border-r border-slate-200 pr-4">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="3" y="4" width="18" height="17" rx="2" />
-          <path d="M16 2v4M8 2v4M3 10h18" />
-        </svg>
-      </div>
-
+    <div className="flex items-center gap-3 border-r border-slate-200 pr-3 sm:pr-5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+        <CalendarDays size={18} strokeWidth={2} />
+      </span>
       <div className="min-w-0">
-        <p className="text-[11px] font-medium capitalize text-slate-500">
-          {dateText}
-        </p>
-
-        <p
-          className="font-mono text-sm font-semibold tracking-wide tabular-nums text-slate-800"
-          aria-label={`Pukul ${timeText}`}
-        >
-          {timeText}
-        </p>
+        <p className="text-[11px] font-semibold text-slate-500">{dateText}</p>
+        <div className="mt-0.5 flex items-center gap-1.5 text-slate-800">
+          <Clock3 size={13} className="text-indigo-600" />
+          <time className="text-sm font-bold tabular-nums tracking-normal" aria-label={`Pukul ${timeText} WIB`}>
+            {timeText}
+          </time>
+          <span className="text-[10px] font-semibold text-slate-400">WIB</span>
+        </div>
       </div>
     </div>
   );

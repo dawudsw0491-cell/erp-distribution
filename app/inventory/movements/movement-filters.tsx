@@ -32,7 +32,7 @@ const movementLabels: Record<string, string> = {
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
-  posted: "Posted",
+  posted: "Selesai",
   cancelled: "Cancelled",
 };
 

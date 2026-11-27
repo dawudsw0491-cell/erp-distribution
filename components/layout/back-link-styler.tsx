@@ -13,7 +13,7 @@ export default function BackLinkStyler() {
         const anchor = node as HTMLAnchorElement;
         if (anchor.dataset.hexaBackStyled === "true") return;
         const label = (anchor.textContent ?? "").replace(/\s+/g, " ").trim();
-        if (!/^(?:←\s*)?Kembali\b/i.test(label)) return;
+        if (!/^(?:←\s*)?(?:Kembali(?:\s+ke)?\b.*|Daftar Returns|Daftar Stock Opname)$/i.test(label)) return;
         anchor.dataset.hexaBackStyled = "true";
         anchor.setAttribute("aria-label", label);
         anchor.textContent = "Back";

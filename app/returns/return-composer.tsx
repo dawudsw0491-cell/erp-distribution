@@ -106,20 +106,20 @@ export default function ReturnComposer({
         <label className="text-sm font-medium">Tanggal Retur<input type="date" name="return_date" required value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
         <label className="text-sm font-medium">Alasan Retur<input name="reason" required maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Contoh: unit rusak / salah kirim" /></label>
       </div>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50"><tr><th className="p-3">Pilih</th><th className="p-3">Produk</th><th className="p-3">Sumber</th><th className="p-3">Kuantitas Retur</th><th className="p-3">Unit / IMEI</th></tr></thead>
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-3 py-3 font-semibold">Pilih</th><th className="px-3 py-3 font-semibold">Produk / Varian</th><th className="px-3 py-3 font-semibold">Kuantitas Retur</th><th className="px-3 py-3 font-semibold">IMEI / Serial Unit</th></tr></thead>
           <tbody className="divide-y">{sourceLines.map((line) => {
             const selectedCodes = units[line.id] ?? [];
             const quantity = line.has_source_unit ? 1 : selectedCodes.length || Number(quantities[line.id] || "0");
             return (
-              <tr key={line.id}>
-                <td className="p-3"><input type="checkbox" checked={Boolean(selected[line.id])} onChange={(e) => setSelected((old) => ({ ...old, [line.id]: e.target.checked }))} /></td>
-                <td className="p-3"><p className="font-semibold">{line.product_name}</p><p className="text-xs text-slate-500">{line.variant_sku} · {line.variant_name}</p></td>
+              <tr key={line.id} className="border-t border-slate-100 align-middle transition-colors hover:bg-slate-50/70">
+                <td className="px-3 py-3"><input type="checkbox" checked={Boolean(selected[line.id])} onChange={(e) => setSelected((old) => ({ ...old, [line.id]: e.target.checked }))} /></td>
+                <td className="p-3"><p className="font-medium text-slate-800">{line.product_name}</p><p className="mt-0.5 text-xs text-slate-500">{line.variant_sku} · {line.variant_name}</p></td>
                 <td className="p-3">{line.source_quantity} unit</td>
                 <td className="p-3">{line.units.length || line.has_source_unit ? <span className="font-semibold">{selected[line.id] ? quantity : 0} unit</span> : <input type="number" min="0.001" max={line.source_quantity} step={line.tracking_type === "quantity" ? "0.001" : "1"} value={quantities[line.id] ?? ""} onChange={(e) => setQuantities((old) => ({ ...old, [line.id]: e.target.value }))} disabled={!selected[line.id]} placeholder="0" className="w-28 rounded-lg border px-2 py-1.5 disabled:bg-slate-100" />}</td>
                 <td className="p-3">
-                  {line.units.length ? <div className="max-h-32 min-w-44 space-y-1 overflow-y-auto rounded-lg border p-2">{line.units.map((unit) => <label key={unit.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedCodes.includes(unit.unit_code)} disabled={!selected[line.id]} onChange={(e) => setUnits((old) => ({ ...old, [line.id]: e.target.checked ? [...(old[line.id] ?? []), unit.unit_code] : (old[line.id] ?? []).filter((code) => code !== unit.unit_code) }))} /><span className="font-mono">{unit.unit_code}</span></label>)}</div> : <span className="text-xs text-slate-400">{line.has_source_unit ? "Unit mengikuti DO" : "Agregat SKU"}</span>}
+                  {line.units.length ? <div className="max-h-32 min-w-48 space-y-1 overflow-y-auto rounded-md bg-slate-50/80 p-2">{line.units.map((unit) => <label key={unit.id} className="flex items-center gap-2 rounded px-1 py-1 text-xs text-slate-700 hover:bg-white"><input type="checkbox" checked={selectedCodes.includes(unit.unit_code)} disabled={!selected[line.id]} onChange={(e) => setUnits((old) => ({ ...old, [line.id]: e.target.checked ? [...(old[line.id] ?? []), unit.unit_code] : (old[line.id] ?? []).filter((code) => code !== unit.unit_code) }))} /><span className="font-mono">{unit.unit_code}</span></label>)}</div> : <span className="text-xs text-slate-400">{line.has_source_unit ? "Identitas unit tidak tersedia" : "Agregat SKU — tanpa IMEI"}</span>}
                 </td>
               </tr>
             );

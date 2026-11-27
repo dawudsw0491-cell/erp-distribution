@@ -53,12 +53,12 @@ export default function LoginForm() {
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           placeholder="Masukkan ID pengguna"
-          className="w-full rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-3.5 text-sm text-slate-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.035)] outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80"
+          className="w-full rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-3.5 text-sm text-slate-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.035)] outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100/80"
         />
       </div>
 
       <div>
-        <label htmlFor="pin" className="mb-2 block text-sm font-medium text-slate-700">
+        <label htmlFor="pin" className="mb-2 block text-[13px] font-semibold tracking-wide text-slate-700">
           PIN Akses
         </label>
         <input
@@ -72,7 +72,7 @@ export default function LoginForm() {
           value={pin}
           onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
           placeholder="Masukkan PIN 4 digit"
-          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="w-full rounded-2xl border border-slate-200/90 bg-white/85 px-4 py-3.5 text-sm font-medium text-slate-800 shadow-[inset_0_1px_2px_rgba(30,64,175,0.035)] outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100/80"
         />
       </div>
 
@@ -85,7 +85,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full rounded-2xl bg-gradient-to-b from-blue-600 to-blue-700 px-4 py-3.5 text-sm font-bold tracking-wide text-white shadow-[0_8px_18px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] transition duration-200 hover:-translate-y-0.5 hover:from-blue-500 hover:to-blue-700 hover:shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-2xl bg-gradient-to-b from-indigo-500 to-blue-600 px-4 py-3.5 text-sm font-bold tracking-wide text-white shadow-[0_8px_18px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] transition duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-blue-600 hover:shadow-[0_12px_24px_rgba(37,99,235,0.3)] active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? "Memverifikasi..." : "Masuk ke Sistem"}
       </button>

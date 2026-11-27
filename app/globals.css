@@ -318,3 +318,29 @@ body:not(:has(.login-ambient)) .erp-sidebar {
   border-color: rgba(148,163,184,.2);
   box-shadow: 8px 0 28px rgba(47,66,115,.045);
 }
+
+
+/* Sidebar wordmark, vivid module icons, logout glass card and consistent table headings */
+.erp-sidebar .erp-nav-icon svg {
+  stroke-width: 2.35;
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 1px 4px rgba(69, 113, 221, .18));
+}
+.erp-sidebar nav a,
+.erp-sidebar nav button {
+  font-weight: 600;
+}
+.erp-sidebar nav a:focus-visible,
+.erp-sidebar nav button:focus-visible,
+.erp-sidebar button:focus-visible {
+  outline: 2px solid rgba(89, 101, 232, .65);
+  outline-offset: 2px;
+}
+body:not(:has(.login-ambient)) table thead th {
+  text-align: center !important;
+  vertical-align: middle;
+  font-weight: 800 !important;
+}
+body:not(:has(.login-ambient)) table thead th.text-left,
+body:not(:has(.login-ambient)) table thead th.text-right {
+  text-align: center !important;
+}

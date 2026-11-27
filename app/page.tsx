@@ -103,7 +103,6 @@ async function DashboardContent() {
   const todaySales = salesWeek.filter((order) => order.order_date === dateKey(today)).reduce((sum, order) => sum + Number(order.subtotal ?? 0), 0);
   const monthOrders = salesHistory.filter((order) => order.order_date >= dateKey(monthStart) && order.order_date <= dateKey(today));
   const monthSales = monthOrders.reduce((sum, order) => sum + Number(order.subtotal ?? 0), 0);
-  const displayName = dashboard.profile.full_name?.trim() || "Pengguna";
 
   const cards = [
     { title: "Produk Aktif", value: canMaster ? (masterError ? "Gagal dimuat" : number(products.length)) : "—", note: "Produk terdaftar", href: "/master-data" },
@@ -138,8 +137,7 @@ async function DashboardContent() {
               <div className="min-w-[86px]">
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Account</p>
                 <p className="mt-0.5 text-sm font-extrabold leading-tight text-slate-900">Owner</p>
-                <p className="mt-0.5 max-w-[150px] truncate text-[11px] font-medium text-slate-500">{displayName}</p>
-              </div>
+                              </div>
               <ShieldCheck size={16} className="ml-1 text-emerald-600" aria-label="Akun terverifikasi" />
             </div>
           </div>

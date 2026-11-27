@@ -168,10 +168,10 @@ export default function ErpSidebar({
 
           <div>
             <h1 aria-label="HEXA CORE" className="inline-flex items-center text-[17px] font-black leading-none tracking-[0.015em]">
-              <span className="text-slate-950 [text-shadow:0_1px_0_rgba(255,255,255,0.95),0_2px_3px_rgba(15,23,42,0.28)]">HEXA</span>
-              <span className="ml-[0.025em] text-white [-webkit-text-stroke:0.9px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_1px_#fff,0_0_3px_rgba(37,99,235,0.95),0_0_7px_rgba(37,99,235,0.8),0_1px_3px_rgba(15,23,42,0.2)]">CORE</span>
+              <span className="text-slate-950 [text-shadow:0_1px_0_rgba(255,255,255,0.85)]">HEXA</span>
+              <span className="ml-[0.025em] text-white [-webkit-text-stroke:0.85px_#2563eb] [paint-order:stroke_fill] [text-shadow:0_0_1px_#fff,0_1px_1px_rgba(37,99,235,0.45)]">CORE</span>
             </h1>
-            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 [text-shadow:0_1px_0_rgba(255,255,255,0.8)]">
               Enterprise ERP System
             </p>
           </div>

@@ -280,7 +280,7 @@ async function CustomerContent({
                 <th className="px-5 py-3">Termin</th>
                 <th className="px-5 py-3">Limit Kredit</th>
                 <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Aksi</th>
+                <th className="px-5 py-3 text-right">Kelola</th>
               </tr>
             </thead>
 

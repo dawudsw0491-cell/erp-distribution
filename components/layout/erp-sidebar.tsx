@@ -261,11 +261,7 @@ export default function ErpSidebar({
                           >
                             {child.icon && (
                               <span
-                                className={
-                                  childActive
-                                    ? "text-blue-600"
-                                    : "text-cyan-600 group-hover/child:text-indigo-600"
-                                }
+                                className="erp-nav-icon text-cyan-600 drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] group-hover/child:text-indigo-600"
                               >
                                 {child.icon}
                               </span>
@@ -301,11 +297,7 @@ export default function ErpSidebar({
               }`}
             >
               <span
-                className={`transition-colors duration-200 ${
-                  groupActive
-                    ? "text-blue-600"
-                    : "text-slate-400 group-hover:text-slate-700"
-                }`}
+                className="erp-nav-icon text-blue-500 drop-shadow-[0_0_5px_rgba(86,123,235,0.24)] group-hover:text-violet-600"
               >
                 {group.icon}
               </span>

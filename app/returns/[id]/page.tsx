@@ -8,7 +8,7 @@ import { approveReturnAction, cancelReturnDraftAction, processReturnAction, rest
 export const metadata = { title: "Detail Retur | HEXA CORE ERP" };
 const labels:Record<string,string>={draft:"Draft",approved:"Menunggu Proses",posted:"Selesai",cancelled:"Dibatalkan"};
 
-export default async function ReturnDetailPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{error?:string;created?:string;approved?:string;posted?:string;restocked?:string;restocked?:string;restocked?:string}>}) {
+export default async function ReturnDetailPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{error?:string;created?:string;approved?:string;posted?:string;restocked?:string}>}) {
   await connection();
   const {id}=await params, notice=await searchParams;
   const {supabase,user,profile}=await getAuthorizationContext("sales.view");
@@ -17,7 +17,7 @@ export default async function ReturnDetailPage({params,searchParams}:{params:Pro
   const {data:row,error}=await supabase.from("sales_returns").select("*,customers(customer_code,customer_name),suppliers(supplier_code,supplier_name),warehouses(warehouse_name),delivery_orders(delivery_order_number,sales_order_id),goods_receipts(receipt_number,purchase_order_id)").eq("id",id).maybeSingle();
   if(error) return <div className="p-8 text-red-700">Data retur gagal dimuat. Pastikan akses tabel dan Data API tersedia.</div>;
   if(!row) notFound();
-  const [{data:lines,error:linesError},canPost,canApproveCustomer,canApproveSupplier]=await Promise.all([
+  const [{data:lines,error:linesError},canPost,canApproveCustomer,canApproveSupplier,canRestock]=await Promise.all([
     supabase.from("sales_return_items").select("*").eq("return_id",id).order("created_at"),
     supabase.rpc("has_permission",{required_permission:"finance.approve"}),
     supabase.rpc("has_permission",{required_permission:"sales.return"}),

@@ -171,11 +171,11 @@ body {
 }
 .login-color-field {
   background:
-    radial-gradient(ellipse 48% 43% at 17% 37%, rgba(255, 77, 0, .96) 0%, rgba(255, 76, 26, .78) 34%, transparent 76%),
-    radial-gradient(ellipse 50% 42% at 24% 76%, rgba(0, 151, 235, .92) 0%, rgba(38, 169, 238, .68) 35%, transparent 76%),
-    radial-gradient(ellipse 38% 34% at 38% 55%, rgba(222, 34, 71, .58) 0%, transparent 76%),
+    radial-gradient(ellipse 48% 43% at 17% 37%, rgba(255, 82, 35, .98) 0%, rgba(255, 111, 75, .78) 34%, transparent 76%),
+    radial-gradient(ellipse 50% 42% at 24% 76%, rgba(0, 164, 224, .94) 0%, rgba(68, 190, 230, .72) 35%, transparent 76%),
+    radial-gradient(ellipse 38% 34% at 38% 55%, rgba(226, 62, 91, .54) 0%, transparent 76%),
     radial-gradient(ellipse 48% 40% at 80% 16%, rgba(255, 255, 255, .96) 0%, transparent 82%),
-    linear-gradient(125deg, #f7f7f5 0%, #edf2f6 55%, #fbfaf8 100%);
+    linear-gradient(125deg, #fff7f2 0%, #f4f5f5 52%, #effaff 100%);
   background-size: 140% 140%;
   animation: loginColorFlow 22s ease-in-out infinite alternate;
   transform: scale(1.08);

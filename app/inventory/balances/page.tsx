@@ -84,7 +84,6 @@ type StockDisplayRow = {
   averageCost: number;
   minimumStock: number;
   units?: UnitDetailRow[];
-  unitDataMismatch?: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -514,19 +513,12 @@ async function StockBalanceContent({
       unit.product_variant_id === row.product.id &&
       unit.warehouse_id === row.warehouse.id
     );
-    if (row.product.tracking_type === "quantity" || units.length === 0) {
-      return { ...row, units, unitDataMismatch: row.product.tracking_type !== "quantity" && row.onHand > 0 };
-    }
-    const availableUnits = units.filter((unit) => unit.unit_status === "available").length;
-    const onHandUnits = units.filter((unit) => !["sold", "in_transit", "returned_to_supplier"].includes(unit.unit_status)).length;
-    // inventory_balances remains the quantity/value ledger. Product Units are
-    // identity records only; never replace ledger balances with a unit count.
-    const unitDataMismatch =
-      availableUnits !== row.available || onHandUnits !== row.onHand;
+    // Display the actual registered unit status. Inventory totals remain
+    // sourced from the stock balance records; do not relabel every IMEI when
+    // aggregate quantities and serialized-unit records differ.
     return {
       ...row,
       units,
-      unitDataMismatch,
     };
   });
 
@@ -596,7 +588,7 @@ async function StockBalanceContent({
                 {currencyFormat(totals.value)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Berdasarkan inventory valuation
+                Berdasarkan penilaian persediaan
               </p>
             </div>
           </section>
@@ -764,15 +756,12 @@ async function StockBalanceContent({
                                       {row.units?.map((unit) => (
                                         <li key={unit.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-1.5">
                                           <span className="font-mono">{(unit.product_unit_identifiers ?? []).map((identifier) => identifier.identifier_value).join(" / ") || unit.unit_code}</span>
-                                          <span className={row.unitDataMismatch ? "font-semibold text-amber-700" : "text-slate-500"}>{row.unitDataMismatch ? "status belum sinkron" : unit.unit_status}</span>
+                                          <span className="text-slate-500">{unit.unit_status}</span>
                                         </li>
                                       ))}
                                     </ul>
                                   ) : (
                                     <p className="mt-2 min-w-[220px] text-xs text-amber-700">Belum ada IMEI/unit tersimpan untuk varian dan gudang ini.</p>
-                                  )}
-                                  {row.unitDataMismatch && (
-                                    <p className="mt-2 min-w-[220px] rounded bg-amber-50 p-2 text-xs font-medium text-amber-800">Rekonsiliasi diperlukan: saldo ledger tersedia {numberFormat(row.available)} / on hand {numberFormat(row.onHand)}; unit IMEI tersedia {numberFormat((row.units ?? []).filter((unit) => unit.unit_status === "available").length)} / tercatat {numberFormat((row.units ?? []).filter((unit) => !["sold", "in_transit", "returned_to_supplier"].includes(unit.unit_status)).length)}. Angka saldo tetap mengikuti ledger inventory.</p>
                                   )}
                                 </details>
                               )}

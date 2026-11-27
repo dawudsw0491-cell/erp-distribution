@@ -41,7 +41,7 @@ export default function DeliveryOrderComposer({salesOrderId,lines,units,selected
           <thead className="bg-slate-50 text-xs text-slate-600"><tr><th className="px-3 py-3 font-semibold">Produk / SKU</th><th className="px-3 py-3 font-semibold">Sisa SO</th><th className="px-3 py-3 font-semibold">Kirim</th><th className="px-3 py-3 font-semibold">Unit / IMEI</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{lines.map(line=>{
             const selected=selectedUnits[line.id]??[];
-            const options=units.filter(unit=>unit.product_variant_id===line.product_variant_id);
+            const options=units.filter(unit=>unit.product_variant_id===line.product_variant_id&&(selectedUnitsByLine[line.id]??[]).includes(unit.id));
             const tracked=line.tracking_type==="imei"||line.tracking_type==="serial";
             return <tr key={line.id} className="align-top">
               <td className="px-3 py-3"><p className="font-medium">{line.product_name} {line.variant_name}</p><p className="text-xs text-slate-500">{line.variant_sku}</p></td>

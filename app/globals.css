@@ -484,3 +484,67 @@ body:not(:has(.login-ambient)) main section:has(> div > table) td,
 body:not(:has(.login-ambient)) main section:has(> div > table) th {
   border-bottom-color: #e5e7eb !important;
 }
+
+
+/* Final polish for the shared HEXA wordmark and page heading. */
+body:not(:has(.login-ambient)) .erp-sidebar .hexa-wordmark {
+  text-shadow: 0 1px 1px rgba(15, 23, 42, .10);
+}
+body:not(:has(.login-ambient)) .erp-sidebar .hexa-wordmark span:first-child {
+  color: #111827;
+  text-shadow: 0 1px 0 rgba(255,255,255,.9);
+}
+body:not(:has(.login-ambient)) .erp-sidebar .hexa-wordmark span:last-child {
+  text-shadow: 0 0 1px #fff, 0 1px 1px rgba(37,99,235,.24);
+}
+body:not(:has(.login-ambient)) .erp-sidebar .hexa-enterprise-label {
+  color: #64748b;
+  font-weight: 600;
+  text-shadow: 0 1px 0 rgba(255,255,255,.72);
+  letter-spacing: .12em;
+}
+body:not(:has(.login-ambient)) main .hexa-page-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+}
+body:not(:has(.login-ambient)) main .hexa-page-title::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 1.25em;
+  flex: 0 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5965e8, #3988f5 55%, #42c5df);
+}
+
+/* User management tables: more breathing room and neutral grid lines. */
+body:not(:has(.login-ambient)) main section:has(> div > table) {
+  padding: 1.25rem;
+  gap: 1.15rem;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) > div:has(> table) {
+  margin: .25rem 0 0;
+  padding: .5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: .65rem;
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(246,249,255,.96));
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) table {
+  border-radius: .45rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) thead th {
+  text-align: center;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1px solid #d1d5db !important;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) tbody td {
+  border-bottom: 1px solid #e5e7eb !important;
+}
+body:not(:has(.login-ambient)) main section:has(> div > table) tbody tr:last-child td {
+  border-bottom: 0 !important;
+}

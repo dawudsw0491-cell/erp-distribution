@@ -15,7 +15,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), Roboto, Arial, sans-serif;
 }
 
 
@@ -192,4 +192,129 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .login-color-field { animation: none; }
+}
+
+
+/* HEXA CORE enterprise visual system — presentation only */
+:root {
+  --hexa-indigo: #5965e8;
+  --hexa-blue: #3988f5;
+  --hexa-cyan: #42c5df;
+  --hexa-violet: #8874ed;
+  --hexa-ink: #20283b;
+  --hexa-muted: #64748b;
+  --hexa-surface: rgba(255,255,255,.88);
+  --hexa-line: rgba(148,163,184,.22);
+}
+body:not(:has(.login-ambient)) {
+  font-family: var(--font-roboto), Roboto, Arial, sans-serif !important;
+  color: var(--hexa-ink);
+  background: #f1f4fa;
+}
+body:not(:has(.login-ambient)) :is(input,select,textarea,button) {
+  font-family: inherit;
+}
+body:not(:has(.login-ambient)) :is(header, footer) :is(h1,h2,h3,p,span,a,button) {
+  font-weight: 700;
+}
+body:not(:has(.login-ambient)) main {
+  background-color: #f2f5fb;
+}
+body:not(:has(.login-ambient)) [class~="bg-slate-100"] {
+  background-color: #f1f4fa !important;
+}
+body:not(:has(.login-ambient)) [class~="bg-slate-50"] {
+  background-color: #f5f8ff !important;
+}
+body:not(:has(.login-ambient)) [class~="bg-white"] {
+  background-color: rgba(255,255,255,.91) !important;
+}
+body:not(:has(.login-ambient)) [class~="border-slate-200"],
+body:not(:has(.login-ambient)) [class~="border-slate-100"] {
+  border-color: rgba(148,163,184,.24) !important;
+}
+body:not(:has(.login-ambient)) [class~="text-slate-900"] {
+  color: #20283b !important;
+}
+body:not(:has(.login-ambient)) [class~="text-slate-800"] {
+  color: #303b52 !important;
+}
+body:not(:has(.login-ambient)) [class~="text-slate-600"],
+body:not(:has(.login-ambient)) [class~="text-slate-500"] {
+  color: #68758c !important;
+}
+body:not(:has(.login-ambient)) [class~="text-blue-700"],
+body:not(:has(.login-ambient)) [class~="text-blue-600"] {
+  color: #5362d9 !important;
+}
+body:not(:has(.login-ambient)) [class~="bg-blue-50"] {
+  background: linear-gradient(110deg, rgba(91,105,235,.12), rgba(65,173,226,.10)) !important;
+}
+body:not(:has(.login-ambient)) [class~="bg-blue-600"],
+body:not(:has(.login-ambient)) [class~="bg-blue-700"] {
+  background: linear-gradient(110deg, #5866e8 0%, #477fe9 52%, #39a9d8 100%) !important;
+}
+body:not(:has(.login-ambient)) [class*="rounded-xl"][class*="bg-white"],
+body:not(:has(.login-ambient)) [class*="rounded-2xl"][class*="bg-white"],
+body:not(:has(.login-ambient)) [class*="rounded-lg"][class*="bg-white"] {
+  border-color: rgba(148,163,184,.22);
+  box-shadow: 0 10px 28px rgba(58,79,132,.055), inset 0 1px 0 rgba(255,255,255,.92);
+}
+body:not(:has(.login-ambient)) table {
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #303b52;
+}
+body:not(:has(.login-ambient)) table thead {
+  background: linear-gradient(100deg, #edf2ff 0%, #edf5ff 58%, #eaf8fc 100%) !important;
+}
+body:not(:has(.login-ambient)) table thead th {
+  color: #4b5874 !important;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .025em;
+  border-bottom: 1px solid rgba(119,139,190,.22);
+}
+body:not(:has(.login-ambient)) table tbody tr {
+  transition: background-color .16s ease, box-shadow .16s ease;
+}
+body:not(:has(.login-ambient)) table tbody tr:hover {
+  background: rgba(231,239,255,.62);
+}
+body:not(:has(.login-ambient)) table tbody td {
+  border-bottom-color: rgba(148,163,184,.16);
+}
+body:not(:has(.login-ambient)) input:not([type="checkbox"]):not([type="radio"]),
+body:not(:has(.login-ambient)) select,
+body:not(:has(.login-ambient)) textarea {
+  border-color: rgba(148,163,184,.32);
+  background-color: rgba(255,255,255,.92);
+  border-radius: .75rem;
+}
+body:not(:has(.login-ambient)) input:focus,
+body:not(:has(.login-ambient)) select:focus,
+body:not(:has(.login-ambient)) textarea:focus {
+  border-color: #7a86ee;
+  box-shadow: 0 0 0 3px rgba(104,119,237,.13);
+  outline: none;
+}
+body:not(:has(.login-ambient)) button[class*="bg-blue"],
+body:not(:has(.login-ambient)) a[class*="bg-blue"] {
+  background-image: linear-gradient(110deg, #5866e8 0%, #477fe9 52%, #39a9d8 100%);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 5px 14px rgba(79,111,220,.18);
+}
+body:not(:has(.login-ambient)) button[class*="bg-blue"]:hover,
+body:not(:has(.login-ambient)) a[class*="bg-blue"]:hover {
+  filter: saturate(1.08) brightness(1.025);
+}
+body:not(:has(.login-ambient)) [class*="shadow-sm"],
+body:not(:has(.login-ambient)) [class*="shadow-md"] {
+  --tw-shadow-color: rgba(58,79,132,.07);
+}
+body:not(:has(.login-ambient)) .erp-sidebar {
+  background: rgba(255,255,255,.94);
+  border-color: rgba(148,163,184,.2);
+  box-shadow: 8px 0 28px rgba(47,66,115,.045);
 }

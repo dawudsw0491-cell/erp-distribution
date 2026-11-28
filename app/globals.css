@@ -611,3 +611,31 @@ body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider:has(+ h1) {
 body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider-hidden {
   display: none !important;
 }
+
+
+/* Standard page heading: compact uppercase title with one blue accent. */
+body:not(:has(.login-ambient)) main h1.hexa-page-title {
+  font-size: 1.35rem !important;
+  line-height: 1.35 !important;
+  font-weight: 750 !important;
+  letter-spacing: -.025em;
+  text-transform: uppercase;
+  gap: .55rem !important;
+}
+body:not(:has(.login-ambient)) main h1.hexa-page-title::before {
+  width: 4px !important;
+  height: 1.22em !important;
+  flex: 0 0 4px !important;
+  border-radius: 999px;
+}
+body:not(:has(.login-ambient)) main .hexa-glass-action {
+  border: 1px solid rgba(80,99,220,.28) !important;
+  border-radius: .7rem !important;
+  background: linear-gradient(110deg, #5866e8 0%, #477fe9 52%, #39a9d8 100%) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 6px 16px rgba(79,111,220,.18), inset 0 1px 0 rgba(255,255,255,.22) !important;
+}
+body:not(:has(.login-ambient)) main .hexa-glass-action:hover {
+  filter: saturate(1.08) brightness(1.035);
+}

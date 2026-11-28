@@ -75,26 +75,9 @@ async function NewCustomerContent({
 
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-5xl p-6 lg:p-8">
-          <div className="mb-6 text-sm text-gray-500">
-            <Link
-              href="/master-data"
-              className="hover:text-blue-600"
-            >
-              Master Data
-            </Link>
-            {" / "}
-            <Link
-              href="/customers"
-              className="hover:text-blue-600"
-            >
-              Master Pelanggan
-            </Link>
-            {" / Tambah"}
-          </div>
-
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="hexa-page-title text-2xl font-bold text-gray-900">
                 Tambah Pelanggan
               </h1>
               <p className="mt-1 text-sm text-gray-500">

@@ -584,3 +584,24 @@ body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider {
   line-height: 0;
   vertical-align: middle;
 }
+
+
+/* Primary action links/buttons share the same high-contrast glass gradient. */
+body:not(:has(.login-ambient)) main a[class*="bg-blue"],
+body:not(:has(.login-ambient)) main button[class*="bg-blue"],
+body:not(:has(.login-ambient)) main a[class*="bg-indigo"],
+body:not(:has(.login-ambient)) main button[class*="bg-indigo"],
+body:not(:has(.login-ambient)) main a[class*="bg-cyan"],
+body:not(:has(.login-ambient)) main button[class*="bg-cyan"],
+body:not(:has(.login-ambient)) main a[class*="bg-sky"],
+body:not(:has(.login-ambient)) main button[class*="bg-sky"] {
+  background-image: linear-gradient(110deg, #5866e8 0%, #477fe9 52%, #39a9d8 100%) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  border-color: rgba(75, 105, 225, .35);
+  box-shadow: 0 6px 16px rgba(79, 111, 220, .2), inset 0 1px 0 rgba(255,255,255,.2);
+  text-decoration: none !important;
+}
+body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider:has(+ h1) {
+  display: none !important;
+}

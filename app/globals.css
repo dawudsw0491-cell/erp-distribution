@@ -568,3 +568,19 @@ body:not(:has(.login-ambient)) main section:has(table) tbody td,
 body:not(:has(.login-ambient)) main div:has(table) tbody td {
   border-bottom: 1px solid #e5e7eb !important;
 }
+
+
+/* Breadcrumb separator: use the HEXA blue vertical accent, never a slash. */
+body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider {
+  display: inline-block;
+  width: 3px;
+  height: 1.25rem;
+  flex: 0 0 3px;
+  margin-inline: .2rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5965e8 0%, #3988f5 58%, #42c5df 100%);
+  color: transparent !important;
+  font-size: 0;
+  line-height: 0;
+  vertical-align: middle;
+}

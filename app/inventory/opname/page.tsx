@@ -405,7 +405,7 @@ async function StockOpnameContent({
                         "Pembuat",
                         "Tanggal Dibuat",
                         "Snapshot",
-                        "Tindakan",
+                        "Detail",
                       ].map((heading) => (
                         <th
                           key={heading}

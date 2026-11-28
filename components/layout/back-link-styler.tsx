@@ -39,8 +39,11 @@ export default function BackLinkStyler() {
         heading.classList.add("hexa-page-title");
 
         // Remove compact breadcrumb rows directly above the page title.
-        const previous = heading.previousElementSibling as HTMLElement | null;
-        if (previous) {
+        const candidates = [
+          heading.previousElementSibling,
+          heading.parentElement?.parentElement?.previousElementSibling,
+        ].filter(Boolean) as HTMLElement[];
+        candidates.forEach((previous) => {
           const text = (previous.textContent ?? "").replace(/\s+/g, " ").trim();
           const isBreadcrumb = text.includes("/") && text.length < 180 &&
             (previous.tagName === "P" || previous.tagName === "DIV" || previous.tagName === "NAV");
@@ -51,7 +54,7 @@ export default function BackLinkStyler() {
           if (previous.classList.contains("hexa-breadcrumb-divider")) {
             previous.classList.add("hexa-breadcrumb-divider-hidden");
           }
-        }
+        });
       });
 
       // Normalize outlined add-row/add-item actions without changing labels or handlers.

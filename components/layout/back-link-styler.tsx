@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-/** Apply shared Back, breadcrumb and page-title treatments across ERP routes. */
+/** Shared ERP page-title, Back-link, breadcrumb and action-button consistency. */
 export default function BackLinkStyler() {
   const pathname = usePathname();
 
@@ -13,7 +13,7 @@ export default function BackLinkStyler() {
         const anchor = node as HTMLAnchorElement;
         if (anchor.dataset.hexaBackStyled === "true") return;
         const label = (anchor.textContent ?? "").replace(/\s+/g, " ").trim();
-        if (!/^(?:←\s*)?(?:Kembali(?:\s+ke)?\b.*|Daftar Returns|Daftar Stock Opname)$/i.test(label)) return;
+        if (!/^(?:←\s*.+|Kembali(?:\s+ke)?\b.*|Daftar Returns|Daftar Stock Opname)$/i.test(label)) return;
         anchor.dataset.hexaBackStyled = "true";
         anchor.setAttribute("aria-label", label);
         anchor.textContent = "Back";
@@ -30,8 +30,6 @@ export default function BackLinkStyler() {
         separator.classList.add("hexa-breadcrumb-divider");
       });
 
-      // Every real page title receives one consistent blue title accent.
-      // Error-state headings (red/amber) are deliberately left unchanged.
       document.querySelectorAll("main h1").forEach((node) => {
         const heading = node as HTMLHeadingElement;
         if (heading.classList.contains("text-red-700") ||
@@ -39,9 +37,29 @@ export default function BackLinkStyler() {
             heading.classList.contains("text-red-600") ||
             heading.classList.contains("text-amber-600")) return;
         heading.classList.add("hexa-page-title");
-        const previous = heading.previousElementSibling;
-        if (previous?.classList.contains("hexa-breadcrumb-divider")) {
-          previous.classList.add("hexa-breadcrumb-divider-hidden");
+
+        // Remove compact breadcrumb rows directly above the page title.
+        const previous = heading.previousElementSibling as HTMLElement | null;
+        if (previous) {
+          const text = (previous.textContent ?? "").replace(/\s+/g, " ").trim();
+          const isBreadcrumb = text.includes("/") && text.length < 180 &&
+            (previous.tagName === "P" || previous.tagName === "DIV" || previous.tagName === "NAV");
+          if (isBreadcrumb) {
+            previous.hidden = true;
+            previous.setAttribute("aria-hidden", "true");
+          }
+          if (previous.classList.contains("hexa-breadcrumb-divider")) {
+            previous.classList.add("hexa-breadcrumb-divider-hidden");
+          }
+        }
+      });
+
+      // Normalize outlined add-row/add-item actions without changing labels or handlers.
+      document.querySelectorAll("main button").forEach((node) => {
+        const button = node as HTMLButtonElement;
+        const label = (button.textContent ?? "").replace(/\s+/g, " ").trim();
+        if (/^\+\s*(Tambah Baris|Tambah Item)$/i.test(label)) {
+          button.classList.add("hexa-glass-action");
         }
       });
     };

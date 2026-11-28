@@ -605,3 +605,9 @@ body:not(:has(.login-ambient)) main button[class*="bg-sky"] {
 body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider:has(+ h1) {
   display: none !important;
 }
+
+
+/* One accent per page: suppress the breadcrumb divider immediately before a title. */
+body:not(:has(.login-ambient)) main .hexa-breadcrumb-divider-hidden {
+  display: none !important;
+}

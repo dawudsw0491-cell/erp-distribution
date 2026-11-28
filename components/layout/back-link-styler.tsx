@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-/** Normalize shared Back links and breadcrumb separators across ERP modules. */
+/** Apply shared Back, breadcrumb and page-title treatments across ERP routes. */
 export default function BackLinkStyler() {
   const pathname = usePathname();
 
@@ -20,8 +20,6 @@ export default function BackLinkStyler() {
         anchor.classList.add("hexa-back-glass");
       });
 
-      // Replace visual slash separators only; slash characters in labels,
-      // ratios, identifiers and business data remain untouched.
       document.querySelectorAll("main span.text-slate-400").forEach((node) => {
         const separator = node as HTMLSpanElement;
         if (separator.dataset.hexaSeparatorStyled === "true") return;
@@ -30,6 +28,21 @@ export default function BackLinkStyler() {
         separator.textContent = "";
         separator.setAttribute("aria-hidden", "true");
         separator.classList.add("hexa-breadcrumb-divider");
+      });
+
+      // Every real page title receives one consistent blue title accent.
+      // Error-state headings (red/amber) are deliberately left unchanged.
+      document.querySelectorAll("main h1").forEach((node) => {
+        const heading = node as HTMLHeadingElement;
+        if (heading.classList.contains("text-red-700") ||
+            heading.classList.contains("text-amber-700") ||
+            heading.classList.contains("text-red-600") ||
+            heading.classList.contains("text-amber-600")) return;
+        heading.classList.add("hexa-page-title");
+        const previous = heading.previousElementSibling;
+        if (previous?.classList.contains("hexa-breadcrumb-divider")) {
+          previous.classList.add("hexa-breadcrumb-divider-hidden");
+        }
       });
     };
 
